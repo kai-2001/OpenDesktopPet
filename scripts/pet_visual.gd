@@ -7,6 +7,7 @@ const SHEETS := {
 	"roll": ["roll.png", 4],
 	"belly_clap": ["belly-clap.png", 4],
 	"sleep": ["sleep.png", 4],
+	"clap": ["clap.png", 4],
 	"actions": ["actions.png", 4],
 	"drag": ["drag.png", 3],
 }
@@ -58,7 +59,9 @@ func _process(delta: float) -> void:
 	if _idle_clock >= 2.6:
 		_idle_clock = 0.0
 		_idle_step = (_idle_step + 1) % 4
-		var idle_frames := [0, 1, 2, 0]
+		# Use a true two-eye blink. Frame 1 is a wink and is intentionally not
+		# part of the automatic idle loop.
+		var idle_frames := [0, 2, 0, 3]
 		_show_frame("idle", idle_frames[_idle_step])
 
 
@@ -108,7 +111,7 @@ func play_action(action: String) -> void:
 	var serial := _animation_serial
 	match action:
 		"clap", "happy":
-			await _pose_action("actions", 0, 3, 0.16, serial)
+			await _sequence("clap", [0, 1, 2, 1, 0, 1, 2, 1, 0], 0.12, serial)
 		"eat":
 			await _pose_action("actions", 1, 4, 0.28, serial)
 		"drink":
@@ -162,8 +165,14 @@ func _show_frame(sheet: String, frame: int) -> void:
 	if sheet == "idle":
 		# The generated poses have slightly different drawing centers. Anchor
 		# their body mass so blinking changes only the face, not pet position.
-		var idle_offsets := [Vector2(-5, 0), Vector2(5, 0), Vector2(11, 0), Vector2(20, 0)]
+		var idle_offsets := [Vector2(0, 0), Vector2(12.4, 0), Vector2(17.05, 0), Vector2(26.65, 0.15)]
 		_sprite.position = idle_offsets[clampi(frame, 0, 3)]
+	elif sheet == "clap":
+		var clap_offsets := [
+			Vector2(0, 0), Vector2(7.3, -0.8),
+			Vector2(15.5, -2.5), Vector2(24.0, -2.0)
+		]
+		_sprite.position = clap_offsets[clampi(frame, 0, 3)]
 	# Generated sheets share a 2048x768 canvas. This keeps the visible pet near
 	# the original desktop footprint while every pose remains a complete drawing.
 	_sprite.scale = Vector2.ONE * 0.31

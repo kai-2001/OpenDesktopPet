@@ -15,7 +15,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await _capture("01_idle.png")
 	_pet.play_action("clap")
-	await get_tree().create_timer(0.22).timeout
+	await get_tree().create_timer(0.3).timeout
 	await _capture("02_clap.png")
 	await get_tree().create_timer(0.9).timeout
 	_pet.play_action("eat")

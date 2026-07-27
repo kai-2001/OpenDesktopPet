@@ -209,7 +209,7 @@ func _single_click_reaction() -> void:
 
 func _setup_idle_behavior() -> void:
 	var timer := Timer.new()
-	timer.wait_time = randf_range(8.0, 14.0)
+	timer.wait_time = randf_range(10.0, 16.0)
 	timer.one_shot = true
 	timer.timeout.connect(func() -> void:
 		_idle_count += 1
@@ -217,7 +217,7 @@ func _setup_idle_behavior() -> void:
 			_run_autonomous_action()
 			if _idle_count % 3 == 0:
 				say(["我在這裡。", "滾一下好了。", "今天也要照顧我。"].pick_random(), 2.5)
-		timer.wait_time = randf_range(8.0, 16.0)
+		timer.wait_time = randf_range(11.0, 19.0)
 		timer.start()
 	)
 	add_child(timer)
