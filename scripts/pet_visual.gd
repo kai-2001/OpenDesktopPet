@@ -14,9 +14,11 @@ var _busy := false
 var _dragging := false
 var _drag_is_moving := false
 var _visual_size := 1.0
+var _home_position := Vector2.ZERO
 
 
 func _ready() -> void:
+	_home_position = position
 	_sprite = Sprite2D.new()
 	add_child(_sprite)
 	_load_sheet("idle", IDLE_SHEET, 4)
@@ -93,7 +95,7 @@ func play_action(action: String) -> void:
 			await get_tree().create_timer(0.4).timeout
 	_show_idle()
 	rotation = 0.0
-	position = Vector2.ZERO
+	position = _home_position
 	scale = Vector2.ONE
 	_busy = false
 
@@ -157,8 +159,8 @@ func _care_pose(frame: int, duration: float) -> void:
 	_show_frame("care", frame)
 	var tween := create_tween()
 	tween.set_loops(3)
-	tween.tween_property(self, "position:y", -4.0, 0.18)
-	tween.tween_property(self, "position:y", 0.0, 0.18)
+	tween.tween_property(self, "position:y", _home_position.y - 4.0, 0.18)
+	tween.tween_property(self, "position:y", _home_position.y, 0.18)
 	await get_tree().create_timer(duration).timeout
 	tween.kill()
 
@@ -185,8 +187,8 @@ func _soft_bounce(count: int) -> void:
 	var tween := create_tween()
 	tween.set_loops(count)
 	tween.set_trans(Tween.TRANS_SINE)
-	tween.tween_property(self, "position:y", -12.0, 0.16)
-	tween.tween_property(self, "position:y", 0.0, 0.18)
+	tween.tween_property(self, "position:y", _home_position.y - 12.0, 0.16)
+	tween.tween_property(self, "position:y", _home_position.y, 0.18)
 	await tween.finished
 
 
