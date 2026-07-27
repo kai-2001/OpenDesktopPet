@@ -4,6 +4,7 @@ extends Node2D
 @onready var pet: Node2D = $PetVisual
 @onready var bubble: PanelContainer = $SpeechBubble
 @onready var bubble_label: Label = $SpeechBubble/Margin/Label
+@onready var bubble_tail: Polygon2D = $SpeechTail
 @onready var wish_badge: Label = $WishBadge
 @onready var context_menu: PopupMenu = $ContextMenu
 var _stats_window: Window
@@ -131,9 +132,11 @@ func say(text: String, seconds := 8.0) -> void:
 	var token := _bubble_token
 	bubble_label.text = text
 	bubble.visible = true
+	bubble_tail.visible = true
 	await get_tree().create_timer(seconds).timeout
 	if token == _bubble_token:
 		bubble.visible = false
+		bubble_tail.visible = false
 
 
 func _finish_window_setup() -> void:
@@ -540,11 +543,15 @@ func _place_bottom_right() -> void:
 
 func _style_bubble() -> void:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#f3fcfdee")
-	style.border_color = Color("#40859b")
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(16)
-	style.shadow_color = Color(0, 0, 0, 0.18)
-	style.shadow_size = 6
+	style.bg_color = Color("#f3fcfd")
+	style.border_color = Color("#347f99")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(18)
+	style.shadow_color = Color(0, 0, 0, 0.38)
+	style.shadow_size = 8
+	style.shadow_offset = Vector2(0, 3)
 	bubble.add_theme_stylebox_override("panel", style)
+	bubble_tail.color = style.bg_color
 	bubble_label.add_theme_color_override("font_color", Color("#183247"))
+	bubble_label.add_theme_color_override("font_outline_color", Color("#ffffff"))
+	bubble_label.add_theme_constant_override("outline_size", 1)
