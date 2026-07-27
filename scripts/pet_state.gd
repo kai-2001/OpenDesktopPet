@@ -30,6 +30,7 @@ var data: Dictionary = {
 	"wish_action": "",
 	"wish_expires_at": 0,
 	"next_wish_at": 0,
+	"wish_intro_seen": false,
 	"last_pet_reward_at": 0,
 }
 
@@ -236,6 +237,7 @@ func _update_wish() -> void:
 	var action := _choose_wish()
 	data.wish_action = action
 	data.wish_expires_at = now + WISH_DURATION_SECONDS
+	data.wish_intro_seen = true
 	message_requested.emit(_wish_announcement(action))
 	_commit()
 
@@ -293,6 +295,12 @@ func _wish_announcement(action: String) -> String:
 
 func _ensure_wish_schedule() -> void:
 	var now := _now()
+	if not bool(data.wish_intro_seen) and String(data.wish_action).is_empty():
+		# Existing saves created before the wish tutorial field should not be
+		# forced to wait for the normal 20–40 minute cycle.
+		data.next_wish_at = now + randi_range(30, 60)
+		data.save_version = SAVE_VERSION
+		return
 	if int(data.next_wish_at) <= 0 and String(data.wish_action).is_empty():
 		data.next_wish_at = now + randi_range(FIRST_WISH_MIN_SECONDS, FIRST_WISH_MAX_SECONDS)
 	data.save_version = SAVE_VERSION

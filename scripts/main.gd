@@ -4,11 +4,13 @@ extends Node2D
 @onready var pet: Node2D = $PetVisual
 @onready var bubble: PanelContainer = $SpeechBubble
 @onready var bubble_label: Label = $SpeechBubble/Margin/Label
+@onready var wish_badge: Label = $WishBadge
 @onready var context_menu: PopupMenu = $ContextMenu
 var _stats_window: Window
 var _stats_status: Label
 var _wish_status: Label
 var _unlock_status: Label
+var _last_message_status: Label
 var _stats_bars: Dictionary = {}
 var _dragging := false
 var _drag_moved := false
@@ -25,6 +27,7 @@ var _last_user_activity_ms := 0
 var _auto_move_tween: Tween
 var _known_unlocked_actions: Dictionary = {}
 var _unlock_tracking_ready := false
+var _last_state_message := "尚無紀錄"
 
 var _pet_hit_polygon := PackedVector2Array([
 	Vector2(70, 100), Vector2(210, 100), Vector2(245, 170),
@@ -123,7 +126,7 @@ func _notification(what: int) -> void:
 		get_tree().quit()
 
 
-func say(text: String, seconds := 3.0) -> void:
+func say(text: String, seconds := 4.5) -> void:
 	_bubble_token += 1
 	var token := _bubble_token
 	bubble_label.text = text
@@ -154,9 +157,16 @@ func _update_cursor(global_mouse: Vector2i) -> void:
 
 func _connect_signals() -> void:
 	state.changed.connect(_refresh_ui)
-	state.message_requested.connect(say)
+	state.message_requested.connect(_show_state_message)
 	state.action_requested.connect(pet.play_action)
 	_refresh_ui(state.data)
+
+
+func _show_state_message(text: String) -> void:
+	_last_state_message = text.replace("\n", "　")
+	if is_instance_valid(_last_message_status):
+		_last_message_status.text = "最近訊息：%s" % _last_state_message
+	say(text, 5.0)
 
 
 func _setup_context_menu() -> void:
@@ -276,8 +286,8 @@ func _build_stats_window() -> void:
 	_stats_bars.clear()
 	_stats_window = Window.new()
 	_stats_window.title = "桌寵詳細狀態"
-	_stats_window.size = Vector2i(400, 680)
-	_stats_window.min_size = Vector2i(400, 680)
+	_stats_window.size = Vector2i(400, 720)
+	_stats_window.min_size = Vector2i(400, 720)
 	_stats_window.unresizable = true
 	# A child Window is already transient to the desktop-pet window. Marking it
 	# always-on-top as well is invalid on Windows and prevents reliable popup.
@@ -331,6 +341,11 @@ func _build_stats_window() -> void:
 	_unlock_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_unlock_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(_unlock_status)
+
+	_last_message_status = _new_label("最近訊息：%s" % _last_state_message, 13, Color("#b9ced5"))
+	_last_message_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_last_message_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(_last_message_status)
 	content.add_child(HSeparator.new())
 
 	var action_title := _new_label("照顧操作", 16, Color("#e9fbff"))
@@ -455,6 +470,9 @@ func _prime_stats_window() -> void:
 func _refresh_ui(snapshot: Dictionary) -> void:
 	pet.set_progression(snapshot)
 	_update_unlock_tracking()
+	var wish_action := String(snapshot.get("wish_action", ""))
+	wish_badge.visible = not wish_action.is_empty()
+	wish_badge.text = _wish_icon(wish_action)
 	var level_text := "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
 		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20
 	]
@@ -472,6 +490,22 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 			(_stats_bars[key] as ProgressBar).value = float(snapshot[key])
 	if context_menu.item_count > 0:
 		context_menu.set_item_text(0, level_text)
+
+
+func _wish_icon(action: String) -> String:
+	match action:
+		"feed":
+			return "🥕"
+		"water":
+			return "💧"
+		"sleep":
+			return "💤"
+		"work":
+			return "🪙"
+		"pet":
+			return "✋"
+		_:
+			return ""
 
 
 func _update_unlock_tracking() -> void:

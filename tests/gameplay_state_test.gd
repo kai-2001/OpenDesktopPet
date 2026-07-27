@@ -18,6 +18,12 @@ func _init() -> void:
 	state.data.wish_action = ""
 	state.data.next_wish_at = 0
 	state.data.wish_expires_at = 0
+	state.data.wish_intro_seen = false
+
+	state.data.next_wish_at = state._now() + 9999
+	state._ensure_wish_schedule()
+	var first_wait := int(state.data.next_wish_at) - state._now()
+	_assert_true(first_wait >= 30 and first_wait <= 60, "first wish migration schedule")
 
 	state._decay_accumulator = 0.0
 	state._process(600.0)
@@ -37,6 +43,7 @@ func _init() -> void:
 	state._update_wish()
 	_assert_true(not String(state.data.wish_action).is_empty(), "due wish should be generated")
 	_assert_true(int(state.data.wish_expires_at) > state._now(), "wish should have an expiry")
+	_assert_true(bool(state.data.wish_intro_seen), "first wish should be marked as seen")
 
 	state.data.hunger = 100.0
 	state.data.thirst = 100.0
