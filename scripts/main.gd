@@ -15,6 +15,15 @@ var _drag_origin := Vector2i.ZERO
 var _bubble_token := 0
 var _idle_count := 0
 var _stats_open_timer: Timer
+var _last_global_mouse := Vector2i.ZERO
+var _last_drag_mouse := Vector2i.ZERO
+var _last_user_activity_ms := 0
+var _auto_move_tween: Tween
+
+var _pet_hit_polygon := PackedVector2Array([
+	Vector2(70, 100), Vector2(210, 100), Vector2(245, 170),
+	Vector2(220, 310), Vector2(60, 310), Vector2(35, 170)
+])
 
 
 func _ready() -> void:
@@ -26,17 +35,28 @@ func _ready() -> void:
 	_connect_signals()
 	_setup_context_menu()
 	_setup_idle_behavior()
+	_last_global_mouse = DisplayServer.mouse_get_position()
+	_last_user_activity_ms = Time.get_ticks_msec()
 	call_deferred("_finish_window_setup")
 	call_deferred("_prime_stats_window")
 	say("雙擊摸摸我，右鍵可以直接操作！", 4.0)
 
 
 func _process(_delta: float) -> void:
+	var mouse := DisplayServer.mouse_get_position()
+	if mouse.distance_to(_last_global_mouse) > 1.0:
+		_last_user_activity_ms = Time.get_ticks_msec()
+		if is_instance_valid(_auto_move_tween):
+			_auto_move_tween.kill()
+			_auto_move_tween = null
+	_last_global_mouse = mouse
+	_update_cursor(mouse)
 	if not _dragging:
 		return
-	var mouse := DisplayServer.mouse_get_position()
 	if mouse.distance_to(_drag_origin) > 4.0:
 		_drag_moved = true
+	pet.set_drag_motion(mouse.distance_to(_last_drag_mouse) > 1.0)
+	_last_drag_mouse = mouse
 	DisplayServer.window_set_position(mouse - _drag_offset)
 
 
@@ -53,11 +73,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			_dragging = true
 			_drag_moved = false
 			_drag_origin = DisplayServer.mouse_get_position()
+			_last_drag_mouse = _drag_origin
 			_drag_offset = _drag_origin - DisplayServer.window_get_position()
 			pet.set_dragging(true)
+			Input.set_default_cursor_shape(Input.CURSOR_DRAG)
 		else:
 			_dragging = false
 			pet.set_dragging(false)
+			Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
 			if not _drag_moved:
 				_single_click_reaction()
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
@@ -90,10 +113,16 @@ func _finish_window_setup() -> void:
 
 
 func _set_pet_passthrough() -> void:
-	get_window().mouse_passthrough_polygon = PackedVector2Array([
-		Vector2(70, 100), Vector2(210, 100), Vector2(245, 170),
-		Vector2(220, 310), Vector2(60, 310), Vector2(35, 170)
-	])
+	get_window().mouse_passthrough_polygon = _pet_hit_polygon
+
+
+func _update_cursor(global_mouse: Vector2i) -> void:
+	if _dragging:
+		Input.set_default_cursor_shape(Input.CURSOR_DRAG)
+		return
+	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
+	var over_pet := Geometry2D.is_point_in_polygon(local_mouse, _pet_hit_polygon)
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if over_pet else Input.CURSOR_ARROW)
 
 
 func _connect_signals() -> void:
@@ -165,19 +194,68 @@ func _single_click_reaction() -> void:
 
 func _setup_idle_behavior() -> void:
 	var timer := Timer.new()
-	timer.wait_time = randf_range(10.0, 16.0)
+	timer.wait_time = randf_range(8.0, 14.0)
 	timer.one_shot = true
 	timer.timeout.connect(func() -> void:
 		_idle_count += 1
-		if not context_menu.visible and not _dragging:
-			pet.play_action("wiggle")
+		if _can_act_autonomously():
+			_run_autonomous_action()
 			if _idle_count % 3 == 0:
 				say(["我在這裡。", "滾一下好了。", "今天也要照顧我。"].pick_random(), 2.5)
-		timer.wait_time = randf_range(10.0, 18.0)
+		timer.wait_time = randf_range(8.0, 16.0)
 		timer.start()
 	)
 	add_child(timer)
 	timer.start()
+
+
+func _can_act_autonomously() -> bool:
+	var mouse_idle_ms := Time.get_ticks_msec() - _last_user_activity_ms
+	return mouse_idle_ms >= 4500 \
+		and not context_menu.visible \
+		and not _stats_window.visible \
+		and not _dragging \
+		and not pet.is_busy()
+
+
+func _run_autonomous_action() -> void:
+	var choice := randi_range(0, 99)
+	if choice < 30:
+		_autonomous_small_roll()
+	elif choice < 58:
+		pet.play_action("clap")
+	elif choice < 78:
+		pet.play_action("belly_clap")
+	elif choice < 90:
+		pet.play_action("wiggle")
+	else:
+		pet.play_action("sleep")
+
+
+func _autonomous_small_roll() -> void:
+	if not _can_act_autonomously():
+		return
+	var screen := DisplayServer.window_get_current_screen()
+	if screen < 0:
+		screen = DisplayServer.get_primary_screen()
+	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var window_size := DisplayServer.window_get_size()
+	var start := DisplayServer.window_get_position()
+	var distance := randi_range(24, 48) * (-1 if randf() < 0.5 else 1)
+	var target_x := clampi(start.x + distance, usable.position.x, usable.end.x - window_size.x)
+	if target_x == start.x:
+		target_x = clampi(start.x - distance, usable.position.x, usable.end.x - window_size.x)
+	var target := Vector2i(target_x, start.y)
+	pet.play_action("roll")
+	_auto_move_tween = create_tween()
+	_auto_move_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_auto_move_tween.tween_method(
+		func(weight: float) -> void:
+			DisplayServer.window_set_position(Vector2i(Vector2(start).lerp(Vector2(target), weight))),
+		0.0, 1.0, 0.75
+	)
+	await _auto_move_tween.finished
+	_auto_move_tween = null
 
 
 func _build_stats_window() -> void:

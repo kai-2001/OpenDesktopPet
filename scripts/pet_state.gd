@@ -61,8 +61,8 @@ func feed() -> void:
 	data.mood = _limit(data.mood + 5.0)
 	data.care += 1
 	_add_xp(2)
-	action_requested.emit("clap")
-	message_requested.emit("好吃！開心拍手！")
+	action_requested.emit("eat")
+	message_requested.emit("好吃！一下就吃光了！")
 	_commit()
 
 
@@ -75,7 +75,7 @@ func water() -> void:
 	data.mood = _limit(data.mood + 2.0)
 	data.care += 1
 	_add_xp(1)
-	action_requested.emit("happy")
+	action_requested.emit("drink")
 	message_requested.emit("咕嚕咕嚕，好清爽！")
 	_commit()
 
@@ -161,4 +161,3 @@ func _apply_offline_progress() -> void:
 
 func _limit(value: float) -> float:
 	return clampf(value, 0.0, 100.0)
-
