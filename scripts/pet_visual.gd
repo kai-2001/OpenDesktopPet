@@ -1,10 +1,9 @@
 class_name PetVisual
 extends Node2D
 
-const IDLE_SHEET := "res://private_pets/active/idle-actions.png"
-const CARE_SHEET := "res://private_pets/active/care-actions.png"
-const MOVEMENT_SHEET := "res://private_pets/active/movement-actions.png"
-const LEGACY_SHEET := "res://private_pets/active/reference-sheet.png"
+const IDLE_SHEET := "res://private_pets/active/idle-actions-v2.png"
+const CARE_SHEET := "res://private_pets/active/care-actions-v2.png"
+const MOVEMENT_SHEET := "res://private_pets/active/movement-actions-v2.png"
 
 var _sprite: Sprite2D
 var _sheets: Dictionary = {}
@@ -24,13 +23,9 @@ func _ready() -> void:
 	_load_sheet("idle", IDLE_SHEET, 4)
 	_load_sheet("care", CARE_SHEET, 4)
 	_load_sheet("movement", MOVEMENT_SHEET, 4)
-	_load_sheet("legacy", LEGACY_SHEET, 3)
 	if _sheets.has("idle"):
 		_using_private_sheet = true
 		_show_frame("idle", 0)
-	elif _sheets.has("legacy"):
-		_using_private_sheet = true
-		_show_frame("legacy", 0)
 	else:
 		queue_redraw()
 
@@ -110,8 +105,6 @@ func _load_sheet(key: String, path: String, columns: int) -> void:
 
 func _show_frame(sheet_key: String, index: int) -> void:
 	if not _sheets.has(sheet_key):
-		if sheet_key != "legacy" and _sheets.has("legacy"):
-			_show_frame("legacy", clampi(index, 0, 2))
 		return
 	var sheet: Dictionary = _sheets[sheet_key]
 	var texture: Texture2D = sheet.texture
@@ -140,8 +133,6 @@ func _apply_sprite_scale() -> void:
 func _show_idle() -> void:
 	if _sheets.has("idle"):
 		_show_frame("idle", 0)
-	else:
-		_show_frame("legacy", 0)
 
 
 func _clap(belly_up: bool) -> void:
