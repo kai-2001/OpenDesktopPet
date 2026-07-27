@@ -22,6 +22,7 @@ var data: Dictionary = {
 }
 
 var _decay_accumulator := 0.0
+var _action_busy := false
 
 
 func _ready() -> void:
@@ -44,61 +45,95 @@ func _process(delta: float) -> void:
 
 
 func pet() -> void:
+	if not _begin_action("clap"):
+		return
+	await get_tree().create_timer(1.0).timeout
 	data.mood = _limit(data.mood + 10.0)
 	data.care += 1
 	_add_xp(1)
-	action_requested.emit("clap")
 	message_requested.emit("嘿嘿！再摸一下！")
 	_commit()
+	_action_busy = false
 
 
 func feed() -> void:
+	if _action_busy:
+		message_requested.emit("先等目前的動作完成～")
+		return
 	if data.coins < 2:
 		message_requested.emit("需要 2 枚金幣，先去工作吧。")
 		return
+	_begin_action("eat")
+	await get_tree().create_timer(1.7).timeout
 	data.coins -= 2
 	data.hunger = _limit(data.hunger + 28.0)
 	data.mood = _limit(data.mood + 5.0)
 	data.care += 1
 	_add_xp(2)
-	action_requested.emit("eat")
 	message_requested.emit("好吃！一下就吃光了！")
 	_commit()
+	_action_busy = false
 
 
 func water() -> void:
+	if _action_busy:
+		message_requested.emit("先等目前的動作完成～")
+		return
 	if data.coins < 1:
 		message_requested.emit("需要 1 枚金幣，先去工作吧。")
 		return
+	_begin_action("drink")
+	await get_tree().create_timer(1.7).timeout
 	data.coins -= 1
 	data.thirst = _limit(data.thirst + 30.0)
 	data.mood = _limit(data.mood + 2.0)
 	data.care += 1
 	_add_xp(1)
-	action_requested.emit("drink")
 	message_requested.emit("咕嚕咕嚕，好清爽！")
 	_commit()
+	_action_busy = false
 
 
 func sleep() -> void:
+	if not _begin_action("sleep"):
+		return
+	await get_tree().create_timer(2.75).timeout
 	data.energy = _limit(data.energy + 35.0)
 	data.mood = _limit(data.mood + 4.0)
-	action_requested.emit("sleep")
 	message_requested.emit("呼嚕……睡成一顆麻糬。")
 	_commit()
+	_action_busy = false
 
 
 func work() -> void:
+	if _action_busy:
+		message_requested.emit("先等目前的動作完成～")
+		return
 	if data.energy < 15.0:
 		message_requested.emit("太累了，先睡一下吧。")
 		return
+	_begin_action("roll")
+	await get_tree().create_timer(0.7).timeout
 	data.energy = _limit(data.energy - 15.0)
 	data.hunger = _limit(data.hunger - 5.0)
 	data.coins += 7
 	_add_xp(5)
-	action_requested.emit("roll")
 	message_requested.emit("滾去工作！賺到 7 枚金幣。")
 	_commit()
+	_action_busy = false
+
+
+func is_action_busy() -> bool:
+	return _action_busy
+
+
+func _begin_action(action: String) -> bool:
+	if _action_busy:
+		message_requested.emit("先等目前的動作完成～")
+		return false
+	_action_busy = true
+	action_requested.emit(action)
+	return true
 
 
 func save_state() -> void:

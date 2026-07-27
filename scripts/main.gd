@@ -10,6 +10,8 @@ var _stats_status: Label
 var _stats_bars: Dictionary = {}
 var _dragging := false
 var _drag_moved := false
+var _left_press_pending := false
+var _left_press_started_ms := 0
 var _drag_offset := Vector2i.ZERO
 var _drag_origin := Vector2i.ZERO
 var _bubble_token := 0
@@ -51,11 +53,17 @@ func _process(_delta: float) -> void:
 			_auto_move_tween = null
 	_last_global_mouse = mouse
 	_update_cursor(mouse)
+	if _left_press_pending and not _dragging:
+		var held_ms := Time.get_ticks_msec() - _left_press_started_ms
+		if (mouse.distance_to(_drag_origin) >= 6.0 or held_ms >= 220) \
+				and not pet.is_busy() and not state.is_action_busy():
+			_begin_drag(mouse)
 	if not _dragging:
 		return
 	if mouse.distance_to(_drag_origin) > 4.0:
 		_drag_moved = true
-	pet.set_drag_motion(mouse.distance_to(_last_drag_mouse) > 1.0)
+	if mouse.distance_to(_last_drag_mouse) > 1.0:
+		pet.set_drag_motion(true)
 	_last_drag_mouse = mouse
 	DisplayServer.window_set_position(mouse - _drag_offset)
 
@@ -65,29 +73,43 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		if event.double_click and event.pressed:
+			_left_press_pending = false
 			_dragging = false
 			pet.set_dragging(false)
-			state.pet()
+			_run_care_action(3)
 			return
 		if event.pressed:
-			_dragging = true
+			_left_press_pending = true
+			_left_press_started_ms = Time.get_ticks_msec()
 			_drag_moved = false
 			_drag_origin = DisplayServer.mouse_get_position()
 			_last_drag_mouse = _drag_origin
 			_drag_offset = _drag_origin - DisplayServer.window_get_position()
-			pet.set_dragging(true)
-			Input.set_default_cursor_shape(Input.CURSOR_DRAG)
 		else:
-			_dragging = false
-			pet.set_dragging(false)
-			Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
-			if not _drag_moved:
+			var was_dragging := _dragging
+			_left_press_pending = false
+			if was_dragging:
+				_dragging = false
+				pet.set_dragging(false)
+				Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
+			else:
 				_single_click_reaction()
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		_left_press_pending = false
 		_dragging = false
 		pet.set_dragging(false)
 		if not _stats_window.visible:
 			_show_context_menu(Vector2i(event.position))
+
+
+func _begin_drag(mouse: Vector2i) -> void:
+	_left_press_pending = false
+	_dragging = true
+	_drag_moved = true
+	_last_drag_mouse = mouse
+	pet.set_dragging(true)
+	pet.set_drag_motion(true)
+	Input.set_default_cursor_shape(Input.CURSOR_DRAG)
 
 
 func _notification(what: int) -> void:
@@ -158,16 +180,8 @@ func _show_context_menu(at: Vector2i) -> void:
 
 func _on_context_action(id: int) -> void:
 	match id:
-		1:
-			state.feed()
-		2:
-			state.water()
-		3:
-			state.pet()
-		4:
-			state.work()
-		5:
-			state.sleep()
+		1, 2, 3, 4, 5:
+			_run_care_action(id)
 		6:
 			_stats_open_timer.start()
 		7:
@@ -341,6 +355,9 @@ func _build_stats_window() -> void:
 
 
 func _run_care_action(id: int) -> void:
+	if state.is_action_busy() or pet.is_busy():
+		say("先等目前的動作完成～", 1.5)
+		return
 	match id:
 		1:
 			state.feed()
