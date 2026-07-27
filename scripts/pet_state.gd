@@ -9,7 +9,6 @@ const SAVE_PATH := "user://save_v2.json"
 const SAVE_VERSION := 2
 const DECAY_INTERVAL_SECONDS := 600
 const PET_REWARD_COOLDOWN_SECONDS := 600
-const WORK_COOLDOWN_SECONDS := 600
 const WISH_DURATION_SECONDS := 900
 const FIRST_WISH_MIN_SECONDS := 120
 const FIRST_WISH_MAX_SECONDS := 300
@@ -32,7 +31,6 @@ var data: Dictionary = {
 	"wish_expires_at": 0,
 	"next_wish_at": 0,
 	"last_pet_reward_at": 0,
-	"work_ready_at": 0,
 }
 
 var _decay_accumulator := 0.0
@@ -126,37 +124,47 @@ func water() -> void:
 
 
 func sleep() -> void:
-	if data.energy >= 92.0 and String(data.wish_action) != "sleep":
-		message_requested.emit("現在還很有精神，不想睡覺。")
-		return
 	if not _begin_action("sleep"):
 		return
 	await get_tree().create_timer(2.75).timeout
-	data.energy = _limit(data.energy + 35.0)
-	data.mood = _limit(data.mood + 4.0)
-	_finish_action("呼嚕……睡成一顆麻糬。" + _complete_wish("sleep"))
+	var recovered: bool = _apply_sleep_result()
+	var message := "呼嚕……睡成一顆麻糬。" if recovered else "雖然很有精神，還是舒服地睡了一覺。"
+	_finish_action(message + _complete_wish("sleep"))
 
 
 func work() -> void:
 	if _action_busy:
 		message_requested.emit("先等目前的動作完成～")
 		return
-	var remaining := int(data.work_ready_at) - _now()
-	if remaining > 0:
-		message_requested.emit("工作還在冷卻，約 %d 分鐘後再試。" % ceili(remaining / 60.0))
-		return
 	if data.energy < 18.0:
 		message_requested.emit("太累了，先睡一下吧。")
+		return
+	if data.hunger < 8.0:
+		message_requested.emit("肚子太餓了，吃飽再工作吧。")
+		return
+	if data.thirst < 10.0:
+		message_requested.emit("太渴了，喝水後再工作吧。")
 		return
 	if not _begin_action("work"):
 		return
 	await get_tree().create_timer(0.9).timeout
-	data.work_ready_at = _now() + WORK_COOLDOWN_SECONDS
+	_apply_work_result()
+	_finish_action("工作完成！賺到 7 枚金幣。" + _complete_wish("work"))
+
+
+func _apply_sleep_result() -> bool:
+	var recovered: bool = float(data.energy) < 100.0
+	data.energy = _limit(data.energy + 35.0)
+	data.mood = _limit(data.mood + 4.0)
+	return recovered
+
+
+func _apply_work_result() -> void:
 	data.energy = _limit(data.energy - 18.0)
-	data.hunger = _limit(data.hunger - 5.0)
+	data.hunger = _limit(data.hunger - 8.0)
+	data.thirst = _limit(data.thirst - 10.0)
 	data.coins += 7
 	_add_xp(5)
-	_finish_action("滾去工作！賺到 7 枚金幣。" + _complete_wish("work"))
 
 
 func is_action_busy() -> bool:
@@ -211,6 +219,12 @@ func _complete_wish(action: String) -> String:
 func _update_wish() -> void:
 	var now := _now()
 	if not String(data.wish_action).is_empty():
+		if not _wish_is_sensible(String(data.wish_action)):
+			data.wish_action = ""
+			data.wish_expires_at = 0
+			data.next_wish_at = now + randi_range(WISH_MIN_SECONDS, WISH_MAX_SECONDS)
+			_commit()
+			return
 		if now > int(data.wish_expires_at):
 			data.wish_action = ""
 			data.wish_expires_at = 0
@@ -227,13 +241,15 @@ func _update_wish() -> void:
 
 
 func _choose_wish() -> String:
-	var weighted: Array[Dictionary] = [
-		{"action": "feed", "weight": 10 + int(100.0 - data.hunger)},
-		{"action": "water", "weight": 10 + int(100.0 - data.thirst)},
-		{"action": "sleep", "weight": 8 + int(100.0 - data.energy)},
-		{"action": "pet", "weight": 12 + int(100.0 - data.mood)},
-	]
-	if data.energy >= 35.0 and _now() >= int(data.work_ready_at):
+	var weighted: Array[Dictionary] = []
+	if data.hunger <= 70.0:
+		weighted.append({"action": "feed", "weight": 15 + int(70.0 - data.hunger)})
+	if data.thirst <= 70.0:
+		weighted.append({"action": "water", "weight": 15 + int(70.0 - data.thirst)})
+	if data.energy <= 70.0:
+		weighted.append({"action": "sleep", "weight": 12 + int(70.0 - data.energy)})
+	weighted.append({"action": "pet", "weight": 12 + int(100.0 - data.mood)})
+	if data.energy >= 35.0 and data.hunger >= 20.0 and data.thirst >= 20.0:
 		weighted.append({"action": "work", "weight": 12})
 	var total := 0
 	for candidate: Dictionary in weighted:
@@ -245,6 +261,20 @@ func _choose_wish() -> String:
 		if roll <= ceiling:
 			return String(candidate.action)
 	return "pet"
+
+
+func _wish_is_sensible(action: String) -> bool:
+	match action:
+		"feed":
+			return data.hunger <= 92.0
+		"water":
+			return data.thirst <= 92.0
+		"sleep":
+			return true
+		"work":
+			return data.energy >= 18.0 and data.hunger >= 8.0 and data.thirst >= 10.0
+		_:
+			return true
 
 
 func _wish_announcement(action: String) -> String:

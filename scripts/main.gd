@@ -166,7 +166,7 @@ func _setup_context_menu() -> void:
 	context_menu.add_item("🥕  餵食（2 金幣）", 1)
 	context_menu.add_item("💧  喝水（1 金幣）", 2)
 	context_menu.add_item("✋  摸摸", 3)
-	context_menu.add_item("🪙  滾去工作（賺 7 金幣）", 4)
+	context_menu.add_item("🪙  工作（賺 7 金幣）", 4)
 	context_menu.add_item("💤  睡覺", 5)
 	context_menu.add_separator()
 	context_menu.add_item("📊  開啟詳細面板", 6)
