@@ -27,13 +27,13 @@ func _ready() -> void:
 	await _capture("04_drink.png")
 	await get_tree().create_timer(1.3).timeout
 	_pet.play_action("sleep")
-	await get_tree().create_timer(0.25).timeout
+	await get_tree().create_timer(0.8).timeout
 	await _capture("05_sleep.png")
-	await get_tree().create_timer(2.5).timeout
+	await get_tree().create_timer(2.2).timeout
 	_pet.play_action("belly_clap")
-	await get_tree().create_timer(0.3).timeout
+	await get_tree().create_timer(0.52).timeout
 	await _capture("06_belly_clap.png")
-	await get_tree().create_timer(1.2).timeout
+	await get_tree().create_timer(1.1).timeout
 	_pet.set_dragging(true)
 	await get_tree().create_timer(0.12).timeout
 	await _capture("07_drag.png")
