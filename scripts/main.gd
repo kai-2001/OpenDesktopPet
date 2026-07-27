@@ -234,20 +234,12 @@ func _can_act_autonomously(require_mouse_idle := false) -> bool:
 
 
 func _run_autonomous_action() -> void:
-	var choice := randi_range(0, 99)
-	if choice < 30:
-		if _can_act_autonomously(true):
-			_autonomous_small_roll()
-		else:
-			pet.play_action(["clap", "belly_clap", "wiggle"].pick_random())
-	elif choice < 58:
-		pet.play_action("clap")
-	elif choice < 78:
-		pet.play_action("belly_clap")
-	elif choice < 90:
-		pet.play_action("wiggle")
-	else:
-		pet.play_action("sleep")
+	var mouse_is_idle := Time.get_ticks_msec() - _last_user_activity_ms >= 4500
+	var action: String = pet.pick_autonomous_action(mouse_is_idle)
+	if action == "move":
+		_autonomous_small_roll()
+	elif not action.is_empty():
+		pet.play_action(action)
 
 
 func _autonomous_small_roll() -> void:
@@ -264,7 +256,7 @@ func _autonomous_small_roll() -> void:
 	if target_x == start.x:
 		target_x = clampi(start.x - distance, usable.position.x, usable.end.x - window_size.x)
 	var target := Vector2i(target_x, start.y)
-	pet.play_action("roll")
+	pet.play_action("move")
 	_auto_move_tween = create_tween()
 	_auto_move_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_auto_move_tween.tween_method(
@@ -280,8 +272,8 @@ func _build_stats_window() -> void:
 	_stats_bars.clear()
 	_stats_window = Window.new()
 	_stats_window.title = "桌寵詳細狀態"
-	_stats_window.size = Vector2i(400, 560)
-	_stats_window.min_size = Vector2i(400, 560)
+	_stats_window.size = Vector2i(400, 600)
+	_stats_window.min_size = Vector2i(400, 600)
 	_stats_window.unresizable = true
 	# A child Window is already transient to the desktop-pet window. Marking it
 	# always-on-top as well is invalid on Windows and prevents reliable popup.
@@ -324,6 +316,7 @@ func _build_stats_window() -> void:
 	_add_stat_row(content, "水分", "thirst", Color("#65c9ff"))
 	_add_stat_row(content, "體力", "energy", Color("#8de28d"))
 	_add_stat_row(content, "心情", "mood", Color("#ff91bd"))
+	_add_stat_row(content, "親密", "affection", Color("#c5a3ff"))
 	content.add_child(HSeparator.new())
 
 	var action_title := _new_label("照顧操作", 16, Color("#e9fbff"))
@@ -446,6 +439,7 @@ func _prime_stats_window() -> void:
 
 
 func _refresh_ui(snapshot: Dictionary) -> void:
+	pet.set_progression(snapshot)
 	var level_text := "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
 		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20
 	]

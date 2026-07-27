@@ -25,13 +25,13 @@ godot --path .
 ## 本機角色素材
 
 `private_pets/` 已被 `.gitignore` 排除，不得提交到公開儲存庫或 Release。
-本機原型會優先讀取：
+程式會從下列設定檔載入目前角色包：
 
 ```text
-private_pets/active/reference-sheet.png
+private_pets/active/pet.json
 ```
 
-目前原型圖像必須是橫向三格，依序為待機、移動、互動。沒有私人素材時，程式會顯示可公開的通用預設圖形。
+角色包包含八個基本動作，也能加入受等級與親密度限制的額外動作。完整格式請參考 [`docs/CHARACTER_PACK.md`](docs/CHARACTER_PACK.md) 與 [`examples/character-pack/pet.json`](examples/character-pack/pet.json)。
 
 ## 授權
 

@@ -18,6 +18,7 @@ var data: Dictionary = {
 	"level": 1,
 	"xp": 0,
 	"care": 0,
+	"affection": 0,
 	"last_seen": 0,
 }
 
@@ -45,11 +46,12 @@ func _process(delta: float) -> void:
 
 
 func pet() -> void:
-	if not _begin_action("clap"):
+	if not _begin_action("pet"):
 		return
 	await get_tree().create_timer(1.0).timeout
 	data.mood = _limit(data.mood + 10.0)
 	data.care += 1
+	data.affection = mini(int(data.affection) + 1, 100)
 	_add_xp(1)
 	message_requested.emit("嘿嘿！再摸一下！")
 	_commit()
@@ -69,6 +71,7 @@ func feed() -> void:
 	data.hunger = _limit(data.hunger + 28.0)
 	data.mood = _limit(data.mood + 5.0)
 	data.care += 1
+	data.affection = mini(int(data.affection) + 1, 100)
 	_add_xp(2)
 	message_requested.emit("好吃！一下就吃光了！")
 	_commit()
@@ -88,6 +91,7 @@ func water() -> void:
 	data.thirst = _limit(data.thirst + 30.0)
 	data.mood = _limit(data.mood + 2.0)
 	data.care += 1
+	data.affection = mini(int(data.affection) + 1, 100)
 	_add_xp(1)
 	message_requested.emit("咕嚕咕嚕，好清爽！")
 	_commit()
@@ -112,7 +116,7 @@ func work() -> void:
 	if data.energy < 15.0:
 		message_requested.emit("太累了，先睡一下吧。")
 		return
-	_begin_action("roll")
+	_begin_action("work")
 	await get_tree().create_timer(0.7).timeout
 	data.energy = _limit(data.energy - 15.0)
 	data.hunger = _limit(data.hunger - 5.0)

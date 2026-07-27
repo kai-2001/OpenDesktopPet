@@ -11,6 +11,7 @@ func _ready() -> void:
 	_pet = PetVisualScript.new()
 	_pet.position = Vector2(140, 190)
 	add_child(_pet)
+	_pet.set_progression({"level": 99, "affection": 100})
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await _capture("01_idle.png")
