@@ -279,7 +279,9 @@ func _build_stats_window() -> void:
 	_stats_window.size = Vector2i(400, 560)
 	_stats_window.min_size = Vector2i(400, 560)
 	_stats_window.unresizable = true
-	_stats_window.always_on_top = true
+	# A child Window is already transient to the desktop-pet window. Marking it
+	# always-on-top as well is invalid on Windows and prevents reliable popup.
+	_stats_window.always_on_top = false
 	_stats_window.visible = false
 	_stats_window.close_requested.connect(func() -> void: _stats_window.hide())
 	add_child(_stats_window)
