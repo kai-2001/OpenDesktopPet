@@ -1,7 +1,7 @@
 class_name PetVisual
 extends Node2D
 
-const FRAME_DIR := "res://private_pets/active/rig2d/fullframes/"
+const FRAME_DIR := "res://private_pets/active/animations/"
 const SHEETS := {
 	"idle": ["idle.png", 4],
 	"roll": ["roll.png", 4],

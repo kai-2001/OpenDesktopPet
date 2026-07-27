@@ -1,7 +1,7 @@
 extends Node2D
 
 const PetVisualScript = preload("res://scripts/pet_visual.gd")
-const OUTPUT_DIR := "res://private_pets/active/rig2d/validation/"
+const OUTPUT_DIR := "res://private_pets/active/validation/screenshots/"
 
 var _pet: Node2D
 
