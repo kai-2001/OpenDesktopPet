@@ -96,11 +96,17 @@ func play_action(action: String) -> void:
 
 
 func _load_sheet(key: String, path: String, columns: int) -> void:
-	if not ResourceLoader.exists(path):
-		return
-	var texture := load(path) as Texture2D
+	var texture: Texture2D
+	if ResourceLoader.exists(path):
+		texture = load(path) as Texture2D
+	elif FileAccess.file_exists(path):
+		var image := Image.load_from_file(path)
+		if image and not image.is_empty():
+			texture = ImageTexture.create_from_image(image)
 	if texture:
 		_sheets[key] = {"texture": texture, "columns": columns}
+	else:
+		push_error("Unable to load pet animation sheet: %s" % path)
 
 
 func _show_frame(sheet_key: String, index: int) -> void:
