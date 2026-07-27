@@ -74,7 +74,7 @@ func _process(_delta: float) -> void:
 	if mouse.distance_to(_last_drag_mouse) > 1.0:
 		pet.set_drag_motion(true)
 	_last_drag_mouse = mouse
-	DisplayServer.window_set_position(mouse - _drag_offset)
+	DisplayServer.window_set_position(_clamp_window_position(mouse - _drag_offset))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -562,6 +562,18 @@ func _place_bottom_right() -> void:
 	var usable := DisplayServer.screen_get_usable_rect(screen)
 	var size := DisplayServer.window_get_size()
 	DisplayServer.window_set_position(usable.position + usable.size - size - Vector2i(24, 24))
+
+
+func _clamp_window_position(requested: Vector2i) -> Vector2i:
+	var window_size := DisplayServer.window_get_size()
+	var screen := DisplayServer.get_screen_from_rect(Rect2i(requested, window_size))
+	if screen < 0:
+		screen = DisplayServer.get_primary_screen()
+	var usable := DisplayServer.screen_get_usable_rect(screen)
+	return Vector2i(
+		clampi(requested.x, usable.position.x, usable.end.x - window_size.x),
+		clampi(requested.y, usable.position.y, usable.end.y - window_size.y)
+	)
 
 
 func _style_bubble() -> void:
