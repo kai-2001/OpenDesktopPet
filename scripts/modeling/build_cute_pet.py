@@ -9,6 +9,9 @@ OUTPUT_DIR = os.path.join(PROJECT_DIR, "private_pets", "active", "model")
 BLEND_PATH = os.path.join(OUTPUT_DIR, "cute_seal_pet.blend")
 GLB_PATH = os.path.join(OUTPUT_DIR, "cute_seal_pet.glb")
 PREVIEW_PATH = os.path.join(OUTPUT_DIR, "cute_seal_pet_preview.png")
+NEUTRAL_PREVIEW_PATH = os.path.join(OUTPUT_DIR, "expression_1_neutral.png")
+EATING_PREVIEW_PATH = os.path.join(OUTPUT_DIR, "expression_2_eating.png")
+HAPPY_PREVIEW_PATH = os.path.join(OUTPUT_DIR, "expression_3_happy.png")
 
 
 def clear_scene():
@@ -100,6 +103,14 @@ def set_expression(objects, expression_name, visible):
         obj.hide_viewport = not visible
 
 
+def activate_expression(expression_name):
+    for obj in bpy.data.objects:
+        expression = obj.get("expression")
+        if expression:
+            obj.hide_render = expression != expression_name
+            obj.hide_viewport = expression != expression_name
+
+
 def build_model():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     clear_scene()
@@ -115,14 +126,15 @@ def build_model():
     root["design_note"] = "Exactly two cream front flippers and one blue forked rear tail."
     root["expression_default"] = "neutral"
 
-    body = uv_part("Body", (0, 0, 0), (1.72, 1.48, 1.68), blue, parent=root)
-    belly = uv_part("BellyPatch", (0, -1.37, -0.18), (1.34, 0.18, 1.29), cream, parent=root)
-    muzzle = uv_part("Muzzle", (0, -1.52, 0.54), (0.78, 0.18, 0.38), blue, parent=root)
+    body = uv_part("Body", (0, 0, 0), (1.72, 1.43, 1.48), blue, parent=root)
+    belly = uv_part("BellyPatch", (0, -1.34, -0.28), (1.27, 0.13, 1.03), cream, parent=root)
+    uv_part("Muzzle_L", (-0.27, -1.45, 0.42), (0.43, 0.105, 0.20), blue, parent=root)
+    uv_part("Muzzle_R", (0.27, -1.45, 0.42), (0.43, 0.105, 0.20), blue, parent=root)
 
-    ear_l = uv_part("Ear_L", (-1.17, -0.31, 1.31), (0.34, 0.25, 0.33), blue, parent=root)
-    ear_r = uv_part("Ear_R", (1.17, -0.31, 1.31), (0.34, 0.25, 0.33), blue, parent=root)
-    flipper_l_ctrl = empty("FrontFlipper_L_CTRL", (-1.35, -0.82, -0.93))
-    flipper_r_ctrl = empty("FrontFlipper_R_CTRL", (1.35, -0.82, -0.93))
+    uv_part("Ear_L", (-1.20, -0.20, 1.18), (0.25, 0.20, 0.22), blue, parent=root)
+    uv_part("Ear_R", (1.20, -0.20, 1.18), (0.25, 0.20, 0.22), blue, parent=root)
+    flipper_l_ctrl = empty("FrontFlipper_L_CTRL", (-1.28, -0.84, -0.94))
+    flipper_r_ctrl = empty("FrontFlipper_R_CTRL", (1.28, -0.84, -0.94))
     flipper_l_ctrl.parent = root
     flipper_r_ctrl.parent = root
     flipper_l_ctrl["limb_role"] = "front_flipper"
@@ -130,7 +142,7 @@ def build_model():
     uv_part(
         "FrontFlipper_L",
         (0, 0, 0),
-        (0.62, 0.27, 0.31),
+        (0.48, 0.22, 0.25),
         cream,
         rotation=(0.08, -0.30, -0.35),
         parent=flipper_l_ctrl,
@@ -138,7 +150,7 @@ def build_model():
     uv_part(
         "FrontFlipper_R",
         (0, 0, 0),
-        (0.62, 0.27, 0.31),
+        (0.48, 0.22, 0.25),
         cream,
         rotation=(-0.08, 0.30, 0.35),
         parent=flipper_r_ctrl,
@@ -165,15 +177,7 @@ def build_model():
     )
     uv_part("RearTail_Base", (0, 0.14, 0), (0.48, 0.34, 0.32), blue, parent=tail_ctrl)
 
-    for name, loc, scale in (
-        ("Spot_R_Upper", (1.69, -0.18, 0.48), (0.035, 0.18, 0.25)),
-        ("Spot_R_Middle", (1.74, -0.17, -0.05), (0.032, 0.14, 0.19)),
-        ("Spot_R_Lower", (1.68, -0.05, -0.48), (0.035, 0.20, 0.16)),
-        ("Spot_L_Upper", (-1.69, -0.18, 0.48), (0.035, 0.18, 0.25)),
-        ("Spot_L_Middle", (-1.74, -0.17, -0.05), (0.032, 0.14, 0.19)),
-        ("Spot_L_Lower", (-1.68, -0.05, -0.48), (0.035, 0.20, 0.16)),
-    ):
-        uv_part(name, loc, scale, white, parent=root)
+    # Side markings belong in the final texture. Geometry decals distorted the silhouette.
 
     face_root = empty("FaceRoot", (0, 0, 0))
     face_root.parent = root
@@ -181,21 +185,21 @@ def build_model():
     neutral = [
         curve_part(
             "Eye_Neutral_L",
-            [(-0.72, -1.58, 0.88), (-0.55, -1.65, 0.82), (-0.38, -1.58, 0.88)],
+            [(-0.67, -1.48, 0.75), (-0.53, -1.53, 0.70), (-0.39, -1.48, 0.75)],
             0.045,
             ink,
             face_root,
         ),
         curve_part(
             "Eye_Neutral_R",
-            [(0.38, -1.58, 0.88), (0.55, -1.65, 0.82), (0.72, -1.58, 0.88)],
+            [(0.39, -1.48, 0.75), (0.53, -1.53, 0.70), (0.67, -1.48, 0.75)],
             0.045,
             ink,
             face_root,
         ),
         curve_part(
             "Mouth_Neutral",
-            [(-0.18, -1.79, 0.38), (0, -1.84, 0.30), (0.18, -1.79, 0.38)],
+            [(-0.16, -1.55, 0.31), (0, -1.59, 0.25), (0.16, -1.55, 0.31)],
             0.04,
             ink,
             face_root,
@@ -204,36 +208,36 @@ def build_model():
     set_expression(neutral, "neutral", True)
 
     open_face = [
-        uv_part("Eye_Open_L", (-0.55, -1.57, 0.84), (0.14, 0.07, 0.20), ink, parent=face_root),
-        uv_part("Eye_Open_R", (0.55, -1.57, 0.84), (0.14, 0.07, 0.20), ink, parent=face_root),
-        uv_part("Mouth_Open", (0, -1.76, 0.33), (0.42, 0.09, 0.34), salmon, parent=face_root),
-        uv_part("Tongue", (0, -1.84, 0.20), (0.25, 0.055, 0.13), tongue, parent=face_root),
+        uv_part("Eye_Open_L", (-0.53, -1.47, 0.74), (0.12, 0.05, 0.16), ink, parent=face_root),
+        uv_part("Eye_Open_R", (0.53, -1.47, 0.74), (0.12, 0.05, 0.16), ink, parent=face_root),
+        uv_part("Mouth_Open", (0, -1.53, 0.28), (0.32, 0.06, 0.25), salmon, parent=face_root),
+        uv_part("Tongue", (0, -1.59, 0.18), (0.21, 0.04, 0.10), tongue, parent=face_root),
     ]
     set_expression(open_face, "open_mouth", False)
 
     happy = [
         curve_part(
             "Eye_Happy_L",
-            [(-0.73, -1.59, 0.82), (-0.55, -1.67, 0.94), (-0.36, -1.59, 0.82)],
+            [(-0.69, -1.49, 0.70), (-0.53, -1.55, 0.82), (-0.37, -1.49, 0.70)],
             0.05,
             ink,
             face_root,
         ),
         curve_part(
             "Eye_Happy_R",
-            [(0.36, -1.59, 0.82), (0.55, -1.67, 0.94), (0.73, -1.59, 0.82)],
+            [(0.37, -1.49, 0.70), (0.53, -1.55, 0.82), (0.69, -1.49, 0.70)],
             0.05,
             ink,
             face_root,
         ),
-        uv_part("Mouth_Happy", (0, -1.76, 0.34), (0.46, 0.09, 0.36), salmon, parent=face_root),
-        uv_part("Tongue_Happy", (0, -1.84, 0.20), (0.28, 0.055, 0.14), tongue, parent=face_root),
+        uv_part("Mouth_Happy", (0, -1.53, 0.28), (0.36, 0.06, 0.27), salmon, parent=face_root),
+        uv_part("Tongue_Happy", (0, -1.59, 0.17), (0.23, 0.04, 0.11), tongue, parent=face_root),
     ]
     set_expression(happy, "happy", False)
 
-    cone_part("Fang_L", (-0.30, -1.72, 0.43), 0.08, 0.23, white, rotation=(math.pi, 0, 0), parent=face_root)
-    cone_part("Fang_R", (0.30, -1.72, 0.43), 0.08, 0.23, white, rotation=(math.pi, 0, 0), parent=face_root)
-    uv_part("Nose", (0, -1.72, 0.63), (0.07, 0.035, 0.045), ink, parent=face_root)
+    cone_part("Fang_L", (-0.25, -1.52, 0.34), 0.065, 0.18, white, rotation=(math.pi, 0, 0), parent=face_root)
+    cone_part("Fang_R", (0.25, -1.52, 0.34), 0.065, 0.18, white, rotation=(math.pi, 0, 0), parent=face_root)
+    uv_part("Nose", (0, -1.53, 0.49), (0.055, 0.025, 0.035), ink, parent=face_root)
 
     return root
 
@@ -283,7 +287,6 @@ def export_files():
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
     scene.render.film_transparent = True
-    scene.render.filepath = PREVIEW_PATH
     scene.view_settings.look = "AgX - Medium High Contrast"
     bpy.ops.wm.save_as_mainfile(filepath=BLEND_PATH)
     bpy.ops.export_scene.gltf(
@@ -293,6 +296,16 @@ def export_files():
         export_extras=True,
         export_yup=True,
     )
+    for expression, path in (
+        ("neutral", NEUTRAL_PREVIEW_PATH),
+        ("open_mouth", EATING_PREVIEW_PATH),
+        ("happy", HAPPY_PREVIEW_PATH),
+    ):
+        activate_expression(expression)
+        scene.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+    activate_expression("neutral")
+    scene.render.filepath = PREVIEW_PATH
     bpy.ops.render.render(write_still=True)
 
 
