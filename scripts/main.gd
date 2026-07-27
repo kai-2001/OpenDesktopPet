@@ -7,6 +7,8 @@ extends Node2D
 @onready var context_menu: PopupMenu = $ContextMenu
 var _stats_window: Window
 var _stats_status: Label
+var _wish_status: Label
+var _unlock_status: Label
 var _stats_bars: Dictionary = {}
 var _dragging := false
 var _drag_moved := false
@@ -21,6 +23,8 @@ var _last_global_mouse := Vector2i.ZERO
 var _last_drag_mouse := Vector2i.ZERO
 var _last_user_activity_ms := 0
 var _auto_move_tween: Tween
+var _known_unlocked_actions: Dictionary = {}
+var _unlock_tracking_ready := false
 
 var _pet_hit_polygon := PackedVector2Array([
 	Vector2(70, 100), Vector2(210, 100), Vector2(245, 170),
@@ -272,8 +276,8 @@ func _build_stats_window() -> void:
 	_stats_bars.clear()
 	_stats_window = Window.new()
 	_stats_window.title = "桌寵詳細狀態"
-	_stats_window.size = Vector2i(400, 600)
-	_stats_window.min_size = Vector2i(400, 600)
+	_stats_window.size = Vector2i(400, 680)
+	_stats_window.min_size = Vector2i(400, 680)
 	_stats_window.unresizable = true
 	# A child Window is already transient to the desktop-pet window. Marking it
 	# always-on-top as well is invalid on Windows and prevents reliable popup.
@@ -311,12 +315,22 @@ func _build_stats_window() -> void:
 	_stats_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(_stats_status)
 
+	_wish_status = _new_label("", 15, Color("#ffd98e"))
+	_wish_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_wish_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(_wish_status)
+
 	content.add_child(HSeparator.new())
 	_add_stat_row(content, "飽食", "hunger", Color("#ffbd69"))
 	_add_stat_row(content, "水分", "thirst", Color("#65c9ff"))
 	_add_stat_row(content, "體力", "energy", Color("#8de28d"))
 	_add_stat_row(content, "心情", "mood", Color("#ff91bd"))
 	_add_stat_row(content, "親密", "affection", Color("#c5a3ff"))
+
+	_unlock_status = _new_label("", 14, Color("#c5a3ff"))
+	_unlock_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_unlock_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(_unlock_status)
 	content.add_child(HSeparator.new())
 
 	var action_title := _new_label("照顧操作", 16, Color("#e9fbff"))
@@ -440,15 +454,45 @@ func _prime_stats_window() -> void:
 
 func _refresh_ui(snapshot: Dictionary) -> void:
 	pet.set_progression(snapshot)
+	_update_unlock_tracking()
 	var level_text := "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
 		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20
 	]
 	if is_instance_valid(_stats_status):
 		_stats_status.text = level_text
+		_wish_status.text = "願望：%s" % String(snapshot.get("wish_text", "目前沒有願望"))
+		var next_unlock: Dictionary = pet.get_next_unlock()
+		if next_unlock.is_empty():
+			_unlock_status.text = "目前已解鎖所有角色動作"
+		else:
+			_unlock_status.text = "下一動作：%s　需要 Lv.%d、親密度 %d" % [
+				next_unlock.name, next_unlock.level, next_unlock.affection
+			]
 		for key: String in _stats_bars:
 			(_stats_bars[key] as ProgressBar).value = float(snapshot[key])
 	if context_menu.item_count > 0:
 		context_menu.set_item_text(0, level_text)
+
+
+func _update_unlock_tracking() -> void:
+	var unlocked: Array[String] = pet.get_unlocked_action_ids()
+	if not _unlock_tracking_ready:
+		for action: String in unlocked:
+			_known_unlocked_actions[action] = true
+		_unlock_tracking_ready = true
+		return
+	for action: String in unlocked:
+		if _known_unlocked_actions.has(action):
+			continue
+		_known_unlocked_actions[action] = true
+		call_deferred("_celebrate_unlock", action)
+
+
+func _celebrate_unlock(action: String) -> void:
+	await get_tree().create_timer(0.4).timeout
+	say("解鎖了新的動作：%s！" % action, 4.0)
+	if not pet.is_busy() and not state.is_action_busy():
+		pet.play_action(action)
 
 
 func _place_bottom_right() -> void:

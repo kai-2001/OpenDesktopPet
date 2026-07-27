@@ -6,7 +6,15 @@ signal message_requested(text: String)
 signal action_requested(action: String)
 
 const SAVE_PATH := "user://save_v2.json"
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
+const DECAY_INTERVAL_SECONDS := 600
+const PET_REWARD_COOLDOWN_SECONDS := 600
+const WORK_COOLDOWN_SECONDS := 600
+const WISH_DURATION_SECONDS := 900
+const FIRST_WISH_MIN_SECONDS := 120
+const FIRST_WISH_MAX_SECONDS := 300
+const WISH_MIN_SECONDS := 1200
+const WISH_MAX_SECONDS := 2400
 
 var data: Dictionary = {
 	"save_version": SAVE_VERSION,
@@ -20,115 +28,157 @@ var data: Dictionary = {
 	"care": 0,
 	"affection": 0,
 	"last_seen": 0,
+	"wish_action": "",
+	"wish_expires_at": 0,
+	"next_wish_at": 0,
+	"last_pet_reward_at": 0,
+	"work_ready_at": 0,
 }
 
 var _decay_accumulator := 0.0
+var _wish_accumulator := 0.0
 var _action_busy := false
 
 
 func _ready() -> void:
 	load_state()
 	_apply_offline_progress()
+	_ensure_wish_schedule()
 	emit_changed()
 
 
 func _process(delta: float) -> void:
 	_decay_accumulator += delta
-	if _decay_accumulator >= 30.0:
-		_decay_accumulator -= 30.0
-		data.hunger = _limit(data.hunger - 3.0)
-		data.thirst = _limit(data.thirst - 4.0)
-		data.energy = _limit(data.energy - 2.0)
+	_wish_accumulator += delta
+	if _decay_accumulator >= DECAY_INTERVAL_SECONDS:
+		_decay_accumulator -= DECAY_INTERVAL_SECONDS
+		data.hunger = _limit(data.hunger - 2.0)
+		data.thirst = _limit(data.thirst - 3.0)
 		if data.hunger < 25.0 or data.thirst < 25.0:
-			data.mood = _limit(data.mood - 4.0)
-		save_state()
-		emit_changed()
+			data.mood = _limit(data.mood - 2.0)
+		_commit()
+	if _wish_accumulator >= 1.0:
+		_wish_accumulator -= 1.0
+		_update_wish()
 
 
 func pet() -> void:
 	if not _begin_action("pet"):
 		return
 	await get_tree().create_timer(1.0).timeout
-	data.mood = _limit(data.mood + 10.0)
-	data.care += 1
-	data.affection = mini(int(data.affection) + 1, 100)
-	_add_xp(1)
-	message_requested.emit("嘿嘿！再摸一下！")
-	_commit()
-	_action_busy = false
+	var now := _now()
+	var rewarded := now >= int(data.last_pet_reward_at) + PET_REWARD_COOLDOWN_SECONDS
+	if rewarded:
+		data.last_pet_reward_at = now
+		data.mood = _limit(data.mood + 8.0)
+		data.care += 1
+		_add_affection(1)
+		_add_xp(1)
+	else:
+		data.mood = _limit(data.mood + 1.0)
+	var message := "嘿嘿！再摸一下！" if rewarded else "很舒服，不過先讓我休息一下～"
+	message += _complete_wish("pet")
+	_finish_action(message)
 
 
 func feed() -> void:
 	if _action_busy:
 		message_requested.emit("先等目前的動作完成～")
 		return
+	if data.hunger >= 92.0:
+		message_requested.emit("肚子已經很飽了，晚點再吃吧。")
+		return
 	if data.coins < 2:
 		message_requested.emit("需要 2 枚金幣，先去工作吧。")
 		return
-	_begin_action("eat")
+	if not _begin_action("eat"):
+		return
 	await get_tree().create_timer(1.7).timeout
 	data.coins -= 2
 	data.hunger = _limit(data.hunger + 28.0)
-	data.mood = _limit(data.mood + 5.0)
+	data.mood = _limit(data.mood + 4.0)
 	data.care += 1
-	data.affection = mini(int(data.affection) + 1, 100)
+	_add_affection(1)
 	_add_xp(2)
-	message_requested.emit("好吃！一下就吃光了！")
-	_commit()
-	_action_busy = false
+	_finish_action("好吃！一下就吃光了！" + _complete_wish("feed"))
 
 
 func water() -> void:
 	if _action_busy:
 		message_requested.emit("先等目前的動作完成～")
 		return
+	if data.thirst >= 92.0:
+		message_requested.emit("現在不渴，晚點再喝吧。")
+		return
 	if data.coins < 1:
 		message_requested.emit("需要 1 枚金幣，先去工作吧。")
 		return
-	_begin_action("drink")
+	if not _begin_action("drink"):
+		return
 	await get_tree().create_timer(1.7).timeout
 	data.coins -= 1
 	data.thirst = _limit(data.thirst + 30.0)
 	data.mood = _limit(data.mood + 2.0)
 	data.care += 1
-	data.affection = mini(int(data.affection) + 1, 100)
+	_add_affection(1)
 	_add_xp(1)
-	message_requested.emit("咕嚕咕嚕，好清爽！")
-	_commit()
-	_action_busy = false
+	_finish_action("咕嚕咕嚕，好清爽！" + _complete_wish("water"))
 
 
 func sleep() -> void:
+	if data.energy >= 92.0 and String(data.wish_action) != "sleep":
+		message_requested.emit("現在還很有精神，不想睡覺。")
+		return
 	if not _begin_action("sleep"):
 		return
 	await get_tree().create_timer(2.75).timeout
 	data.energy = _limit(data.energy + 35.0)
 	data.mood = _limit(data.mood + 4.0)
-	message_requested.emit("呼嚕……睡成一顆麻糬。")
-	_commit()
-	_action_busy = false
+	_finish_action("呼嚕……睡成一顆麻糬。" + _complete_wish("sleep"))
 
 
 func work() -> void:
 	if _action_busy:
 		message_requested.emit("先等目前的動作完成～")
 		return
-	if data.energy < 15.0:
+	var remaining := int(data.work_ready_at) - _now()
+	if remaining > 0:
+		message_requested.emit("工作還在冷卻，約 %d 分鐘後再試。" % ceili(remaining / 60.0))
+		return
+	if data.energy < 18.0:
 		message_requested.emit("太累了，先睡一下吧。")
 		return
-	_begin_action("work")
-	await get_tree().create_timer(0.7).timeout
-	data.energy = _limit(data.energy - 15.0)
+	if not _begin_action("work"):
+		return
+	await get_tree().create_timer(0.9).timeout
+	data.work_ready_at = _now() + WORK_COOLDOWN_SECONDS
+	data.energy = _limit(data.energy - 18.0)
 	data.hunger = _limit(data.hunger - 5.0)
 	data.coins += 7
 	_add_xp(5)
-	message_requested.emit("滾去工作！賺到 7 枚金幣。")
-	_commit()
-	_action_busy = false
+	_finish_action("滾去工作！賺到 7 枚金幣。" + _complete_wish("work"))
 
 
 func is_action_busy() -> bool:
 	return _action_busy
+
+
+func wish_text() -> String:
+	var remaining := maxi(int(data.wish_expires_at) - _now(), 0)
+	var minutes := maxi(ceili(remaining / 60.0), 1)
+	match String(data.wish_action):
+		"feed":
+			return "想吃東西（剩餘約 %d 分鐘）" % minutes
+		"water":
+			return "想喝水（剩餘約 %d 分鐘）" % minutes
+		"pet":
+			return "想被摸摸（剩餘約 %d 分鐘）" % minutes
+		"sleep":
+			return "想睡一下（剩餘約 %d 分鐘）" % minutes
+		"work":
+			return "想出去活動（剩餘約 %d 分鐘）" % minutes
+		_:
+			return "目前沒有願望"
 
 
 func _begin_action(action: String) -> bool:
@@ -140,8 +190,86 @@ func _begin_action(action: String) -> bool:
 	return true
 
 
+func _finish_action(message: String) -> void:
+	message_requested.emit(message)
+	_commit()
+	_action_busy = false
+
+
+func _complete_wish(action: String) -> String:
+	if String(data.wish_action) != action or _now() > int(data.wish_expires_at):
+		return ""
+	data.wish_action = ""
+	data.wish_expires_at = 0
+	data.next_wish_at = _now() + randi_range(WISH_MIN_SECONDS, WISH_MAX_SECONDS)
+	data.mood = _limit(data.mood + 5.0)
+	_add_affection(2)
+	_add_xp(2)
+	return "\n願望完成！親密度和 XP 額外提升。"
+
+
+func _update_wish() -> void:
+	var now := _now()
+	if not String(data.wish_action).is_empty():
+		if now > int(data.wish_expires_at):
+			data.wish_action = ""
+			data.wish_expires_at = 0
+			data.next_wish_at = now + randi_range(WISH_MIN_SECONDS, WISH_MAX_SECONDS)
+			_commit()
+		return
+	if now < int(data.next_wish_at):
+		return
+	var action := _choose_wish()
+	data.wish_action = action
+	data.wish_expires_at = now + WISH_DURATION_SECONDS
+	message_requested.emit(_wish_announcement(action))
+	_commit()
+
+
+func _choose_wish() -> String:
+	var weighted: Array[Dictionary] = [
+		{"action": "feed", "weight": 10 + int(100.0 - data.hunger)},
+		{"action": "water", "weight": 10 + int(100.0 - data.thirst)},
+		{"action": "sleep", "weight": 8 + int(100.0 - data.energy)},
+		{"action": "pet", "weight": 12 + int(100.0 - data.mood)},
+	]
+	if data.energy >= 35.0 and _now() >= int(data.work_ready_at):
+		weighted.append({"action": "work", "weight": 12})
+	var total := 0
+	for candidate: Dictionary in weighted:
+		total += int(candidate.weight)
+	var roll := randi_range(1, total)
+	var ceiling := 0
+	for candidate: Dictionary in weighted:
+		ceiling += int(candidate.weight)
+		if roll <= ceiling:
+			return String(candidate.action)
+	return "pet"
+
+
+func _wish_announcement(action: String) -> String:
+	match action:
+		"feed":
+			return "肚子好像有點餓了……"
+		"water":
+			return "想喝一點水～"
+		"sleep":
+			return "開始想打瞌睡了……"
+		"work":
+			return "今天想出去滾一滾！"
+		_:
+			return "現在好想被摸摸！"
+
+
+func _ensure_wish_schedule() -> void:
+	var now := _now()
+	if int(data.next_wish_at) <= 0 and String(data.wish_action).is_empty():
+		data.next_wish_at = now + randi_range(FIRST_WISH_MIN_SECONDS, FIRST_WISH_MAX_SECONDS)
+	data.save_version = SAVE_VERSION
+
+
 func save_state() -> void:
-	data.last_seen = int(Time.get_unix_time_from_system())
+	data.last_seen = _now()
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		push_warning("Unable to open save file: %s" % FileAccess.get_open_error())
@@ -165,12 +293,18 @@ func load_state() -> void:
 
 
 func emit_changed() -> void:
-	changed.emit(data.duplicate(true))
+	var snapshot := data.duplicate(true)
+	snapshot.wish_text = wish_text()
+	changed.emit(snapshot)
 
 
 func _commit() -> void:
 	save_state()
 	emit_changed()
+
+
+func _add_affection(amount: int) -> void:
+	data.affection = clampi(int(data.affection) + amount, 0, 100)
 
 
 func _add_xp(amount: int) -> void:
@@ -183,19 +317,22 @@ func _add_xp(amount: int) -> void:
 
 
 func _apply_offline_progress() -> void:
-	var now := int(Time.get_unix_time_from_system())
+	var now := _now()
 	var last_seen := int(data.get("last_seen", now))
 	if last_seen <= 0:
 		data.last_seen = now
 		return
-	var intervals: int = mini(int((now - last_seen) / 1800.0), 48)
+	var intervals: int = mini(int((now - last_seen) / float(DECAY_INTERVAL_SECONDS)), 48)
 	if intervals <= 0:
 		return
 	data.hunger = _limit(data.hunger - intervals * 2.0)
-	data.thirst = _limit(data.thirst - intervals * 2.5)
-	data.energy = _limit(data.energy - intervals * 1.0)
+	data.thirst = _limit(data.thirst - intervals * 3.0)
 	if data.hunger < 25.0 or data.thirst < 25.0:
-		data.mood = _limit(data.mood - intervals * 1.5)
+		data.mood = _limit(data.mood - intervals * 1.0)
+
+
+func _now() -> int:
+	return int(Time.get_unix_time_from_system())
 
 
 func _limit(value: float) -> float:

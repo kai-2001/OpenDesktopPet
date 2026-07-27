@@ -147,6 +147,37 @@ func pick_autonomous_action(allow_move: bool) -> String:
 	return ""
 
 
+func get_unlocked_action_ids() -> Array[String]:
+	var result: Array[String] = []
+	for action: String in _actions:
+		if is_action_unlocked(action):
+			result.append(action)
+	return result
+
+
+func get_next_unlock() -> Dictionary:
+	var best: Dictionary = {}
+	var best_distance := 1000000
+	for action: String in _actions:
+		var definition := _action_definition(action)
+		var unlock: Dictionary = definition.get("unlock", {})
+		if unlock.is_empty() or is_action_unlocked(action):
+			continue
+		var level_need := int(unlock.get("level", 1))
+		var affection_need := int(unlock.get("affection", 0))
+		var distance := maxi(level_need - int(_progression.level), 0) * 100 \
+			+ maxi(affection_need - int(_progression.affection), 0)
+		if distance < best_distance:
+			best_distance = distance
+			best = {
+				"id": action,
+				"name": String(definition.get("display_name", action)),
+				"level": level_need,
+				"affection": affection_need,
+			}
+	return best
+
+
 func is_action_unlocked(action: String) -> bool:
 	if not _actions.has(action):
 		return false
