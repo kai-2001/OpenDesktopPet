@@ -134,10 +134,12 @@ func say(text: String, seconds := 8.0) -> void:
 	bubble.visible = true
 	bubble_tail.visible = true
 	_layout_speech_bubble(text)
+	_update_window_interaction_region()
 	await get_tree().create_timer(seconds).timeout
 	if token == _bubble_token:
 		bubble.visible = false
 		bubble_tail.visible = false
+		_update_window_interaction_region()
 
 
 func _layout_speech_bubble(text: String) -> void:
@@ -169,7 +171,34 @@ func _finish_window_setup() -> void:
 
 
 func _set_pet_passthrough() -> void:
-	get_window().mouse_passthrough_polygon = _pet_hit_polygon
+	_update_window_interaction_region()
+
+
+func _update_window_interaction_region() -> void:
+	if bubble.visible:
+		var left := bubble.position.x - 8.0
+		var top := bubble.position.y - 8.0
+		var right := bubble.position.x + bubble.size.x + 8.0
+		var bubble_bottom := bubble.position.y + bubble.size.y + 14.0
+		get_window().mouse_passthrough_polygon = PackedVector2Array([
+			Vector2(left, top),
+			Vector2(right, top),
+			Vector2(right, bubble_bottom),
+			Vector2(245, 170),
+			Vector2(220, 310),
+			Vector2(60, 310),
+			Vector2(35, 170),
+			Vector2(left, bubble_bottom),
+		])
+	elif wish_badge.visible:
+		get_window().mouse_passthrough_polygon = PackedVector2Array([
+			Vector2(218, 4), Vector2(276, 4), Vector2(276, 58),
+			Vector2(245, 170), Vector2(220, 310), Vector2(60, 310),
+			Vector2(35, 170), Vector2(70, 100), Vector2(210, 100),
+			Vector2(218, 58),
+		])
+	else:
+		get_window().mouse_passthrough_polygon = _pet_hit_polygon
 
 
 func _update_cursor(global_mouse: Vector2i) -> void:
@@ -499,6 +528,7 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 	var wish_action := String(snapshot.get("wish_action", ""))
 	wish_badge.visible = not wish_action.is_empty()
 	wish_badge.text = _wish_icon(wish_action)
+	_update_window_interaction_region()
 	var level_text := "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
 		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20
 	]
