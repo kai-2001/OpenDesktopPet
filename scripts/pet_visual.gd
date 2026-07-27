@@ -23,6 +23,7 @@ var _idle_clock := 0.0
 var _idle_step := 0
 var _home_position := Vector2.ZERO
 var _animation_serial := 0
+var _current_action := ""
 
 
 func _ready() -> void:
@@ -84,6 +85,15 @@ func is_busy() -> bool:
 	return _busy or _dragging
 
 
+func cancel_roll() -> void:
+	if not _busy or _current_action != "roll":
+		return
+	_animation_serial += 1
+	_busy = false
+	_current_action = ""
+	_restore_idle()
+
+
 func change_visual_size(delta: float) -> void:
 	_visual_size = clampf(_visual_size + delta, 0.7, 1.4)
 	scale = Vector2.ONE * _visual_size
@@ -93,6 +103,7 @@ func play_action(action: String) -> void:
 	if _busy or _dragging or not _textures.has("idle"):
 		return
 	_busy = true
+	_current_action = action
 	_animation_serial += 1
 	var serial := _animation_serial
 	match action:
@@ -107,7 +118,7 @@ func play_action(action: String) -> void:
 		"sleep":
 			await _sequence("sleep", [0, 1, 2, 3, 2, 3, 2, 3], 0.34, serial)
 		"roll":
-			await _sequence("roll", [0, 1, 2, 3], 0.18, serial)
+			await _sequence("roll", [0, 1, 2, 3, 0], 0.18, serial)
 		"wiggle":
 			await _sequence("idle", [0, 3, 0, 3, 0], 0.12, serial)
 		_:
@@ -115,6 +126,7 @@ func play_action(action: String) -> void:
 	if serial == _animation_serial and not _dragging:
 		_restore_idle()
 		_busy = false
+		_current_action = ""
 
 
 func _pose_action(sheet: String, frame: int, pulses: int, delay: float, serial: int) -> void:
@@ -146,6 +158,12 @@ func _show_frame(sheet: String, frame: int) -> void:
 	_sprite.region_enabled = true
 	_sprite.region_filter_clip_enabled = true
 	_sprite.region_rect = Rect2(cell_width * clampi(frame, 0, columns - 1), 0, cell_width, texture.get_height())
+	_sprite.position = Vector2.ZERO
+	if sheet == "idle":
+		# The generated poses have slightly different drawing centers. Anchor
+		# their body mass so blinking changes only the face, not pet position.
+		var idle_offsets := [Vector2(-5, 0), Vector2(5, 0), Vector2(11, 0), Vector2(20, 0)]
+		_sprite.position = idle_offsets[clampi(frame, 0, 3)]
 	# Generated sheets share a 2048x768 canvas. This keeps the visible pet near
 	# the original desktop footprint while every pose remains a complete drawing.
 	_sprite.scale = Vector2.ONE * 0.31

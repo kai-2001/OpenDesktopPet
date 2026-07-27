@@ -51,6 +51,7 @@ func _process(_delta: float) -> void:
 		if is_instance_valid(_auto_move_tween):
 			_auto_move_tween.kill()
 			_auto_move_tween = null
+			pet.cancel_roll()
 	_last_global_mouse = mouse
 	_update_cursor(mouse)
 	if _left_press_pending and not _dragging:
@@ -223,9 +224,9 @@ func _setup_idle_behavior() -> void:
 	timer.start()
 
 
-func _can_act_autonomously() -> bool:
-	var mouse_idle_ms := Time.get_ticks_msec() - _last_user_activity_ms
-	return mouse_idle_ms >= 4500 \
+func _can_act_autonomously(require_mouse_idle := false) -> bool:
+	var mouse_is_idle := Time.get_ticks_msec() - _last_user_activity_ms >= 4500
+	return (not require_mouse_idle or mouse_is_idle) \
 		and not context_menu.visible \
 		and not _stats_window.visible \
 		and not _dragging \
@@ -235,7 +236,10 @@ func _can_act_autonomously() -> bool:
 func _run_autonomous_action() -> void:
 	var choice := randi_range(0, 99)
 	if choice < 30:
-		_autonomous_small_roll()
+		if _can_act_autonomously(true):
+			_autonomous_small_roll()
+		else:
+			pet.play_action(["clap", "belly_clap", "wiggle"].pick_random())
 	elif choice < 58:
 		pet.play_action("clap")
 	elif choice < 78:
@@ -247,7 +251,7 @@ func _run_autonomous_action() -> void:
 
 
 func _autonomous_small_roll() -> void:
-	if not _can_act_autonomously():
+	if not _can_act_autonomously(true):
 		return
 	var screen := DisplayServer.window_get_current_screen()
 	if screen < 0:
@@ -255,7 +259,7 @@ func _autonomous_small_roll() -> void:
 	var usable := DisplayServer.screen_get_usable_rect(screen)
 	var window_size := DisplayServer.window_get_size()
 	var start := DisplayServer.window_get_position()
-	var distance := randi_range(24, 48) * (-1 if randf() < 0.5 else 1)
+	var distance := randi_range(72, 128) * (-1 if randf() < 0.5 else 1)
 	var target_x := clampi(start.x + distance, usable.position.x, usable.end.x - window_size.x)
 	if target_x == start.x:
 		target_x = clampi(start.x - distance, usable.position.x, usable.end.x - window_size.x)
@@ -266,7 +270,7 @@ func _autonomous_small_roll() -> void:
 	_auto_move_tween.tween_method(
 		func(weight: float) -> void:
 			DisplayServer.window_set_position(Vector2i(Vector2(start).lerp(Vector2(target), weight))),
-		0.0, 1.0, 0.75
+		0.0, 1.0, 0.9
 	)
 	await _auto_move_tween.finished
 	_auto_move_tween = null
