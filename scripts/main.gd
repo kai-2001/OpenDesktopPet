@@ -155,8 +155,14 @@ func _layout_speech_bubble(text: String) -> void:
 		).x
 		line_count += maxi(ceili(text_width / TEXT_WIDTH), 1)
 	var bubble_height := clampf(20.0 + line_count * 20.0, 50.0, 120.0)
-	bubble.position = Vector2((280.0 - BUBBLE_WIDTH) / 2.0, BUBBLE_BOTTOM - bubble_height)
-	bubble.size = Vector2(BUBBLE_WIDTH, bubble_height)
+	var bubble_left := (280.0 - BUBBLE_WIDTH) / 2.0
+	# Explicit offsets are required here. PanelContainer recalculates `size`
+	# from its original offsets after child layout, which previously stretched
+	# short messages down over the pet.
+	bubble.offset_left = bubble_left
+	bubble.offset_top = BUBBLE_BOTTOM - bubble_height
+	bubble.offset_right = bubble_left + BUBBLE_WIDTH
+	bubble.offset_bottom = BUBBLE_BOTTOM
 	bubble_tail.polygon = PackedVector2Array([
 		Vector2(132, BUBBLE_BOTTOM - 2),
 		Vector2(148, BUBBLE_BOTTOM - 2),
