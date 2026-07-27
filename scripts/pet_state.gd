@@ -31,6 +31,7 @@ var data: Dictionary = {
 	"wish_expires_at": 0,
 	"next_wish_at": 0,
 	"wish_intro_seen": false,
+	"wish_notice_version": 0,
 	"last_pet_reward_at": 0,
 }
 
@@ -295,6 +296,13 @@ func _wish_announcement(action: String) -> String:
 
 func _ensure_wish_schedule() -> void:
 	var now := _now()
+	if int(data.wish_notice_version) < 1 and String(data.wish_action).is_empty():
+		# Schedule one near-term wish after the persistent notification UI is
+		# introduced, so existing players can discover and verify it.
+		data.wish_notice_version = 1
+		data.next_wish_at = now + randi_range(30, 60)
+		data.save_version = SAVE_VERSION
+		return
 	if not bool(data.wish_intro_seen) and String(data.wish_action).is_empty():
 		# Existing saves created before the wish tutorial field should not be
 		# forced to wait for the normal 20–40 minute cycle.

@@ -19,11 +19,13 @@ func _init() -> void:
 	state.data.next_wish_at = 0
 	state.data.wish_expires_at = 0
 	state.data.wish_intro_seen = false
+	state.data.wish_notice_version = 0
 
 	state.data.next_wish_at = state._now() + 9999
 	state._ensure_wish_schedule()
 	var first_wait := int(state.data.next_wish_at) - state._now()
 	_assert_true(first_wait >= 30 and first_wait <= 60, "first wish migration schedule")
+	_assert_equal(state.data.wish_notice_version, 1, "wish notification migration version")
 
 	state._decay_accumulator = 0.0
 	state._process(600.0)

@@ -48,7 +48,7 @@ func _ready() -> void:
 	_last_user_activity_ms = Time.get_ticks_msec()
 	call_deferred("_finish_window_setup")
 	call_deferred("_prime_stats_window")
-	say("雙擊摸摸我，右鍵可以直接操作！", 4.0)
+	say("雙擊摸摸我，右鍵可以直接操作！", 8.0)
 
 
 func _process(_delta: float) -> void:
@@ -126,7 +126,7 @@ func _notification(what: int) -> void:
 		get_tree().quit()
 
 
-func say(text: String, seconds := 4.5) -> void:
+func say(text: String, seconds := 8.0) -> void:
 	_bubble_token += 1
 	var token := _bubble_token
 	bubble_label.text = text
@@ -166,7 +166,7 @@ func _show_state_message(text: String) -> void:
 	_last_state_message = text.replace("\n", "　")
 	if is_instance_valid(_last_message_status):
 		_last_message_status.text = "最近訊息：%s" % _last_state_message
-	say(text, 5.0)
+	say(text, 8.0)
 
 
 func _setup_context_menu() -> void:
