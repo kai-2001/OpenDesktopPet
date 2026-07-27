@@ -133,10 +133,33 @@ func say(text: String, seconds := 8.0) -> void:
 	bubble_label.text = text
 	bubble.visible = true
 	bubble_tail.visible = true
+	_layout_speech_bubble(text)
 	await get_tree().create_timer(seconds).timeout
 	if token == _bubble_token:
 		bubble.visible = false
 		bubble_tail.visible = false
+
+
+func _layout_speech_bubble(text: String) -> void:
+	const BUBBLE_WIDTH := 220.0
+	const TEXT_WIDTH := 190.0
+	const BUBBLE_BOTTOM := 124.0
+	var font := bubble_label.get_theme_font("font")
+	var font_size := bubble_label.get_theme_font_size("font_size")
+	var line_count := 0
+	for paragraph: String in text.split("\n"):
+		var text_width := font.get_string_size(
+			paragraph, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size
+		).x
+		line_count += maxi(ceili(text_width / TEXT_WIDTH), 1)
+	var bubble_height := clampf(20.0 + line_count * 20.0, 50.0, 120.0)
+	bubble.position = Vector2((280.0 - BUBBLE_WIDTH) / 2.0, BUBBLE_BOTTOM - bubble_height)
+	bubble.size = Vector2(BUBBLE_WIDTH, bubble_height)
+	bubble_tail.polygon = PackedVector2Array([
+		Vector2(132, BUBBLE_BOTTOM - 2),
+		Vector2(148, BUBBLE_BOTTOM - 2),
+		Vector2(140, BUBBLE_BOTTOM + 11),
+	])
 
 
 func _finish_window_setup() -> void:
@@ -545,11 +568,11 @@ func _style_bubble() -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#f3fcfd")
 	style.border_color = Color("#347f99")
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(18)
-	style.shadow_color = Color(0, 0, 0, 0.38)
-	style.shadow_size = 8
-	style.shadow_offset = Vector2(0, 3)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(14)
+	style.shadow_color = Color(0, 0, 0, 0.32)
+	style.shadow_size = 5
+	style.shadow_offset = Vector2(0, 2)
 	bubble.add_theme_stylebox_override("panel", style)
 	bubble_tail.color = style.bg_color
 	bubble_label.add_theme_color_override("font_color", Color("#183247"))
