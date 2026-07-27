@@ -49,7 +49,7 @@ func _ready() -> void:
 	_last_user_activity_ms = Time.get_ticks_msec()
 	call_deferred("_finish_window_setup")
 	call_deferred("_prime_stats_window")
-	say("雙擊摸摸我，右鍵可以直接操作！", 8.0)
+	say("右鍵操作・雙擊摸摸", 5.0)
 
 
 func _process(_delta: float) -> void:
@@ -127,7 +127,7 @@ func _notification(what: int) -> void:
 		get_tree().quit()
 
 
-func say(text: String, seconds := 8.0) -> void:
+func say(text: String, seconds := 6.0) -> void:
 	_bubble_token += 1
 	var token := _bubble_token
 	bubble_label.text = text
@@ -143,8 +143,8 @@ func say(text: String, seconds := 8.0) -> void:
 
 
 func _layout_speech_bubble(text: String) -> void:
-	const BUBBLE_WIDTH := 220.0
-	const TEXT_WIDTH := 190.0
+	const BUBBLE_WIDTH := 200.0
+	const TEXT_WIDTH := 170.0
 	const BUBBLE_BOTTOM := 124.0
 	var font := bubble_label.get_theme_font("font")
 	var font_size := bubble_label.get_theme_font_size("font_size")
@@ -176,20 +176,10 @@ func _set_pet_passthrough() -> void:
 
 func _update_window_interaction_region() -> void:
 	if bubble.visible:
-		var left := bubble.position.x - 8.0
-		var top := bubble.position.y - 8.0
-		var right := bubble.position.x + bubble.size.x + 8.0
-		var bubble_bottom := bubble.position.y + bubble.size.y + 14.0
-		get_window().mouse_passthrough_polygon = PackedVector2Array([
-			Vector2(left, top),
-			Vector2(right, top),
-			Vector2(right, bubble_bottom),
-			Vector2(245, 170),
-			Vector2(220, 310),
-			Vector2(60, 310),
-			Vector2(35, 170),
-			Vector2(left, bubble_bottom),
-		])
+		# A concave native hit-test region distorts translucent controls on
+		# Windows. Use the normal rectangular window briefly while speech is
+		# visible; restore click-through shaping as soon as it disappears.
+		get_window().mouse_passthrough_polygon = PackedVector2Array()
 	elif wish_badge.visible:
 		get_window().mouse_passthrough_polygon = PackedVector2Array([
 			Vector2(218, 4), Vector2(276, 4), Vector2(276, 58),
@@ -221,7 +211,7 @@ func _show_state_message(text: String) -> void:
 	_last_state_message = text.replace("\n", "　")
 	if is_instance_valid(_last_message_status):
 		_last_message_status.text = "最近訊息：%s" % _last_state_message
-	say(text, 8.0)
+	say(text, 6.0)
 
 
 func _setup_context_menu() -> void:
@@ -608,13 +598,13 @@ func _clamp_window_position(requested: Vector2i) -> Vector2i:
 
 func _style_bubble() -> void:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#f3fcfd")
-	style.border_color = Color("#347f99")
+	style.bg_color = Color(0.953, 0.988, 0.996, 0.82)
+	style.border_color = Color(0.204, 0.498, 0.6, 0.82)
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(14)
-	style.shadow_color = Color(0, 0, 0, 0.32)
-	style.shadow_size = 5
-	style.shadow_offset = Vector2(0, 2)
+	style.shadow_color = Color(0, 0, 0, 0.2)
+	style.shadow_size = 3
+	style.shadow_offset = Vector2(0, 1)
 	bubble.add_theme_stylebox_override("panel", style)
 	bubble_tail.color = style.bg_color
 	bubble_label.add_theme_color_override("font_color", Color("#183247"))
