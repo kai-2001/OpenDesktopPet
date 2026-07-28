@@ -38,6 +38,9 @@ var _pet_hit_polygon := PackedVector2Array([
 
 
 func _ready() -> void:
+	# PetVisual is ready before this parent node. Keep its first loaded frame
+	# hidden until the native transparent window has been positioned and shaped.
+	pet.visible = false
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
 	_style_bubble()
@@ -220,6 +223,10 @@ func _finish_window_setup() -> void:
 	_set_pet_passthrough()
 	_position_speech_window()
 	_speech_window.show()
+	# Give Windows one compositor frame to apply the final position and native
+	# region, then reveal the already-loaded sprite in one complete frame.
+	await get_tree().process_frame
+	pet.visible = true
 	say("右鍵操作・雙擊摸摸", 5.0)
 
 
