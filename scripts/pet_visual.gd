@@ -1,8 +1,11 @@
 class_name PetVisual
 extends Node2D
 
-const PACK_ROOT := "res://private_pets/active/"
-const MANIFEST_PATH := PACK_ROOT + "pet.json"
+signal action_completed(request_id: int, requested_action: String, success: bool)
+
+const PRIVATE_PACK_ROOT := "res://private_pets/active/"
+const DEFAULT_PACK_ROOT := "res://characters/default/"
+const USER_PACK_ROOT := "user://characters/active/"
 const REQUIRED_ACTIONS := ["idle", "pet", "eat", "drink", "sleep", "move", "drag", "work"]
 
 var _sprite: Sprite2D
@@ -22,6 +25,9 @@ var _idle_step := 0
 var _home_position := Vector2.ZERO
 var _animation_serial := 0
 var _current_action := ""
+var _pack_root := ""
+var _active_request_id := 0
+var _active_requested_action := ""
 
 
 func _ready() -> void:
@@ -32,7 +38,7 @@ func _ready() -> void:
 	if _load_pack():
 		_show_action_frame("idle", _first_frame("idle"))
 	else:
-		push_error("No valid character pack was found at %s." % MANIFEST_PATH)
+		push_error("No valid character pack was found.")
 		queue_redraw()
 
 
@@ -62,6 +68,8 @@ func set_progression(snapshot: Dictionary) -> void:
 
 
 func set_dragging(value: bool) -> void:
+	if value:
+		_cancel_active_request()
 	_animation_serial += 1
 	_dragging = value
 	_busy = false
@@ -98,21 +106,46 @@ func cancel_roll() -> void:
 
 
 func change_visual_size(delta: float) -> void:
-	_visual_size = clampf(_visual_size + delta, 0.7, 1.4)
+	_visual_size = clampf(_visual_size + delta, 0.7, 1.15)
 	scale = Vector2.ONE * _visual_size
 
 
-func play_action(requested_action: String) -> void:
+func set_visual_size(value: float) -> void:
+	_visual_size = clampf(value, 0.7, 1.15)
+	scale = Vector2.ONE * _visual_size
+
+
+func contains_point(point_in_canvas: Vector2) -> bool:
+	if not is_instance_valid(_sprite) or _sprite.texture == null:
+		return false
+	return _sprite.get_rect().has_point(_sprite.to_local(point_in_canvas))
+
+
+func play_action(requested_action: String, request_id := 0) -> void:
 	if _busy or _dragging or not _actions.has("idle"):
+		if request_id > 0:
+			action_completed.emit(request_id, requested_action, false)
 		return
 	var action := _resolve_action(requested_action)
 	if not _actions.has(action):
+		if request_id > 0:
+			action_completed.emit(request_id, requested_action, false)
+			return
 		action = String(_manifest.get("fallback_action", "idle"))
 	if not is_action_unlocked(action):
+		if request_id > 0:
+			action_completed.emit(request_id, requested_action, false)
+			return
 		action = String(_manifest.get("fallback_action", "idle"))
+	if not _actions.has(action):
+		if request_id > 0:
+			action_completed.emit(request_id, requested_action, false)
+		return
 	var definition := _action_definition(action)
 	_busy = true
 	_current_action = action
+	_active_request_id = request_id
+	_active_requested_action = requested_action
 	_animation_serial += 1
 	var serial := _animation_serial
 	var behavior := String(definition.get("behavior", "sequence"))
@@ -124,6 +157,7 @@ func play_action(requested_action: String) -> void:
 		_restore_idle()
 		_busy = false
 		_current_action = ""
+		_finish_active_request(true)
 
 
 func pick_autonomous_action(allow_move: bool) -> String:
@@ -184,6 +218,17 @@ func is_action_unlocked(action: String) -> bool:
 	var unlock: Dictionary = _action_definition(action).get("unlock", {})
 	return int(_progression.level) >= int(unlock.get("level", 1)) \
 		and int(_progression.affection) >= int(unlock.get("affection", 0))
+
+
+func get_action_duration(requested_action: String) -> float:
+	var action := _resolve_action(requested_action)
+	if not _actions.has(action):
+		return 0.0
+	var definition := _action_definition(action)
+	var frame_time := float(definition.get("frame_time", 0.16))
+	if String(definition.get("behavior", "sequence")) == "pulse":
+		return maxi(int(definition.get("pulses", 4)), 1) * frame_time
+	return _sequence_for(definition).size() * frame_time
 
 
 func _play_sequence(action: String, definition: Dictionary, serial: int) -> void:
@@ -264,7 +309,7 @@ func _texture_for(definition: Dictionary) -> Texture2D:
 	var relative_path := String(definition.get("file", ""))
 	if relative_path.is_empty():
 		return null
-	var path := PACK_ROOT + relative_path
+	var path := _pack_root.path_join(relative_path)
 	if _texture_cache.has(path):
 		return _texture_cache[path] as Texture2D
 	var texture := _load_texture(path)
@@ -274,29 +319,96 @@ func _texture_for(definition: Dictionary) -> Texture2D:
 
 
 func _load_pack() -> bool:
-	if not FileAccess.file_exists(MANIFEST_PATH):
+	for candidate_root: String in [USER_PACK_ROOT, PRIVATE_PACK_ROOT, DEFAULT_PACK_ROOT]:
+		if _load_pack_from(candidate_root):
+			return true
+	return false
+
+
+func _load_pack_from(candidate_root: String) -> bool:
+	var manifest_path := candidate_root.path_join("pet.json")
+	if not FileAccess.file_exists(manifest_path):
 		return false
-	var file := FileAccess.open(MANIFEST_PATH, FileAccess.READ)
+	var file := FileAccess.open(manifest_path, FileAccess.READ)
 	if file == null:
 		return false
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
 	if parsed is not Dictionary:
 		push_error("pet.json is not valid JSON.")
 		return false
-	_manifest = parsed
-	if int(_manifest.get("format_version", 0)) != 1:
-		push_error("Unsupported character-pack format version.")
+	var candidate_manifest: Dictionary = parsed
+	if int(candidate_manifest.get("format_version", 0)) != 1:
+		push_warning("Unsupported character-pack format version: %s" % manifest_path)
 		return false
-	_actions = _manifest.get("actions", {})
-	_aliases = _manifest.get("aliases", {})
-	_pack_scale = float(_manifest.get("scale", 0.31))
+	var candidate_actions: Variant = candidate_manifest.get("actions", {})
+	if candidate_actions is not Dictionary:
+		push_warning("Character pack actions must be an object: %s" % manifest_path)
+		return false
 	for required_action: String in REQUIRED_ACTIONS:
-		if not _actions.has(required_action):
-			push_error("Character pack is missing required action: %s" % required_action)
+		if not candidate_actions.has(required_action):
+			push_warning("Character pack is missing required action '%s': %s" % [
+				required_action, manifest_path
+			])
 			return false
-		var definition := _action_definition(required_action)
-		if String(definition.get("file", "")).is_empty():
-			push_error("Action '%s' has no file." % required_action)
+	for action_id: String in candidate_actions:
+		if not _validate_action(action_id, candidate_actions[action_id], candidate_root):
+			return false
+	var fallback := String(candidate_manifest.get("fallback_action", "idle"))
+	if not candidate_actions.has(fallback):
+		push_warning("Character-pack fallback action does not exist: %s" % fallback)
+		return false
+	_manifest = candidate_manifest
+	_actions = candidate_actions
+	_aliases = candidate_manifest.get("aliases", {}) \
+		if candidate_manifest.get("aliases", {}) is Dictionary else {}
+	_pack_scale = clampf(float(candidate_manifest.get("scale", 0.31)), 0.01, 4.0)
+	_pack_root = candidate_root
+	return true
+
+
+func _validate_action(action_id: String, raw_definition: Variant, root: String) -> bool:
+	if raw_definition is not Dictionary:
+		push_warning("Action '%s' must be an object." % action_id)
+		return false
+	var definition: Dictionary = raw_definition
+	var relative_path := String(definition.get("file", ""))
+	if relative_path.is_empty() or relative_path.is_absolute_path() or relative_path.contains(".."):
+		push_warning("Action '%s' has an unsafe or empty file path." % action_id)
+		return false
+	var full_path := root.path_join(relative_path)
+	if not FileAccess.file_exists(full_path) and not ResourceLoader.exists(full_path):
+		push_warning("Action '%s' image does not exist: %s" % [action_id, full_path])
+		return false
+	var columns := int(definition.get("columns", 1))
+	var rows := int(definition.get("rows", 1))
+	if columns <= 0 or rows <= 0:
+		push_warning("Action '%s' columns and rows must be positive." % action_id)
+		return false
+	var sequence: Variant = definition.get("sequence", [0])
+	if sequence is not Array or sequence.is_empty():
+		push_warning("Action '%s' sequence must be a non-empty array." % action_id)
+		return false
+	for frame: Variant in sequence:
+		var frame_index := int(frame)
+		if frame_index < 0 or frame_index >= columns * rows:
+			push_warning("Action '%s' contains an out-of-range frame." % action_id)
+			return false
+	if float(definition.get("frame_time", 0.16)) <= 0.0:
+		push_warning("Action '%s' frame_time must be positive." % action_id)
+		return false
+	if float(definition.get("frame_time", 0.16)) > 5.0 or sequence.size() > 120:
+		push_warning("Action '%s' animation duration settings are excessive." % action_id)
+		return false
+	if int(definition.get("pulses", 4)) < 1 or int(definition.get("pulses", 4)) > 120:
+		push_warning("Action '%s' pulses must be between 1 and 120." % action_id)
+		return false
+	var offsets: Variant = definition.get("offsets", [])
+	if offsets is not Array:
+		push_warning("Action '%s' offsets must be an array." % action_id)
+		return false
+	for offset: Variant in offsets:
+		if offset is not Array or offset.size() < 2:
+			push_warning("Action '%s' has an invalid offset." % action_id)
 			return false
 	return true
 
@@ -310,7 +422,29 @@ func _restore_idle() -> void:
 	_show_action_frame("idle", _first_frame("idle"))
 
 
+func _cancel_active_request() -> void:
+	if _active_request_id <= 0:
+		return
+	var request_id := _active_request_id
+	var requested_action := _active_requested_action
+	_active_request_id = 0
+	_active_requested_action = ""
+	action_completed.emit(request_id, requested_action, false)
+
+
+func _finish_active_request(success: bool) -> void:
+	if _active_request_id <= 0:
+		return
+	var request_id := _active_request_id
+	var requested_action := _active_requested_action
+	_active_request_id = 0
+	_active_requested_action = ""
+	action_completed.emit(request_id, requested_action, success)
+
+
 func _load_texture(path: String) -> Texture2D:
+	if path.begins_with("res://") and ResourceLoader.exists(path):
+		return load(path) as Texture2D
 	if FileAccess.file_exists(path):
 		var image := Image.load_from_file(path)
 		if image and not image.is_empty():

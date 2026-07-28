@@ -13,14 +13,12 @@ var _unlock_status: Label
 var _last_message_status: Label
 var _stats_bars: Dictionary = {}
 var _dragging := false
-var _drag_moved := false
 var _left_press_pending := false
 var _left_press_started_ms := 0
 var _drag_offset := Vector2i.ZERO
 var _drag_origin := Vector2i.ZERO
 var _bubble_token := 0
 var _idle_count := 0
-var _stats_open_timer: Timer
 var _last_global_mouse := Vector2i.ZERO
 var _last_drag_mouse := Vector2i.ZERO
 var _last_user_activity_ms := 0
@@ -31,12 +29,6 @@ var _last_state_message := "尚無紀錄"
 var _window_is_passthrough := false
 var _cursor_shape := Input.CURSOR_ARROW
 
-var _pet_hit_polygon := PackedVector2Array([
-	Vector2(70, 100), Vector2(210, 100), Vector2(245, 170),
-	Vector2(220, 310), Vector2(60, 310), Vector2(35, 170)
-])
-
-
 func _ready() -> void:
 	# PetVisual is ready before this parent node. Keep its first loaded frame
 	# hidden until the native transparent window has been positioned and shaped.
@@ -45,7 +37,6 @@ func _ready() -> void:
 	get_viewport().gui_embed_subwindows = false
 	_style_bubble()
 	_build_stats_window()
-	_setup_stats_open_timer()
 	_connect_signals()
 	_setup_context_menu()
 	_setup_idle_behavior()
@@ -73,8 +64,6 @@ func _process(_delta: float) -> void:
 			_begin_drag(mouse)
 	if not _dragging:
 		return
-	if mouse.distance_to(_drag_origin) > 4.0:
-		_drag_moved = true
 	if mouse.distance_to(_last_drag_mouse) > 1.0:
 		pet.set_drag_motion(true)
 	_last_drag_mouse = mouse
@@ -94,7 +83,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.pressed:
 			_left_press_pending = true
 			_left_press_started_ms = Time.get_ticks_msec()
-			_drag_moved = false
 			_drag_origin = DisplayServer.mouse_get_position()
 			_last_drag_mouse = _drag_origin
 			_drag_offset = _drag_origin - DisplayServer.window_get_position()
@@ -118,7 +106,6 @@ func _unhandled_input(event: InputEvent) -> void:
 func _begin_drag(mouse: Vector2i) -> void:
 	_left_press_pending = false
 	_dragging = true
-	_drag_moved = true
 	_last_drag_mouse = mouse
 	pet.set_dragging(true)
 	pet.set_drag_motion(true)
@@ -206,8 +193,8 @@ func _finish_window_setup() -> void:
 
 func _update_window_passthrough(global_mouse: Vector2i) -> void:
 	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
-	var over_pet := Geometry2D.is_point_in_polygon(local_mouse, _pet_hit_polygon)
-	var should_pass_through := not (over_pet or _dragging or _left_press_pending)
+	var over_pet: bool = pet.contains_point(local_mouse)
+	var should_pass_through: bool = not (over_pet or _dragging or _left_press_pending)
 	if should_pass_through == _window_is_passthrough:
 		return
 	_window_is_passthrough = should_pass_through
@@ -219,7 +206,7 @@ func _update_cursor(global_mouse: Vector2i) -> void:
 		_set_cursor_shape(Input.CURSOR_DRAG)
 		return
 	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
-	var over_pet := Geometry2D.is_point_in_polygon(local_mouse, _pet_hit_polygon)
+	var over_pet: bool = pet.contains_point(local_mouse)
 	_set_cursor_shape(Input.CURSOR_POINTING_HAND if over_pet else Input.CURSOR_ARROW)
 
 
@@ -234,6 +221,7 @@ func _connect_signals() -> void:
 	state.changed.connect(_refresh_ui)
 	state.message_requested.connect(_show_state_message)
 	state.action_requested.connect(pet.play_action)
+	pet.action_completed.connect(state.receive_action_completed)
 	state.wish_started.connect(_show_wish_notice)
 	# PetState becomes ready before its parent, so its first `changed` signal is
 	# emitted before this node can connect. Ask it for a complete snapshot here
@@ -286,15 +274,15 @@ func _on_context_action(id: int) -> void:
 		1, 2, 3, 4, 5:
 			_run_care_action(id)
 		6:
-			_stats_open_timer.start()
+			call_deferred("_show_stats_window")
 		7:
 			state.save_state()
 			get_tree().quit()
 		20:
-			pet.change_visual_size(-0.1)
+			state.change_visual_size(-0.1)
 			say("這個大小比較不擋路。", 2.0)
 		21:
-			pet.change_visual_size(0.1)
+			state.change_visual_size(0.1)
 			say("放大一點點。", 2.0)
 
 
@@ -332,7 +320,8 @@ func _can_act_autonomously(require_mouse_idle := false) -> bool:
 		and not context_menu.visible \
 		and not _stats_window.visible \
 		and not _dragging \
-		and not pet.is_busy()
+		and not pet.is_busy() \
+		and not state.is_action_busy()
 
 
 func _run_autonomous_action() -> void:
@@ -375,7 +364,7 @@ func _build_stats_window() -> void:
 	_stats_window = Window.new()
 	_stats_window.title = "桌寵詳細狀態"
 	_stats_window.size = Vector2i(400, 720)
-	_stats_window.min_size = Vector2i(400, 720)
+	_stats_window.min_size = Vector2i(360, 480)
 	_stats_window.unresizable = true
 	# A child Window is already transient to the desktop-pet window. Marking it
 	# always-on-top as well is invalid on Windows and prevents reliable popup.
@@ -394,12 +383,18 @@ func _build_stats_window() -> void:
 	panel.add_theme_stylebox_override("panel", panel_style)
 	_stats_window.add_child(panel)
 
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
+
 	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	margin.add_theme_constant_override("margin_left", 24)
 	margin.add_theme_constant_override("margin_top", 20)
 	margin.add_theme_constant_override("margin_right", 24)
 	margin.add_theme_constant_override("margin_bottom", 20)
-	panel.add_child(margin)
+	scroll.add_child(margin)
 
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
@@ -529,6 +524,10 @@ func _show_stats_window() -> void:
 	if screen < 0:
 		screen = DisplayServer.get_primary_screen()
 	var usable := DisplayServer.screen_get_usable_rect(screen)
+	_stats_window.size = Vector2i(
+		mini(400, usable.size.x - 24),
+		mini(720, usable.size.y - 24)
+	)
 	var target := Vector2i(pet_position.x - _stats_window.size.x - 14, pet_position.y - 60)
 	if target.x < usable.position.x:
 		target.x = pet_position.x + pet_size.x + 14
@@ -536,19 +535,10 @@ func _show_stats_window() -> void:
 	_stats_window.position = target
 	_stats_window.show()
 	_stats_window.grab_focus()
-	_stats_window.move_to_foreground()
-
-
-func _setup_stats_open_timer() -> void:
-	_stats_open_timer = Timer.new()
-	_stats_open_timer.one_shot = true
-	_stats_open_timer.wait_time = 0.35
-	_stats_open_timer.timeout.connect(_show_stats_window)
-	add_child(_stats_open_timer)
-
 
 func _refresh_ui(snapshot: Dictionary) -> void:
 	pet.set_progression(snapshot)
+	pet.set_visual_size(float(snapshot.get("visual_scale", 1.0)))
 	_update_unlock_tracking()
 	var level_text := "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
 		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20

@@ -4,6 +4,8 @@ const PetVisualScript = preload("res://scripts/pet_visual.gd")
 const OUTPUT_DIR := "res://private_pets/active/validation/screenshots/"
 
 var _pet: Node2D
+var _request_id := 1000
+var _completed_requests: Dictionary = {}
 
 
 func _ready() -> void:
@@ -11,39 +13,42 @@ func _ready() -> void:
 	_pet = PetVisualScript.new()
 	_pet.position = Vector2(140, 190)
 	add_child(_pet)
+	_pet.action_completed.connect(_on_action_completed)
 	_pet.set_progression({"level": 99, "affection": 100})
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await _capture("01_idle.png")
-	_pet.play_action("clap")
-	await get_tree().create_timer(0.3).timeout
-	await _capture("02_clap.png")
-	await get_tree().create_timer(0.9).timeout
-	_pet.play_action("eat")
-	await get_tree().create_timer(0.32).timeout
-	await _capture("03_eat.png")
-	await get_tree().create_timer(1.5).timeout
-	_pet.play_action("drink")
-	await get_tree().create_timer(0.32).timeout
-	await _capture("04_drink.png")
-	await get_tree().create_timer(1.3).timeout
-	_pet.play_action("sleep")
-	await get_tree().create_timer(0.8).timeout
-	await _capture("05_sleep.png")
-	await get_tree().create_timer(2.2).timeout
-	_pet.play_action("belly_clap")
-	await get_tree().create_timer(0.52).timeout
-	await _capture("06_belly_clap.png")
-	await get_tree().create_timer(1.1).timeout
+	await _capture_action("clap", "02_clap.png")
+	await _capture_action("eat", "03_eat.png")
+	await _capture_action("drink", "04_drink.png")
+	await _capture_action("sleep", "05_sleep.png")
+	await _capture_action("belly_clap", "06_belly_clap.png")
 	_pet.set_dragging(true)
-	await get_tree().create_timer(0.12).timeout
+	await get_tree().process_frame
 	await _capture("07_drag.png")
 	_pet.set_dragging(false)
-	await get_tree().create_timer(0.2).timeout
-	_pet.play_action("roll")
-	await get_tree().create_timer(0.22).timeout
-	await _capture("08_roll.png")
+	await get_tree().process_frame
+	await _capture_action("roll", "08_roll.png")
 	get_tree().quit()
+
+
+func _capture_action(action: String, filename: String) -> void:
+	_request_id += 1
+	var request_id := _request_id
+	var duration: float = _pet.get_action_duration(action)
+	_pet.play_action(action, request_id)
+	await get_tree().create_timer(maxf(duration * 0.45, 0.05)).timeout
+	await _capture(filename)
+	while not _completed_requests.has(request_id):
+		await _pet.action_completed
+	var success := bool(_completed_requests[request_id])
+	_completed_requests.erase(request_id)
+	if not success:
+		push_error("Unable to validate action: %s" % action)
+
+
+func _on_action_completed(request_id: int, _action: String, success: bool) -> void:
+	_completed_requests[request_id] = success
 
 
 func _capture(filename: String) -> void:

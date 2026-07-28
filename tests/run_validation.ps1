@@ -1,0 +1,55 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$GodotExe
+)
+
+$ErrorActionPreference = 'Stop'
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$isolatedAppData = Join-Path $env:TEMP (
+    'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')
+)
+$productionSave = Join-Path $env:APPDATA 'Godot\app_userdata\Open Desktop Pet\save_v2.json'
+$productionHashBefore = if (Test-Path $productionSave) {
+    (Get-FileHash -LiteralPath $productionSave -Algorithm SHA256).Hash
+} else {
+    ''
+}
+
+New-Item -ItemType Directory -Force -Path $isolatedAppData | Out-Null
+$originalAppData = $env:APPDATA
+try {
+    $env:APPDATA = $isolatedAppData
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $gameplayOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/gameplay_state_test.gd' 2>&1
+    $gameplayExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+    $gameplayOutput | Write-Output
+    if ($gameplayExitCode -ne 0 -or -not ($gameplayOutput -match 'GAMEPLAY_STATE_TEST_OK')) {
+        throw 'Gameplay state validation failed.'
+    }
+
+    $ErrorActionPreference = 'Continue'
+    $windowOutput = & $GodotExe --path $projectRoot --script 'res://tests/window_integration_test.gd' 2>&1
+    $windowExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+    $windowOutput | Write-Output
+    if ($windowExitCode -ne 0 -or -not ($windowOutput -match 'WINDOW_INTEGRATION_TEST_OK')) {
+        throw 'Window integration validation failed.'
+    }
+}
+finally {
+    $ErrorActionPreference = 'Stop'
+    $env:APPDATA = $originalAppData
+}
+
+$productionHashAfter = if (Test-Path $productionSave) {
+    (Get-FileHash -LiteralPath $productionSave -Algorithm SHA256).Hash
+} else {
+    ''
+}
+if ($productionHashBefore -ne $productionHashAfter) {
+    throw 'Production save changed during isolated validation.'
+}
+
+Write-Output 'AUTOMATED_VALIDATION_OK'

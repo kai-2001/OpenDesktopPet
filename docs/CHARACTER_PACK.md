@@ -18,6 +18,18 @@ private_pets/active/
 
 `private_pets/` 已被 Git 忽略，私人角色圖片不會包含在開源程式碼或 Release。
 
+已打包 EXE 的外部角色包則放到：
+
+```text
+%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\active\
+├─ pet.json
+└─ animations\
+```
+
+程式依序嘗試 `user://characters/active/`、開發用
+`res://private_pets/active/`、公開內建 `res://characters/default/`。
+前一個角色包驗證失敗時會回退到下一個，不會帶著半套設定繼續執行。
+
 ## 必要動作
 
 `pet.json` 的 `actions` 必須包含以下八個 ID：
@@ -68,6 +80,13 @@ private_pets/active/
 - `behavior: "pulse"`：固定姿勢搭配輕微呼吸縮放，適合只有一格的吃飯或喝水。
 - `pulses`：`pulse` 重複次數。
 
+角色包會在載入時驗證檔案存在、相對路徑安全、欄列數、影格範圍、
+播放速度、pulse 次數、offset 格式與 fallback。`frame_time` 必須大於
+0 且不超過 5 秒，單一 sequence 與 pulses 最多 120 次。
+
+照顧獎勵會等角色包的實際動畫播放完成後才結算，不需要在遊戲邏輯中
+另外填寫動作秒數。
+
 ## 額外動作與解鎖
 
 八個必要動作以外的 ID 都視為額外動作：
@@ -112,7 +131,7 @@ private_pets/active/
 2. 準備八組基本 Sprite Sheet。
 3. 修改每組的欄列數、播放順序與速度。
 4. 將角色包內容放入 `private_pets/active/`。
-5. 使用 `DesktopPet.vbs` 啟動。
+5. 原始碼開發使用 `DesktopPet.vbs`；已打包版本放入 AppData 路徑後重啟 EXE。
 6. 若眨眼或動作發生位移，填寫每格 `offsets`。
 
 食物替換、配件掛點和造型圖層不屬於格式 v1，會在下一階段擴充，避免目前角色作者需要處理組合爆炸。

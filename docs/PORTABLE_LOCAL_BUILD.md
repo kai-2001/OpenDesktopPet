@@ -19,8 +19,18 @@ Game progress is created separately at:
 
 `%APPDATA%\Godot\app_userdata\Open Desktop Pet\save_v2.json`
 
+The executable never stores progress inside itself. Safe-save recovery may
+also leave a `save_v2.json.backup` file beside the active save.
+
 Copy that file to the same location on another computer if progress should
 move with the executable.
+
+An external character pack can override the embedded character without
+rebuilding the executable. Put its manifest and referenced artwork under:
+
+`%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\active\`
+
+See `CHARACTER_PACK.md` for the manifest and filename rules.
 
 ## Distribution note
 

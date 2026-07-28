@@ -1,0 +1,17 @@
+{
+  "format_version": 1,
+  "id": "open_desktop_pet_default",
+  "name": "Default Desktop Pet",
+  "scale": 0.42,
+  "fallback_action": "idle",
+  "actions": {
+    "idle": {"file": "pet.svg", "columns": 1, "sequence": [0], "idle_interval": 2.6},
+    "pet": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 4, "frame_time": 0.16},
+    "eat": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 5, "frame_time": 0.2},
+    "drink": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 5, "frame_time": 0.2},
+    "sleep": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 6, "frame_time": 0.24, "autonomous_weight": 10},
+    "move": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 5, "frame_time": 0.18, "autonomous_weight": 25},
+    "drag": {"file": "pet.svg", "columns": 1, "sequence": [0], "frame_time": 0.16},
+    "work": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 5, "frame_time": 0.18}
+  }
+}
