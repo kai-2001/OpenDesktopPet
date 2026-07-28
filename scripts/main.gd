@@ -206,10 +206,9 @@ func _update_window_interaction_region() -> void:
 		get_window().mouse_passthrough_polygon = PackedVector2Array()
 	elif wish_badge.visible:
 		get_window().mouse_passthrough_polygon = PackedVector2Array([
-			Vector2(218, 4), Vector2(276, 4), Vector2(276, 58),
-			Vector2(245, 170), Vector2(220, 310), Vector2(60, 310),
-			Vector2(35, 170), Vector2(70, 100), Vector2(210, 100),
-			Vector2(218, 58),
+			Vector2(70, 100), Vector2(184, 100), Vector2(192, 82),
+			Vector2(240, 82), Vector2(240, 132), Vector2(245, 170),
+			Vector2(220, 310), Vector2(60, 310), Vector2(35, 170),
 		])
 	else:
 		get_window().mouse_passthrough_polygon = _pet_hit_polygon
@@ -540,8 +539,17 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 	pet.set_progression(snapshot)
 	_update_unlock_tracking()
 	var wish_action := String(snapshot.get("wish_action", ""))
-	wish_badge.visible = not wish_action.is_empty()
-	wish_badge.text = _wish_icon(wish_action)
+	var wish_is_active := not wish_action.is_empty() \
+		and int(snapshot.get("wish_expires_at", 0)) > int(Time.get_unix_time_from_system())
+	if wish_is_active:
+		wish_badge.text = _wish_icon(wish_action)
+		wish_badge.visible = true
+	else:
+		# Clear the glyph before removing it from the transparent window. This
+		# prevents Windows from retaining the final rendered frame as the native
+		# hit-test region shrinks back around the pet.
+		wish_badge.text = ""
+		wish_badge.visible = false
 	_update_window_interaction_region()
 	var level_text := "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
 		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20
