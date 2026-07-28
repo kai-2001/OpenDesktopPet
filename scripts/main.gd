@@ -522,18 +522,8 @@ func _new_label(text: String, font_size: int, color: Color) -> Label:
 
 
 func _show_stats_window() -> void:
-	var created_now := false
 	if not is_instance_valid(_stats_window):
 		_build_stats_window()
-		created_now = true
-	# Adding a Window node does not guarantee that Windows has created its
-	# native HWND in the same frame. Presenting it immediately can set Godot's
-	# visible flag without producing an onscreen window.
-	if created_now:
-		await get_tree().process_frame
-		await get_tree().process_frame
-	if not is_instance_valid(_stats_window):
-		return
 	_refresh_ui(state.get_snapshot())
 	var pet_position := DisplayServer.window_get_position()
 	var pet_size := DisplayServer.window_get_size()
