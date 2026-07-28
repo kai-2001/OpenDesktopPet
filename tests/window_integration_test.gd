@@ -14,6 +14,13 @@ func _init() -> void:
 	_assert_true(main.pet.visible, "pet is revealed after native window setup")
 	_assert_true(main.pet.contains_point(Vector2(140, 190)), "pet center is interactive")
 	_assert_true(not main.pet.contains_point(Vector2(5, 5)), "transparent corner is not interactive")
+	main.pet.play_action("move")
+	await process_frame
+	_assert_true(main.pet.is_busy(), "autonomous animation starts for drag interruption test")
+	_assert_true(main._can_begin_drag(), "autonomous animation does not block dragging")
+	main.pet.set_dragging(true)
+	_assert_true(not main.pet.is_busy() or main.pet._dragging, "dragging interrupts autonomous animation")
+	main.pet.set_dragging(false)
 	main.bubble.visible = true
 	main.bubble_tail.visible = true
 	main._refresh_interaction_polygon()

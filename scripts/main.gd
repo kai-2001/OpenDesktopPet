@@ -58,7 +58,7 @@ func _process(_delta: float) -> void:
 	if _left_press_pending and not _dragging:
 		var held_ms := Time.get_ticks_msec() - _left_press_started_ms
 		if (mouse.distance_to(_drag_origin) >= 6.0 or held_ms >= 220) \
-				and not pet.is_busy() and not state.is_action_busy():
+				and _can_begin_drag():
 			_begin_drag(mouse)
 	if not _dragging:
 		return
@@ -113,6 +113,13 @@ func _begin_drag(mouse: Vector2i) -> void:
 	pet.set_dragging(true)
 	pet.set_drag_motion(true)
 	_set_cursor_shape(Input.CURSOR_DRAG)
+
+
+func _can_begin_drag() -> bool:
+	# PetVisual.set_dragging() deliberately cancels its current animation.
+	# PetState stays busy only for user-requested care actions whose result must
+	# settle, so those remain protected while autonomous animations can yield.
+	return not state.is_action_busy()
 
 
 func _notification(what: int) -> void:
