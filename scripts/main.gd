@@ -197,7 +197,7 @@ func _finish_window_setup() -> void:
 
 func _update_window_passthrough(global_mouse: Vector2i) -> void:
 	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
-	var over_pet: bool = pet.contains_point(local_mouse)
+	var over_pet := _is_pet_interactive_at(local_mouse)
 	var should_pass_through: bool = not (over_pet or _dragging or _left_press_pending)
 	if should_pass_through == _window_is_passthrough:
 		return
@@ -210,8 +210,25 @@ func _update_cursor(global_mouse: Vector2i) -> void:
 		_set_cursor_shape(Input.CURSOR_DRAG)
 		return
 	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
-	var over_pet: bool = pet.contains_point(local_mouse)
+	var over_pet := _is_pet_interactive_at(local_mouse)
 	_set_cursor_shape(Input.CURSOR_POINTING_HAND if over_pet else Input.CURSOR_ARROW)
+
+
+func _is_pet_interactive_at(local_point: Vector2) -> bool:
+	if _is_speech_overlay_at(local_point):
+		return false
+	return pet.contains_point(local_point)
+
+
+func _is_speech_overlay_at(local_point: Vector2) -> bool:
+	if bubble.visible and bubble.get_global_rect().has_point(local_point):
+		return true
+	if bubble_tail.visible:
+		return Geometry2D.is_point_in_polygon(
+			bubble_tail.to_local(local_point),
+			bubble_tail.polygon
+		)
+	return false
 
 
 func _set_cursor_shape(shape: Input.CursorShape) -> void:
@@ -632,8 +649,11 @@ func _place_bottom_right() -> void:
 	if screen < 0:
 		screen = DisplayServer.get_primary_screen()
 	var usable := DisplayServer.screen_get_usable_rect(screen)
-	var size := DisplayServer.window_get_size()
-	DisplayServer.window_set_position(usable.position + usable.size - size - Vector2i(24, 24))
+	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
+	DisplayServer.window_set_position(Vector2i(
+		usable.end.x - ceili(visual_bounds.end.x) - 24,
+		usable.end.y - ceili(visual_bounds.end.y) - 24
+	))
 
 
 func _clamp_window_position(requested: Vector2i) -> Vector2i:
@@ -642,9 +662,18 @@ func _clamp_window_position(requested: Vector2i) -> Vector2i:
 	if screen < 0:
 		screen = DisplayServer.get_primary_screen()
 	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
 	return Vector2i(
-		clampi(requested.x, usable.position.x, usable.end.x - window_size.x),
-		clampi(requested.y, usable.position.y, usable.end.y - window_size.y)
+		clampi(
+			requested.x,
+			usable.position.x - floori(visual_bounds.position.x),
+			usable.end.x - ceili(visual_bounds.end.x)
+		),
+		clampi(
+			requested.y,
+			usable.position.y - floori(visual_bounds.position.y),
+			usable.end.y - ceili(visual_bounds.end.y)
+		)
 	)
 
 

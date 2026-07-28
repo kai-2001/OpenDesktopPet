@@ -3,7 +3,7 @@
 每個角色包是一個資料夾。將使用中的角色包內容放到：
 
 ```text
-private_pets/active/
+characters/custom/
 ├─ pet.json
 └─ animations/
    ├─ idle.png
@@ -16,18 +16,19 @@ private_pets/active/
    └─ work.png
 ```
 
-`private_pets/` 已被 Git 忽略，私人角色圖片不會包含在開源程式碼或 Release。
+`characters/custom/` 已被 Git 忽略，自訂角色圖片不會包含在開源程式碼或公開 Release。
 
 已打包 EXE 的外部角色包則放到：
 
 ```text
-%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\active\
+%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\custom\
 ├─ pet.json
 └─ animations\
 ```
 
-程式依序嘗試 `user://characters/active/`、開發用
-`res://private_pets/active/`、公開內建 `res://characters/default/`。
+角色包只有兩種類別：自訂角色與公開角色。程式依序嘗試外部自訂
+`user://characters/custom/`、本機打包自訂 `res://characters/custom/`，
+最後才使用公開內建 `res://characters/public/`。
 前一個角色包驗證失敗時會回退到下一個，不會帶著半套設定繼續執行。
 
 ## 必要動作
@@ -130,7 +131,7 @@ private_pets/active/
 1. 複製 `examples/character-pack/pet.json`。
 2. 準備八組基本 Sprite Sheet。
 3. 修改每組的欄列數、播放順序與速度。
-4. 將角色包內容放入 `private_pets/active/`。
+4. 將角色包內容放入 `characters/custom/`。
 5. 原始碼開發使用 `DesktopPet.vbs`；已打包版本放入 AppData 路徑後重啟 EXE。
 6. 若眨眼或動作發生位移，填寫每格 `offsets`。
 

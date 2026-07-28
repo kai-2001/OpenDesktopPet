@@ -33,17 +33,17 @@ godot --path .
 
 ## 角色素材
 
-`private_pets/` 已被 `.gitignore` 排除，不得提交到公開儲存庫或 Release。
+`characters/custom/` 已被 `.gitignore` 排除，不得提交到公開儲存庫或 Release。
 開發環境可從下列設定檔載入私人角色包：
 
 ```text
-private_pets/active/pet.json
+characters/custom/pet.json
 ```
 
 打包後的使用者角色包放在：
 
 ```text
-%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\active\pet.json
+%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\custom\pet.json
 ```
 
 載入優先順序為外部使用者角色、開發用私人角色、最後是公開版內建的
@@ -54,9 +54,9 @@ private_pets/active/pet.json
 ## 授權
 
 程式碼採 MIT License。第三方及私人角色素材不因程式碼授權而取得再散佈權利。
-提交變更前請確認素材具有相容的公開授權，或僅放在被忽略的 `private_pets/`。
+提交變更前請確認素材具有相容的公開授權，或僅放在被忽略的 `characters/custom/`。
 
 ## 版本控制
 
 公開提交只包含引擎、通用 UI、遊戲邏輯、文件與可再散佈素材。
-`.godot/`、建置輸出、日誌與 `private_pets/` 不會進入 Git。
+`.godot/`、建置輸出、日誌與 `characters/custom/` 不會進入 Git。

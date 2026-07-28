@@ -3,9 +3,9 @@ extends Node2D
 
 signal action_completed(request_id: int, requested_action: String, success: bool)
 
-const PRIVATE_PACK_ROOT := "res://private_pets/active/"
-const DEFAULT_PACK_ROOT := "res://characters/default/"
-const USER_PACK_ROOT := "user://characters/active/"
+const BUNDLED_CUSTOM_PACK_ROOT := "res://characters/custom/"
+const PUBLIC_PACK_ROOT := "res://characters/public/"
+const USER_CUSTOM_PACK_ROOT := "user://characters/custom/"
 const REQUIRED_ACTIONS := ["idle", "pet", "eat", "drink", "sleep", "move", "drag", "work"]
 
 var _sprite: Sprite2D
@@ -28,6 +28,7 @@ var _current_action := ""
 var _pack_root := ""
 var _active_request_id := 0
 var _active_requested_action := ""
+var _hit_image_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -118,7 +119,46 @@ func set_visual_size(value: float) -> void:
 func contains_point(point_in_canvas: Vector2) -> bool:
 	if not is_instance_valid(_sprite) or _sprite.texture == null:
 		return false
-	return _sprite.get_rect().has_point(_sprite.to_local(point_in_canvas))
+	var sprite_point := _sprite.to_local(point_in_canvas)
+	var sprite_rect := _sprite.get_rect()
+	if not sprite_rect.has_point(sprite_point):
+		return false
+	var image := _hit_image_for(_sprite.texture)
+	if image == null or image.is_empty():
+		return true
+	var normalized := (sprite_point - sprite_rect.position) / sprite_rect.size
+	var source_rect := _sprite.region_rect if _sprite.region_enabled \
+		else Rect2(Vector2.ZERO, Vector2(_sprite.texture.get_size()))
+	var pixel := Vector2i(
+		clampi(
+			floori(source_rect.position.x + normalized.x * source_rect.size.x),
+			0,
+			image.get_width() - 1
+		),
+		clampi(
+			floori(source_rect.position.y + normalized.y * source_rect.size.y),
+			0,
+			image.get_height() - 1
+		)
+	)
+	return image.get_pixelv(pixel).a >= 0.08
+
+
+func get_visual_bounds_in_canvas() -> Rect2:
+	if not is_instance_valid(_sprite) or _sprite.texture == null:
+		return Rect2(position, Vector2.ONE)
+	var sprite_rect := _sprite.get_rect()
+	var transform := _sprite.get_global_transform()
+	var corners := [
+		transform * sprite_rect.position,
+		transform * Vector2(sprite_rect.end.x, sprite_rect.position.y),
+		transform * sprite_rect.end,
+		transform * Vector2(sprite_rect.position.x, sprite_rect.end.y),
+	]
+	var bounds := Rect2(corners[0], Vector2.ZERO)
+	for corner: Vector2 in corners:
+		bounds = bounds.expand(corner)
+	return bounds
 
 
 func play_action(requested_action: String, request_id := 0) -> void:
@@ -319,7 +359,11 @@ func _texture_for(definition: Dictionary) -> Texture2D:
 
 
 func _load_pack() -> bool:
-	for candidate_root: String in [USER_PACK_ROOT, PRIVATE_PACK_ROOT, DEFAULT_PACK_ROOT]:
+	for candidate_root: String in [
+		USER_CUSTOM_PACK_ROOT,
+		BUNDLED_CUSTOM_PACK_ROOT,
+		PUBLIC_PACK_ROOT,
+	]:
 		if _load_pack_from(candidate_root):
 			return true
 	return false
@@ -452,6 +496,15 @@ func _load_texture(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
 		return load(path) as Texture2D
 	return null
+
+
+func _hit_image_for(texture: Texture2D) -> Image:
+	var key := texture.get_rid().get_id()
+	if _hit_image_cache.has(key):
+		return _hit_image_cache[key] as Image
+	var image := texture.get_image()
+	_hit_image_cache[key] = image
+	return image
 
 
 func _draw() -> void:

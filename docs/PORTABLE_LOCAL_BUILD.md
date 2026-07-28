@@ -28,7 +28,7 @@ move with the executable.
 An external character pack can override the embedded character without
 rebuilding the executable. Put its manifest and referenced artwork under:
 
-`%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\active\`
+`%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\custom\`
 
 See `CHARACTER_PACK.md` for the manifest and filename rules.
 

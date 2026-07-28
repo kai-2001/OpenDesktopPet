@@ -1,5 +1,6 @@
 .godot/
 build/
 private_pets/
+characters/custom/
 素材/
 *.log

@@ -14,7 +14,7 @@ func _init() -> void:
 		var path := ProjectSettings.globalize_path(TEST_SAVE_PATH + suffix)
 		if FileAccess.file_exists(TEST_SAVE_PATH + suffix):
 			DirAccess.remove_absolute(path)
-	var invalid_pack_root := "user://characters/active"
+	var invalid_pack_root := "user://characters/custom"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(invalid_pack_root))
 	var invalid_manifest := FileAccess.open(
 		invalid_pack_root.path_join("pet.json"), FileAccess.WRITE
@@ -32,17 +32,17 @@ func _init() -> void:
 	visual.action_completed.connect(state.receive_action_completed)
 	await process_frame
 	_assert_true(
-		visual._pack_root != PetVisualScript.USER_PACK_ROOT,
+		visual._pack_root != PetVisualScript.USER_CUSTOM_PACK_ROOT,
 		"invalid external character pack must be rejected"
 	)
 	var default_visual := PetVisualScript.new()
 	_assert_true(
-		default_visual._load_pack_from(PetVisualScript.DEFAULT_PACK_ROOT),
+		default_visual._load_pack_from(PetVisualScript.PUBLIC_PACK_ROOT),
 		"public default character pack must validate and load"
 	)
 	_assert_equal(
 		default_visual._pack_root,
-		PetVisualScript.DEFAULT_PACK_ROOT,
+		PetVisualScript.PUBLIC_PACK_ROOT,
 		"public default character root"
 	)
 	default_visual.free()

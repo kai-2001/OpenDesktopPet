@@ -14,6 +14,66 @@ func _init() -> void:
 	_assert_true(main.pet.visible, "pet is revealed after native window setup")
 	_assert_true(main.pet.contains_point(Vector2(140, 190)), "pet center is interactive")
 	_assert_true(not main.pet.contains_point(Vector2(5, 5)), "transparent corner is not interactive")
+	main.bubble.visible = true
+	main.bubble_tail.visible = true
+	var bubble_pet_overlap := Vector2(-1, -1)
+	var bubble_rect: Rect2 = main.bubble.get_global_rect()
+	for y in range(floori(bubble_rect.position.y), ceili(bubble_rect.end.y), 2):
+		for x in range(floori(bubble_rect.position.x), ceili(bubble_rect.end.x), 2):
+			var candidate := Vector2(x, y)
+			if main.pet.contains_point(candidate):
+				bubble_pet_overlap = candidate
+				break
+		if bubble_pet_overlap.x >= 0:
+			break
+	if bubble_pet_overlap.x < 0:
+		bubble_pet_overlap = bubble_rect.get_center()
+	_assert_true(
+		main._is_speech_overlay_at(bubble_pet_overlap),
+		"speech pass-through test uses the visible bubble area"
+	)
+	_assert_true(
+		not main._is_pet_interactive_at(bubble_pet_overlap),
+		"visible speech bubble overrides the pet hit area"
+	)
+	main._update_window_passthrough(
+		DisplayServer.window_get_position() + Vector2i(bubble_pet_overlap)
+	)
+	_assert_true(
+		main.get_window().mouse_passthrough,
+		"native desktop window passes clicks through the speech bubble"
+	)
+	_assert_true(
+		not main._is_pet_interactive_at(Vector2(140, 128)),
+		"visible speech tail is click-through"
+	)
+	main.bubble.visible = false
+	main.bubble_tail.visible = false
+	main._update_window_passthrough(
+		DisplayServer.window_get_position() + Vector2i(140, 190)
+	)
+	_assert_true(
+		not main.get_window().mouse_passthrough,
+		"native desktop window captures clicks on the visible pet"
+	)
+
+	var screen_for_drag := DisplayServer.window_get_current_screen()
+	if screen_for_drag < 0:
+		screen_for_drag = DisplayServer.get_primary_screen()
+	var drag_usable := DisplayServer.screen_get_usable_rect(screen_for_drag)
+	var visual_bounds: Rect2 = main.pet.get_visual_bounds_in_canvas()
+	var clamped_top_left: Vector2i = main._clamp_window_position(
+		drag_usable.position - Vector2i(10000, 10000)
+	)
+	var visible_at_top_left := Rect2(
+		Vector2(clamped_top_left) + visual_bounds.position,
+		visual_bounds.size
+	)
+	_assert_true(
+		visible_at_top_left.position.x >= drag_usable.position.x - 1
+			and visible_at_top_left.position.y >= drag_usable.position.y - 1,
+		"drag clamp uses visible pet bounds at the top-left"
+	)
 
 	main._show_context_menu(Vector2i(140, 190))
 	await process_frame
