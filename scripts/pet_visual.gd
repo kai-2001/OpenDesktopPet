@@ -2,6 +2,7 @@ class_name PetVisual
 extends Node2D
 
 signal action_completed(request_id: int, requested_action: String, success: bool)
+signal interaction_region_changed(polygon: PackedVector2Array)
 
 const BUNDLED_CUSTOM_PACK_ROOT := "res://characters/custom/"
 const PUBLIC_PACK_ROOT := "res://characters/public/"
@@ -29,6 +30,7 @@ var _pack_root := ""
 var _active_request_id := 0
 var _active_requested_action := ""
 var _hit_image_cache: Dictionary = {}
+var _hit_polygon_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -81,6 +83,7 @@ func set_dragging(value: bool) -> void:
 		scale = Vector2.ONE * _visual_size
 	else:
 		_restore_idle()
+	_emit_interaction_region()
 
 
 func set_drag_motion(is_moving: bool) -> void:
@@ -109,11 +112,13 @@ func cancel_roll() -> void:
 func change_visual_size(delta: float) -> void:
 	_visual_size = clampf(_visual_size + delta, 0.7, 1.15)
 	scale = Vector2.ONE * _visual_size
+	_emit_interaction_region()
 
 
 func set_visual_size(value: float) -> void:
 	_visual_size = clampf(value, 0.7, 1.15)
 	scale = Vector2.ONE * _visual_size
+	_emit_interaction_region()
 
 
 func contains_point(point_in_canvas: Vector2) -> bool:
@@ -159,6 +164,17 @@ func get_visual_bounds_in_canvas() -> Rect2:
 	for corner: Vector2 in corners:
 		bounds = bounds.expand(corner)
 	return bounds
+
+
+func get_interaction_polygon() -> PackedVector2Array:
+	if not is_instance_valid(_sprite) or _sprite.texture == null:
+		return PackedVector2Array()
+	var source_polygon := _source_hit_polygon()
+	var transformed := PackedVector2Array()
+	var transform := _sprite.get_global_transform()
+	for point: Vector2 in source_polygon:
+		transformed.append(transform * point)
+	return transformed
 
 
 func play_action(requested_action: String, request_id := 0) -> void:
@@ -316,6 +332,7 @@ func _show_action_frame(action: String, frame: int) -> void:
 	)
 	_sprite.position = _frame_offset(definition, safe_frame)
 	_sprite.scale = Vector2.ONE * float(definition.get("scale", _pack_scale))
+	_emit_interaction_region()
 
 
 func _frame_offset(definition: Dictionary, frame: int) -> Vector2:
@@ -505,6 +522,59 @@ func _hit_image_for(texture: Texture2D) -> Image:
 	var image := texture.get_image()
 	_hit_image_cache[key] = image
 	return image
+
+
+func _source_hit_polygon() -> PackedVector2Array:
+	var texture := _sprite.texture
+	var image := _hit_image_for(texture)
+	if image == null or image.is_empty():
+		return PackedVector2Array()
+	var source_rect := _sprite.region_rect if _sprite.region_enabled \
+		else Rect2(Vector2.ZERO, Vector2(texture.get_size()))
+	var pixel_rect := Rect2i(
+		Vector2i(floori(source_rect.position.x), floori(source_rect.position.y)),
+		Vector2i(ceili(source_rect.size.x), ceili(source_rect.size.y))
+	)
+	var cache_key := "%s:%s" % [texture.get_rid().get_id(), pixel_rect]
+	var pixel_polygon: PackedVector2Array
+	if _hit_polygon_cache.has(cache_key):
+		pixel_polygon = _hit_polygon_cache[cache_key]
+	else:
+		var frame_image := image.get_region(pixel_rect)
+		var bitmap := BitMap.new()
+		bitmap.create_from_image_alpha(frame_image, 0.08)
+		var polygons := bitmap.opaque_to_polygons(
+			Rect2i(Vector2i.ZERO, frame_image.get_size()),
+			2.0
+		)
+		var largest_area := -1.0
+		for candidate: PackedVector2Array in polygons:
+			var area := absf(_polygon_area(candidate))
+			if area > largest_area:
+				largest_area = area
+				pixel_polygon = candidate
+		_hit_polygon_cache[cache_key] = pixel_polygon
+	var sprite_rect := _sprite.get_rect()
+	var result := PackedVector2Array()
+	for point: Vector2 in pixel_polygon:
+		result.append(sprite_rect.position + Vector2(
+			point.x / source_rect.size.x * sprite_rect.size.x,
+			point.y / source_rect.size.y * sprite_rect.size.y
+		))
+	return result
+
+
+func _polygon_area(polygon: PackedVector2Array) -> float:
+	var area := 0.0
+	for index in polygon.size():
+		var next := (index + 1) % polygon.size()
+		area += polygon[index].x * polygon[next].y
+		area -= polygon[next].x * polygon[index].y
+	return area * 0.5
+
+
+func _emit_interaction_region() -> void:
+	interaction_region_changed.emit(get_interaction_polygon())
 
 
 func _draw() -> void:

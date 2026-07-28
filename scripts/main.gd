@@ -26,7 +26,6 @@ var _auto_move_tween: Tween
 var _known_unlocked_actions: Dictionary = {}
 var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
-var _window_is_passthrough := false
 var _cursor_shape := Input.CURSOR_ARROW
 
 func _ready() -> void:
@@ -54,7 +53,6 @@ func _process(_delta: float) -> void:
 			_auto_move_tween = null
 			pet.cancel_roll()
 	_last_global_mouse = mouse
-	_update_window_passthrough(mouse)
 	_update_cursor(mouse)
 	if _left_press_pending and not _dragging:
 		var held_ms := Time.get_ticks_msec() - _left_press_started_ms
@@ -187,22 +185,12 @@ func _finish_window_setup() -> void:
 	_place_bottom_right()
 	# Rendering remains a normal transparent rectangle. Mouse input alone is
 	# toggled as the pointer enters or leaves the pet, so speech is never clipped.
-	get_window().mouse_passthrough_polygon = PackedVector2Array()
+	_apply_interaction_polygon(pet.get_interaction_polygon())
 	# Give Windows one compositor frame to apply the final position and native
 	# transparency, then reveal the already-loaded sprite in one complete frame.
 	await get_tree().process_frame
 	pet.visible = true
 	say("右鍵操作・雙擊摸摸", 5.0)
-
-
-func _update_window_passthrough(global_mouse: Vector2i) -> void:
-	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
-	var over_pet := _is_pet_interactive_at(local_mouse)
-	var should_pass_through: bool = not (over_pet or _dragging or _left_press_pending)
-	if should_pass_through == _window_is_passthrough:
-		return
-	_window_is_passthrough = should_pass_through
-	get_window().mouse_passthrough = should_pass_through
 
 
 func _update_cursor(global_mouse: Vector2i) -> void:
@@ -231,6 +219,11 @@ func _is_speech_overlay_at(local_point: Vector2) -> bool:
 	return false
 
 
+func _apply_interaction_polygon(polygon: PackedVector2Array) -> void:
+	get_window().mouse_passthrough = false
+	get_window().mouse_passthrough_polygon = polygon
+
+
 func _set_cursor_shape(shape: Input.CursorShape) -> void:
 	if shape == _cursor_shape:
 		return
@@ -243,6 +236,7 @@ func _connect_signals() -> void:
 	state.message_requested.connect(_show_state_message)
 	state.action_requested.connect(pet.play_action)
 	pet.action_completed.connect(state.receive_action_completed)
+	pet.interaction_region_changed.connect(_apply_interaction_polygon)
 	state.wish_started.connect(_show_wish_notice)
 	# PetState becomes ready before its parent, so its first `changed` signal is
 	# emitted before this node can connect. Ask it for a complete snapshot here

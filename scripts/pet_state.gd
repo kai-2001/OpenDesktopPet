@@ -211,7 +211,7 @@ func wish_text() -> String:
 		"sleep":
 			return "想睡一下（剩餘約 %d 分鐘）" % minutes
 		"work":
-			return "想出去活動（剩餘約 %d 分鐘）" % minutes
+			return "想工作（完成一次工作，剩餘約 %d 分鐘）" % minutes
 		_:
 			return "目前沒有願望"
 

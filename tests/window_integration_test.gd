@@ -36,12 +36,11 @@ func _init() -> void:
 		not main._is_pet_interactive_at(bubble_pet_overlap),
 		"visible speech bubble overrides the pet hit area"
 	)
-	main._update_window_passthrough(
-		DisplayServer.window_get_position() + Vector2i(bubble_pet_overlap)
-	)
+	var native_hit_polygon: PackedVector2Array = \
+		main.get_window().mouse_passthrough_polygon
 	_assert_true(
-		main.get_window().mouse_passthrough,
-		"native desktop window passes clicks through the speech bubble"
+		not Geometry2D.is_point_in_polygon(bubble_pet_overlap, native_hit_polygon),
+		"native desktop hit region excludes the speech bubble"
 	)
 	_assert_true(
 		not main._is_pet_interactive_at(Vector2(140, 128)),
@@ -49,12 +48,9 @@ func _init() -> void:
 	)
 	main.bubble.visible = false
 	main.bubble_tail.visible = false
-	main._update_window_passthrough(
-		DisplayServer.window_get_position() + Vector2i(140, 190)
-	)
 	_assert_true(
-		not main.get_window().mouse_passthrough,
-		"native desktop window captures clicks on the visible pet"
+		Geometry2D.is_point_in_polygon(Vector2(140, 190), native_hit_polygon),
+		"native desktop hit region includes the visible pet"
 	)
 
 	var screen_for_drag := DisplayServer.window_get_current_screen()
