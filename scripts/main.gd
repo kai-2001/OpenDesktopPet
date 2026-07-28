@@ -4,6 +4,10 @@ const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_STATS_SIZE := Vector2i(400, 720)
 const MIN_STATS_SIZE := Vector2i(360, 480)
 const VISIBILITY_CHECK_INTERVAL := 0.10
+const DEFAULT_TARGET_FPS := 30
+const TARGET_FPS_OPTIONS := [15, 30, 60]
+const AUTOSTART_REGISTRY_KEY := "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+const AUTOSTART_VALUE_NAME := "Open Desktop Pet"
 
 @onready var state: Node = $PetState
 @onready var pet: Node2D = $PetVisual
@@ -16,7 +20,13 @@ var _stats_status: Label
 var _wish_status: Label
 var _unlock_status: Label
 var _last_message_status: Label
+var _fps_option_button: OptionButton
+var _autostart_check_box: CheckBox
+var _settings_feedback: Label
 var _stats_bars: Dictionary = {}
+var _autostart_threads: Dictionary = {}
+var _autostart_operation_serial := 0
+var _latest_autostart_operation_id := 0
 var _dragging := false
 var _left_press_pending := false
 var _left_press_started_ms := 0
@@ -39,6 +49,7 @@ func _ready() -> void:
 	# PetVisual is ready before this parent node. Keep its first loaded frame
 	# hidden until the native transparent window has been positioned and shaped.
 	pet.visible = false
+	_load_runtime_settings()
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
 	_style_bubble()
@@ -132,6 +143,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_save_stats_window_size()
 		state.save_state()
+		_finish_all_autostart_threads()
 		get_tree().quit()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN \
 			or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
@@ -488,10 +500,34 @@ func _build_stats_window() -> void:
 	panel.add_theme_stylebox_override("panel", panel_style)
 	_stats_window.add_child(panel)
 
+	var tabs := TabContainer.new()
+	tabs.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var tab_bar := tabs.get_tab_bar()
+	tab_bar.add_theme_font_size_override("font_size", 16)
+	tab_bar.add_theme_constant_override("h_separation", 6)
+	var selected_tab_style := StyleBoxFlat.new()
+	selected_tab_style.bg_color = Color("#203c48")
+	selected_tab_style.border_color = Color("#55c8e5")
+	selected_tab_style.border_width_top = 2
+	selected_tab_style.content_margin_left = 18
+	selected_tab_style.content_margin_right = 18
+	selected_tab_style.content_margin_top = 9
+	selected_tab_style.content_margin_bottom = 9
+	var unselected_tab_style := selected_tab_style.duplicate() as StyleBoxFlat
+	unselected_tab_style.bg_color = Color("#101a1f")
+	unselected_tab_style.border_color = Color("#263b44")
+	var hovered_tab_style := selected_tab_style.duplicate() as StyleBoxFlat
+	hovered_tab_style.bg_color = Color("#284b59")
+	tab_bar.add_theme_stylebox_override("tab_selected", selected_tab_style)
+	tab_bar.add_theme_stylebox_override("tab_unselected", unselected_tab_style)
+	tab_bar.add_theme_stylebox_override("tab_hovered", hovered_tab_style)
+	panel.add_child(tabs)
+
 	var scroll := ScrollContainer.new()
+	scroll.name = "狀態"
 	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	panel.add_child(scroll)
+	tabs.add_child(scroll)
 
 	var margin := MarginContainer.new()
 	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -574,6 +610,80 @@ func _build_stats_window() -> void:
 	close_button.custom_minimum_size.y = 42
 	close_button.pressed.connect(_destroy_stats_window)
 	content.add_child(close_button)
+
+	var settings_scroll := ScrollContainer.new()
+	settings_scroll.name = "設定"
+	settings_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	tabs.add_child(settings_scroll)
+
+	var settings_margin := MarginContainer.new()
+	settings_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_margin.add_theme_constant_override("margin_left", 24)
+	settings_margin.add_theme_constant_override("margin_top", 20)
+	settings_margin.add_theme_constant_override("margin_right", 24)
+	settings_margin.add_theme_constant_override("margin_bottom", 20)
+	settings_scroll.add_child(settings_margin)
+
+	var settings_content := VBoxContainer.new()
+	settings_content.add_theme_constant_override("separation", 16)
+	settings_margin.add_child(settings_content)
+
+	var settings_title := _new_label("桌寵設定", 24, Color("#e9fbff"))
+	settings_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	settings_content.add_child(settings_title)
+
+	var fps_row := HBoxContainer.new()
+	fps_row.add_theme_constant_override("separation", 12)
+	var fps_label := _new_label("桌寵幀率（FPS）", 16, Color("#e9fbff"))
+	fps_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fps_row.add_child(fps_label)
+	_fps_option_button = OptionButton.new()
+	for fps: int in TARGET_FPS_OPTIONS:
+		_fps_option_button.add_item("%d FPS" % fps, fps)
+	_fps_option_button.select(
+		_fps_option_button.get_item_index(Engine.max_fps)
+	)
+	_fps_option_button.custom_minimum_size = Vector2(120, 40)
+	_fps_option_button.item_selected.connect(_on_target_fps_selected)
+	fps_row.add_child(_fps_option_button)
+	settings_content.add_child(fps_row)
+
+	var fps_hint := _new_label(
+		"控制整個桌寵的更新率（15–60）；30 FPS 適合日常使用，降低可省電。",
+		13,
+		Color("#b9ced5")
+	)
+	fps_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	settings_content.add_child(fps_hint)
+	settings_content.add_child(HSeparator.new())
+
+	_autostart_check_box = CheckBox.new()
+	_autostart_check_box.text = "登入 Windows 時自動開啟桌寵"
+	_autostart_check_box.add_theme_font_size_override("font_size", 16)
+	_autostart_check_box.button_pressed = false
+	_autostart_check_box.disabled = true
+	_autostart_check_box.toggled.connect(_on_autostart_toggled)
+	settings_content.add_child(_autostart_check_box)
+
+	_settings_feedback = _new_label(
+		"請使用打包版設定開機啟動。"
+		if OS.has_feature("editor")
+		else "正在讀取 Windows 開機啟動設定…",
+		13,
+		Color("#b9ced5")
+	)
+	_settings_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	settings_content.add_child(_settings_feedback)
+	if _is_autostart_supported():
+		call_deferred("_start_autostart_operation", "query", false)
+	elif not OS.has_feature("editor"):
+		_settings_feedback.text = "目前平台不支援 Windows 開機啟動設定。"
+
+	var settings_close_button := Button.new()
+	settings_close_button.text = "關閉詳細面板"
+	settings_close_button.custom_minimum_size.y = 42
+	settings_close_button.pressed.connect(_destroy_stats_window)
+	settings_content.add_child(settings_close_button)
 
 
 func _run_care_action(id: int) -> void:
@@ -673,6 +783,9 @@ func _destroy_stats_window() -> void:
 	_wish_status = null
 	_unlock_status = null
 	_last_message_status = null
+	_fps_option_button = null
+	_autostart_check_box = null
+	_settings_feedback = null
 	_stats_bars.clear()
 
 
@@ -690,6 +803,259 @@ func _load_stats_window_size() -> Vector2i:
 		maxi(saved_width, MIN_STATS_SIZE.x),
 		maxi(saved_height, MIN_STATS_SIZE.y)
 	)
+
+
+func _load_runtime_settings() -> void:
+	var config := ConfigFile.new()
+	var target_fps := DEFAULT_TARGET_FPS
+	if config.load(UI_SETTINGS_PATH) == OK:
+		target_fps = int(config.get_value(
+			"performance", "target_fps", DEFAULT_TARGET_FPS
+		))
+	Engine.max_fps = _normalize_target_fps(target_fps)
+
+
+func _normalize_target_fps(value: int) -> int:
+	var nearest: int = TARGET_FPS_OPTIONS[0]
+	for candidate: int in TARGET_FPS_OPTIONS:
+		if absi(candidate - value) < absi(nearest - value):
+			nearest = candidate
+	return nearest
+
+
+func _on_target_fps_selected(index: int) -> void:
+	_set_target_fps(_fps_option_button.get_item_id(index))
+
+
+func _set_target_fps(value: int) -> void:
+	var target_fps := _normalize_target_fps(value)
+	Engine.max_fps = target_fps
+	if is_instance_valid(_fps_option_button):
+		var target_index := _fps_option_button.get_item_index(target_fps)
+		if target_index >= 0 and _fps_option_button.selected != target_index:
+			_fps_option_button.select(target_index)
+	var config := ConfigFile.new()
+	config.load(UI_SETTINGS_PATH)
+	config.set_value("performance", "target_fps", target_fps)
+	config.save(UI_SETTINGS_PATH)
+
+
+func _is_autostart_supported() -> bool:
+	return OS.get_name() == "Windows" and not OS.has_feature("editor")
+
+
+func _autostart_command(executable_path := OS.get_executable_path()) -> String:
+	return "\"%s\"" % _native_windows_path(executable_path)
+
+
+func _native_windows_path(path: String) -> String:
+	return path.replace("/", "\\")
+
+
+func _registry_executable() -> String:
+	var windows_root := OS.get_environment("SystemRoot")
+	if windows_root.is_empty():
+		windows_root = "C:\\Windows"
+	return windows_root.path_join("System32").path_join("reg.exe")
+
+
+func _query_registry_value_blocking(
+	registry_key: String,
+	value_name: String,
+	expected_executable_path: String
+) -> Dictionary:
+	var output: Array = []
+	var exit_code := OS.execute(
+		_registry_executable(),
+		PackedStringArray([
+			"query", registry_key, "/v", value_name
+		]),
+		output,
+		true,
+		false
+	)
+	var exists := exit_code == 0
+	var expected_command := _autostart_command(expected_executable_path)
+	var legacy_command := "\"%s\"" % expected_executable_path.replace("\\", "/")
+	var output_text := "\n".join(PackedStringArray(output)).strip_edges()
+	return {
+		"exists": exists,
+		"matches": exists and output_text.to_lower().contains(
+			expected_command.to_lower()
+		),
+		"legacy_matches": exists and output_text.to_lower().contains(
+			legacy_command.to_lower()
+		),
+		"output": output_text,
+	}
+
+
+func _query_autostart_state_blocking() -> Dictionary:
+	return _query_registry_value_blocking(
+		AUTOSTART_REGISTRY_KEY,
+		AUTOSTART_VALUE_NAME,
+		OS.get_executable_path()
+	)
+
+
+func _on_autostart_toggled(enabled: bool) -> void:
+	if not _is_autostart_supported():
+		return
+	_start_autostart_operation("set", enabled)
+
+
+func _write_registry_autostart_blocking(
+	registry_key: String,
+	value_name: String,
+	enabled: bool,
+	executable_path: String
+) -> bool:
+	var arguments := PackedStringArray()
+	if enabled:
+		arguments = PackedStringArray([
+			"add",
+			registry_key,
+			"/v",
+			value_name,
+			"/t",
+			"REG_SZ",
+			"/d",
+			# reg.exe is a native Windows command-line program. The literal
+			# quotes required by Run values must survive its argv parser.
+			"\\\"%s\\\"" % _native_windows_path(executable_path),
+			"/f",
+		])
+	else:
+		arguments = PackedStringArray([
+			"delete",
+			registry_key,
+			"/v",
+			value_name,
+			"/f",
+		])
+	var output: Array = []
+	var exit_code := OS.execute(
+		_registry_executable(), arguments, output, true, false
+	)
+	if exit_code != 0:
+		push_warning(
+			"Windows autostart registry command failed (%d): %s" % [
+				exit_code,
+				"\n".join(PackedStringArray(output)).strip_edges(),
+			]
+		)
+	return exit_code == 0
+
+
+func _set_autostart_enabled_blocking(enabled: bool) -> bool:
+	return _write_registry_autostart_blocking(
+		AUTOSTART_REGISTRY_KEY,
+		AUTOSTART_VALUE_NAME,
+		enabled,
+		OS.get_executable_path()
+	)
+
+
+func _start_autostart_operation(operation: String, enabled: bool) -> void:
+	if is_instance_valid(_autostart_check_box):
+		_autostart_check_box.disabled = true
+	if is_instance_valid(_settings_feedback):
+		_settings_feedback.text = (
+			"正在讀取 Windows 開機啟動設定…"
+			if operation == "query"
+			else "正在套用開機啟動設定…"
+		)
+	_autostart_operation_serial += 1
+	var operation_id := _autostart_operation_serial
+	_latest_autostart_operation_id = operation_id
+	var operation_thread := Thread.new()
+	_autostart_threads[operation_id] = operation_thread
+	var start_error := operation_thread.start(
+		Callable(self, "_run_autostart_operation").bind(
+			operation_id, operation, enabled
+		)
+	)
+	if start_error != OK:
+		_autostart_threads.erase(operation_id)
+		_finish_autostart_operation(
+			operation_id,
+			operation,
+			enabled,
+			{"exists": false, "matches": false}
+			if operation == "query"
+			else {"success": false}
+		)
+
+
+func _run_autostart_operation(
+	operation_id: int, operation: String, enabled: bool
+) -> void:
+	var result: Variant
+	if operation == "query":
+		result = _query_autostart_state_blocking()
+	else:
+		result = {"success": _set_autostart_enabled_blocking(enabled)}
+	call_deferred(
+		"_finish_autostart_operation",
+		operation_id,
+		operation,
+		enabled,
+		result
+	)
+
+
+func _finish_autostart_operation(
+	operation_id: int,
+	operation: String,
+	enabled: bool,
+	result: Dictionary
+) -> void:
+	_finish_autostart_thread(operation_id)
+	# A panel can be closed and recreated while an older registry request is
+	# finishing. Only the newest request may update the current controls.
+	if operation_id != _latest_autostart_operation_id:
+		return
+	if not is_instance_valid(_autostart_check_box) \
+			or _autostart_check_box.is_queued_for_deletion():
+		return
+	_autostart_check_box.disabled = false
+	if operation == "query":
+		var matches := bool(result.get("matches", false))
+		var exists := bool(result.get("exists", false))
+		var legacy_matches := bool(result.get("legacy_matches", false))
+		_autostart_check_box.set_pressed_no_signal(matches)
+		if matches:
+			_settings_feedback.text = "已設定由目前這個 EXE 隨 Windows 登入啟動。"
+		elif legacy_matches:
+			# Older builds stored Godot's forward-slash executable path. The
+			# entry already expresses the user's autostart preference, so
+			# migrate it to a native Windows command automatically.
+			_settings_feedback.text = "正在更新舊的開機啟動路徑…"
+			_start_autostart_operation("set", true)
+		elif exists:
+			_settings_feedback.text = "偵測到其他位置的舊設定；重新勾選即可更新。"
+		else:
+			_settings_feedback.text = "這項設定只套用到目前的 Windows 使用者。"
+	elif bool(result.get("success", false)):
+		_autostart_check_box.set_pressed_no_signal(enabled)
+		_settings_feedback.text = (
+			"已啟用開機自動啟動。" if enabled else "已關閉開機自動啟動。"
+		)
+	else:
+		_autostart_check_box.set_pressed_no_signal(not enabled)
+		_settings_feedback.text = "設定失敗，請稍後再試。"
+
+
+func _finish_autostart_thread(operation_id: int) -> void:
+	var operation_thread: Thread = _autostart_threads.get(operation_id)
+	if is_instance_valid(operation_thread) and operation_thread.is_started():
+		operation_thread.wait_to_finish()
+	_autostart_threads.erase(operation_id)
+
+
+func _finish_all_autostart_threads() -> void:
+	for operation_id: int in _autostart_threads.keys():
+		_finish_autostart_thread(operation_id)
 
 
 func _save_stats_window_size() -> void:

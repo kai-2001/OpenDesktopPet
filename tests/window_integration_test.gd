@@ -155,6 +155,113 @@ func _init() -> void:
 	_assert_true(not main._stats_window.unresizable, "details window can be resized")
 	_assert_true(not main._stats_window.transient, "details window is an independent native window")
 	_assert_true(main._stats_window.always_on_top, "details window remains above normal windows")
+	_assert_true(
+		is_instance_valid(main._fps_option_button),
+		"details window includes an FPS preset selector"
+	)
+	_assert_true(
+		is_instance_valid(main._autostart_check_box),
+		"details window includes a Windows autostart setting"
+	)
+	var original_target_fps := Engine.max_fps
+	main._set_target_fps(47)
+	_assert_equal(
+		Engine.max_fps,
+		60,
+		"unsupported FPS values normalize to the nearest preset"
+	)
+	var settings_config := ConfigFile.new()
+	_assert_equal(
+		settings_config.load(main.UI_SETTINGS_PATH),
+		OK,
+		"FPS setting is persisted"
+	)
+	_assert_equal(
+		int(settings_config.get_value("performance", "target_fps", 0)),
+		60,
+		"persisted FPS setting matches the normalized preset"
+	)
+	main._set_target_fps(original_target_fps)
+	if OS.has_feature("editor"):
+		_assert_true(
+			main._autostart_check_box.disabled,
+			"development runs cannot register the editor for autostart"
+		)
+	if OS.get_name() == "Windows":
+		var registry_test_key := (
+			"HKCU\\Software\\OpenDesktopPet-AutomatedTest-"
+			+ str(Time.get_ticks_usec())
+		)
+		var registry_test_value := "AutostartProbe"
+		var expected_test_executable := "C:\\Program Files\\Open Desktop Pet\\Pet.exe"
+		_assert_equal(
+			main._autostart_command(
+				"C:/Program Files/Open Desktop Pet/Pet.exe"
+			),
+			"\"C:\\Program Files\\Open Desktop Pet\\Pet.exe\"",
+			"autostart commands normalize Godot paths for Windows"
+		)
+		_assert_true(
+			main._write_registry_autostart_blocking(
+				registry_test_key,
+				registry_test_value,
+				true,
+				expected_test_executable
+			),
+			"autostart helper really writes an isolated HKCU registry value"
+		)
+		var matching_registry_state: Dictionary = \
+			main._query_registry_value_blocking(
+				registry_test_key,
+				registry_test_value,
+				expected_test_executable
+			)
+		_assert_true(
+			bool(matching_registry_state.get("matches", false)),
+			"autostart query verifies the complete executable path"
+		)
+		var stale_registry_state: Dictionary = \
+			main._query_registry_value_blocking(
+				registry_test_key,
+				registry_test_value,
+				"C:\\Moved\\Pet.exe"
+			)
+		_assert_true(
+			bool(stale_registry_state.get("exists", false))
+				and not bool(stale_registry_state.get("matches", true)),
+			"autostart query detects a stale executable path"
+		)
+		_assert_true(
+			main._write_registry_autostart_blocking(
+				registry_test_key,
+				registry_test_value,
+				false,
+				expected_test_executable
+			),
+			"autostart helper really removes its isolated registry value"
+		)
+		var removed_registry_state: Dictionary = \
+			main._query_registry_value_blocking(
+				registry_test_key,
+				registry_test_value,
+				expected_test_executable
+			)
+		_assert_true(
+			not bool(removed_registry_state.get("exists", true)),
+			"isolated registry value is absent after removal"
+		)
+		var registry_cleanup_output: Array = []
+		_assert_equal(
+			OS.execute(
+				main._registry_executable(),
+				PackedStringArray(["delete", registry_test_key, "/f"]),
+				registry_cleanup_output,
+				true,
+				false
+			),
+			0,
+			"isolated autostart test registry key is cleaned up"
+		)
 	var screen := DisplayServer.window_get_current_screen()
 	if screen < 0:
 		screen = DisplayServer.get_primary_screen()
