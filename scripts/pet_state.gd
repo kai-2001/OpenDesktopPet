@@ -7,7 +7,7 @@ signal action_requested(action: String, request_id: int)
 signal wish_started(action: String)
 signal action_result_available(request_id: int)
 
-const DEFAULT_SAVE_PATH := "user://save_v2.json"
+const DEFAULT_SAVE_PATH := "user://profiles/default/save_v2.json"
 const SAVE_VERSION := 2
 const DECAY_INTERVAL_SECONDS := 600
 const PET_REWARD_COOLDOWN_SECONDS := 600
@@ -17,7 +17,7 @@ const FIRST_WISH_MAX_SECONDS := 60
 const WISH_MIN_SECONDS := 1200
 const WISH_MAX_SECONDS := 2400
 
-var data: Dictionary = {
+const DEFAULT_DATA := {
 	"save_version": SAVE_VERSION,
 	"hunger": 80.0,
 	"thirst": 80.0,
@@ -39,14 +39,40 @@ var data: Dictionary = {
 	"visual_scale": 1.0,
 }
 
+var data: Dictionary = DEFAULT_DATA.duplicate(true)
 var save_path := DEFAULT_SAVE_PATH
 var _clock_accumulator := 0.0
 var _action_busy := false
 var _next_request_id := 1
 var _action_results: Dictionary = {}
+var _initialized := false
 
 
 func _ready() -> void:
+	call_deferred("_initialize_if_needed")
+
+
+func configure_profile(character_id: String) -> void:
+	var safe_id := character_id.strip_edges().to_lower().validate_filename()
+	safe_id = safe_id.replace(" ", "_")
+	if safe_id.is_empty():
+		safe_id = "default"
+	var profile_save_path := "user://profiles/%s/save_v2.json" % safe_id
+	if _initialized and save_path == profile_save_path:
+		return
+	save_path = profile_save_path
+	data = DEFAULT_DATA.duplicate(true)
+	_clock_accumulator = 0.0
+	_action_busy = false
+	_action_results.clear()
+	_initialized = false
+	_initialize_if_needed()
+
+
+func _initialize_if_needed() -> void:
+	if _initialized:
+		return
+	_initialized = true
 	load_state()
 	_apply_elapsed_decay(_now(), 48)
 	_ensure_wish_schedule()
@@ -353,6 +379,9 @@ func _ensure_wish_schedule() -> void:
 
 func save_state() -> void:
 	data.last_seen = _now()
+	DirAccess.make_dir_recursive_absolute(
+		ProjectSettings.globalize_path(save_path.get_base_dir())
+	)
 	var temporary_path := save_path + ".tmp"
 	var backup_path := save_path + ".backup"
 	var file := FileAccess.open(temporary_path, FileAccess.WRITE)

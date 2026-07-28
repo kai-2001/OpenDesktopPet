@@ -3,6 +3,7 @@
   "id": "replace_me",
   "name": "新角色",
   "scale": 0.31,
+  "source_facing": "left",
   "fallback_action": "idle",
   "interactions": {
     "feed": {"label": "餵食", "icon": "🥕", "wish": "想吃東西（剩餘約 {minutes} 分鐘）"},

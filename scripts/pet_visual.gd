@@ -18,6 +18,9 @@ var _progression: Dictionary = {"level": 1, "affection": 0}
 var _busy := false
 var _dragging := false
 var _drag_moving := false
+var _drag_frame_clock := 0.0
+var _drag_frame_step := 0
+var _facing_direction := -1
 var _visual_size := 1.0
 var _pack_scale := 0.31
 var _time := 0.0
@@ -48,6 +51,15 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	if _dragging:
+		if _drag_moving:
+			var definition := _action_definition("drag")
+			var sequence := _sequence_for(definition)
+			var frame_time := float(definition.get("frame_time", 0.12))
+			_drag_frame_clock += delta
+			if _drag_frame_clock >= frame_time:
+				_drag_frame_clock = fmod(_drag_frame_clock, frame_time)
+				_drag_frame_step = (_drag_frame_step + 1) % sequence.size()
+				_show_action_frame("drag", int(sequence[_drag_frame_step]))
 		var sway := sin(_time * 8.0) * (0.025 if _drag_moving else 0.008)
 		rotation = sway
 		return
@@ -77,6 +89,8 @@ func set_dragging(value: bool) -> void:
 	_dragging = value
 	_busy = false
 	_drag_moving = false
+	_drag_frame_clock = 0.0
+	_drag_frame_step = 0
 	_current_action = ""
 	if value:
 		_show_action_frame("drag", _first_frame("drag"))
@@ -89,11 +103,27 @@ func set_dragging(value: bool) -> void:
 func set_drag_motion(is_moving: bool) -> void:
 	if not _dragging:
 		return
+	if _drag_moving == is_moving:
+		return
 	_drag_moving = is_moving
-	var definition := _action_definition("drag")
-	var sequence := _sequence_for(definition)
-	var index := mini(1 if is_moving else 0, sequence.size() - 1)
-	_show_action_frame("drag", int(sequence[index]))
+	_drag_frame_clock = 0.0
+	if not is_moving:
+		_drag_frame_step = 0
+		_show_action_frame("drag", _first_frame("drag"))
+
+
+func set_facing_direction(direction: int) -> void:
+	if direction == 0:
+		return
+	var normalized := 1 if direction > 0 else -1
+	if normalized == _facing_direction:
+		return
+	_facing_direction = normalized
+	var scale_action := _current_action
+	if scale_action.is_empty():
+		scale_action = "drag" if _dragging else "idle"
+	_apply_sprite_scale(_action_definition(scale_action))
+	_emit_interaction_region()
 
 
 func is_busy() -> bool:
@@ -290,6 +320,11 @@ func get_dialogue(key: String, fallback: String) -> String:
 	return fallback
 
 
+func get_character_id() -> String:
+	var character_id := String(_manifest.get("id", "")).strip_edges()
+	return character_id if not character_id.is_empty() else "default"
+
+
 func get_interaction_label(action: String, fallback: String) -> String:
 	return String(_interaction_value(action, "label", fallback))
 
@@ -380,8 +415,24 @@ func _show_action_frame(action: String, frame: int) -> void:
 		cell_size.y
 	)
 	_sprite.position = _frame_offset(definition, safe_frame)
-	_sprite.scale = Vector2.ONE * float(definition.get("scale", _pack_scale))
+	_apply_sprite_scale(definition)
 	_emit_interaction_region()
+
+
+func _apply_sprite_scale(definition: Dictionary) -> void:
+	if not is_instance_valid(_sprite):
+		return
+	var action_scale := float(definition.get("scale", _pack_scale)) \
+		if not definition.is_empty() \
+		else _pack_scale
+	var source_facing := String(definition.get(
+		"source_facing", _manifest.get("source_facing", "left")
+	)).to_lower()
+	if source_facing not in ["left", "right"]:
+		source_facing = "left"
+	var desired_facing := "right" if _facing_direction > 0 else "left"
+	var horizontal := -1.0 if source_facing != desired_facing else 1.0
+	_sprite.scale = Vector2(horizontal, 1.0) * action_scale
 
 
 func _frame_offset(definition: Dictionary, frame: int) -> Vector2:

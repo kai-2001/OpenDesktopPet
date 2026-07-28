@@ -112,6 +112,35 @@ func _init() -> void:
 	loaded.load_state()
 	_assert_equal(loaded.data.coins, state.data.coins, "safe save round trip")
 	loaded.free()
+
+	var profile_a := PetStateScript.new()
+	profile_a.configure_profile("Profile A")
+	_assert_equal(
+		profile_a.save_path,
+		"user://profiles/profile_a/save_v2.json",
+		"character ID selects a safe profile save path"
+	)
+	profile_a.data.coins = 111
+	profile_a.save_state()
+	var profile_b := PetStateScript.new()
+	profile_b.configure_profile("Profile B")
+	_assert_equal(
+		profile_b.data.coins,
+		PetStateScript.DEFAULT_DATA.coins,
+		"a different character ID starts from independent defaults"
+	)
+	profile_b.data.coins = 222
+	profile_b.save_state()
+	var reloaded_profile_a := PetStateScript.new()
+	reloaded_profile_a.configure_profile("Profile A")
+	_assert_equal(
+		reloaded_profile_a.data.coins,
+		111,
+		"reloading one character ID does not read another profile"
+	)
+	profile_a.free()
+	profile_b.free()
+	reloaded_profile_a.free()
 	state.queue_free()
 	visual.queue_free()
 	DirAccess.remove_absolute(

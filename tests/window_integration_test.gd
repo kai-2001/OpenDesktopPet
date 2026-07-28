@@ -12,6 +12,13 @@ func _init() -> void:
 	await process_frame
 
 	_assert_true(main.pet.visible, "pet is revealed after native window setup")
+	_assert_equal(
+		main.state.save_path,
+		"user://profiles/%s/save_v2.json" % (
+			main.pet.get_character_id().to_lower().validate_filename().replace(" ", "_")
+		),
+		"active character ID selects the gameplay save profile"
+	)
 	_assert_true(
 		is_instance_valid(main._visibility_watchdog),
 		"fixed-interval visibility watchdog is running"
@@ -68,7 +75,35 @@ func _init() -> void:
 	_assert_true(main._can_begin_drag(), "autonomous animation does not block dragging")
 	main.pet.set_dragging(true)
 	_assert_true(not main.pet.is_busy() or main.pet._dragging, "dragging interrupts autonomous animation")
+	var first_drag_region: Rect2 = main.pet._sprite.region_rect
+	main.pet.set_drag_motion(true)
+	await create_timer(0.14).timeout
+	var drag_sequence: Array = main.pet._sequence_for(
+		main.pet._action_definition("drag")
+	)
+	if drag_sequence.size() > 1:
+		_assert_true(
+			main.pet._sprite.region_rect != first_drag_region,
+			"drag motion advances through the configured frame sequence"
+		)
 	main.pet.set_dragging(false)
+	main.pet.set_facing_direction(-1)
+	_assert_true(
+		main.pet._sprite.scale.x > 0.0,
+		"left-facing movement uses the source artwork"
+	)
+	main.pet.set_facing_direction(1)
+	_assert_true(
+		main.pet._sprite.scale.x < 0.0,
+		"right-facing movement mirrors the artwork"
+	)
+	main.pet._facing_direction = 1
+	main.pet._apply_sprite_scale({"scale": 1.0, "source_facing": "right"})
+	_assert_true(
+		main.pet._sprite.scale.x > 0.0,
+		"right-facing source artwork is not mirrored when moving right"
+	)
+	main.pet.set_facing_direction(-1)
 	main.bubble.visible = true
 	main.bubble_tail.visible = true
 	main._refresh_interaction_polygon()

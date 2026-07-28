@@ -49,11 +49,13 @@ func _ready() -> void:
 	# PetVisual is ready before this parent node. Keep its first loaded frame
 	# hidden until the native transparent window has been positioned and shaped.
 	pet.visible = false
+	state.configure_profile(pet.get_character_id())
 	_load_runtime_settings()
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
 	_style_bubble()
 	_connect_signals()
+	_refresh_ui(state.get_snapshot())
 	_setup_context_menu()
 	_setup_idle_behavior()
 	_setup_visibility_watchdog()
@@ -80,7 +82,10 @@ func _process(_delta: float) -> void:
 	if not _dragging:
 		return
 	if mouse.distance_to(_last_drag_mouse) > 1.0:
+		pet.set_facing_direction(1 if mouse.x > _last_drag_mouse.x else -1)
 		pet.set_drag_motion(true)
+	else:
+		pet.set_drag_motion(false)
 	_last_drag_mouse = mouse
 	DisplayServer.window_set_position(_clamp_window_position(mouse - _drag_offset))
 
@@ -463,6 +468,7 @@ func _autonomous_small_roll() -> void:
 	if target_x == start.x:
 		target_x = clampi(start.x - distance, usable.position.x, usable.end.x - window_size.x)
 	var target := Vector2i(target_x, start.y)
+	pet.set_facing_direction(1 if target_x > start.x else -1)
 	pet.play_action("move")
 	_auto_move_tween = create_tween()
 	_auto_move_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
