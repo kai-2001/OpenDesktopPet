@@ -19,19 +19,6 @@ func _init() -> void:
 		),
 		"active character ID selects the gameplay save profile"
 	)
-	_assert_true(
-		is_instance_valid(main._visibility_watchdog),
-		"fixed-interval visibility watchdog is running"
-	)
-	_assert_equal(
-		main._visibility_watchdog.wait_time,
-		main.VISIBILITY_CHECK_INTERVAL,
-		"visibility watchdog uses the fixed 100 ms interval"
-	)
-	_assert_true(
-		not main._check_window_visibility(),
-		"visible window does not trigger redundant recovery"
-	)
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MINIMIZED)
 	var recovery_deadline := Time.get_ticks_msec() + 1500
 	while DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED \
@@ -40,12 +27,7 @@ func _init() -> void:
 	_assert_equal(
 		DisplayServer.window_get_mode(),
 		DisplayServer.WINDOW_MODE_WINDOWED,
-		"watchdog really restores a natively minimized pet window"
-	)
-	_assert_equal(
-		main._visibility_watchdog.wait_time,
-		main.VISIBILITY_CHECK_INTERVAL,
-		"successful recovery keeps the fixed 100 ms interval"
+		"per-frame check restores a natively minimized pet window"
 	)
 	_assert_true(
 		main.pet.get_dialogue("startup", "__fallback__") != "__fallback__",
@@ -190,6 +172,16 @@ func _init() -> void:
 	_assert_true(not main._stats_window.unresizable, "details window can be resized")
 	_assert_true(not main._stats_window.transient, "details window is an independent native window")
 	_assert_true(main._stats_window.always_on_top, "details window remains above normal windows")
+	main._stats_window.mode = Window.MODE_MINIMIZED
+	var stats_recovery_deadline := Time.get_ticks_msec() + 1500
+	while main._stats_window.mode == Window.MODE_MINIMIZED \
+			and Time.get_ticks_msec() < stats_recovery_deadline:
+		await create_timer(0.05).timeout
+	_assert_equal(
+		main._stats_window.mode,
+		Window.MODE_WINDOWED,
+		"per-frame check restores an open minimized details window"
+	)
 	_assert_true(
 		is_instance_valid(main._fps_option_button),
 		"details window includes an FPS preset selector"
