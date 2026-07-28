@@ -36,7 +36,6 @@ func _ready() -> void:
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
 	_style_bubble()
-	_build_stats_window()
 	_connect_signals()
 	_setup_context_menu()
 	_setup_idle_behavior()
@@ -99,10 +98,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_left_press_pending = false
 		_dragging = false
 		pet.set_dragging(false)
-		if _stats_window.visible:
-			# A native details window can lose focus behind another always-on-top
-			# application. Never swallow the right-click without a recovery path.
-			_bring_stats_window_forward()
+		if _is_stats_window_open():
+			# Do not trust a stale native `visible` flag. Recreate the native
+			# window so a panel lost by Windows is always recoverable.
+			_destroy_stats_window()
+			call_deferred("_show_stats_window")
 		else:
 			_show_context_menu(Vector2i(event.position))
 
@@ -322,7 +322,7 @@ func _can_act_autonomously(require_mouse_idle := false) -> bool:
 	var mouse_is_idle := Time.get_ticks_msec() - _last_user_activity_ms >= 4500
 	return (not require_mouse_idle or mouse_is_idle) \
 		and not context_menu.visible \
-		and not _stats_window.visible \
+		and not _is_stats_window_open() \
 		and not _dragging \
 		and not pet.is_busy() \
 		and not state.is_action_busy()
@@ -375,7 +375,7 @@ func _build_stats_window() -> void:
 	_stats_window.transient = false
 	_stats_window.always_on_top = true
 	_stats_window.visible = false
-	_stats_window.close_requested.connect(func() -> void: _stats_window.hide())
+	_stats_window.close_requested.connect(_destroy_stats_window)
 	add_child(_stats_window)
 
 	var panel := PanelContainer.new()
@@ -466,7 +466,7 @@ func _build_stats_window() -> void:
 	var close_button := Button.new()
 	close_button.text = "關閉詳細狀態"
 	close_button.custom_minimum_size.y = 42
-	close_button.pressed.connect(func() -> void: _stats_window.hide())
+	close_button.pressed.connect(_destroy_stats_window)
 	content.add_child(close_button)
 
 
@@ -522,6 +522,8 @@ func _new_label(text: String, font_size: int, color: Color) -> Label:
 
 
 func _show_stats_window() -> void:
+	if not is_instance_valid(_stats_window):
+		_build_stats_window()
 	_refresh_ui(state.get_snapshot())
 	var pet_position := DisplayServer.window_get_position()
 	var pet_size := DisplayServer.window_get_size()
@@ -549,6 +551,21 @@ func _bring_stats_window_forward() -> void:
 		_stats_window.show()
 	_stats_window.grab_focus()
 	DisplayServer.window_move_to_foreground(_stats_window.get_window_id())
+
+
+func _is_stats_window_open() -> bool:
+	return is_instance_valid(_stats_window) and _stats_window.visible
+
+
+func _destroy_stats_window() -> void:
+	if is_instance_valid(_stats_window):
+		_stats_window.queue_free()
+	_stats_window = null
+	_stats_status = null
+	_wish_status = null
+	_unlock_status = null
+	_last_message_status = null
+	_stats_bars.clear()
 
 func _refresh_ui(snapshot: Dictionary) -> void:
 	pet.set_progression(snapshot)

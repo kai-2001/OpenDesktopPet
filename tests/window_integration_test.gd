@@ -30,7 +30,18 @@ func _init() -> void:
 	main._bring_stats_window_forward()
 	await process_frame
 	_assert_true(main._stats_window.visible, "an existing details window can be brought forward")
-	main._stats_window.hide()
+	var first_stats_window_id: int = main._stats_window.get_instance_id()
+	main._destroy_stats_window()
+	await process_frame
+	main._show_stats_window()
+	await process_frame
+	await process_frame
+	_assert_true(main._stats_window.visible, "details window is visible after native recreation")
+	_assert_true(
+		main._stats_window.get_instance_id() != first_stats_window_id,
+		"details window recreation uses a fresh native window"
+	)
+	main._destroy_stats_window()
 
 	main.say("快速訊息一", 0.1)
 	main.say("💤", 0.1)
