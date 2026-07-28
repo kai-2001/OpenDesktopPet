@@ -28,6 +28,8 @@ var _auto_move_tween: Tween
 var _known_unlocked_actions: Dictionary = {}
 var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
+var _window_is_passthrough := false
+var _cursor_shape := Input.CURSOR_ARROW
 
 var _pet_hit_polygon := PackedVector2Array([
 	Vector2(70, 100), Vector2(210, 100), Vector2(245, 170),
@@ -103,7 +105,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if was_dragging:
 				_dragging = false
 				pet.set_dragging(false)
-				Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
+				_set_cursor_shape(Input.CURSOR_POINTING_HAND)
 			else:
 				_single_click_reaction()
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
@@ -121,7 +123,7 @@ func _begin_drag(mouse: Vector2i) -> void:
 	_last_drag_mouse = mouse
 	pet.set_dragging(true)
 	pet.set_drag_motion(true)
-	Input.set_default_cursor_shape(Input.CURSOR_DRAG)
+	_set_cursor_shape(Input.CURSOR_DRAG)
 
 
 func _notification(what: int) -> void:
@@ -206,16 +208,27 @@ func _finish_window_setup() -> void:
 func _update_window_passthrough(global_mouse: Vector2i) -> void:
 	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
 	var over_pet := Geometry2D.is_point_in_polygon(local_mouse, _pet_hit_polygon)
-	get_window().mouse_passthrough = not (over_pet or _dragging or _left_press_pending)
+	var should_pass_through := not (over_pet or _dragging or _left_press_pending)
+	if should_pass_through == _window_is_passthrough:
+		return
+	_window_is_passthrough = should_pass_through
+	get_window().mouse_passthrough = should_pass_through
 
 
 func _update_cursor(global_mouse: Vector2i) -> void:
 	if _dragging:
-		Input.set_default_cursor_shape(Input.CURSOR_DRAG)
+		_set_cursor_shape(Input.CURSOR_DRAG)
 		return
 	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
 	var over_pet := Geometry2D.is_point_in_polygon(local_mouse, _pet_hit_polygon)
-	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND if over_pet else Input.CURSOR_ARROW)
+	_set_cursor_shape(Input.CURSOR_POINTING_HAND if over_pet else Input.CURSOR_ARROW)
+
+
+func _set_cursor_shape(shape: Input.CursorShape) -> void:
+	if shape == _cursor_shape:
+		return
+	_cursor_shape = shape
+	Input.set_default_cursor_shape(shape)
 
 
 func _connect_signals() -> void:
