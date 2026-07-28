@@ -227,7 +227,10 @@ func _connect_signals() -> void:
 	state.changed.connect(_refresh_ui)
 	state.message_requested.connect(_show_state_message)
 	state.action_requested.connect(pet.play_action)
-	_refresh_ui(state.data)
+	# PetState becomes ready before its parent, so its first `changed` signal is
+	# emitted before this node can connect. Ask it for a complete snapshot here
+	# instead of passing the raw dictionary, which does not contain `wish_text`.
+	state.emit_changed()
 
 
 func _show_state_message(text: String) -> void:
