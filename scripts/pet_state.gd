@@ -4,6 +4,7 @@ extends Node
 signal changed(snapshot: Dictionary)
 signal message_requested(text: String)
 signal action_requested(action: String)
+signal wish_started(action: String)
 
 const SAVE_PATH := "user://save_v2.json"
 const SAVE_VERSION := 2
@@ -239,7 +240,7 @@ func _update_wish() -> void:
 	data.wish_action = action
 	data.wish_expires_at = now + WISH_DURATION_SECONDS
 	data.wish_intro_seen = true
-	message_requested.emit(_wish_announcement(action))
+	wish_started.emit(action)
 	_commit()
 
 

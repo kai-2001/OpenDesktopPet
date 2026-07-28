@@ -42,17 +42,4 @@ z_index = 99
 polygon = PackedVector2Array(128, 96, 152, 96, 140, 124)
 color = Color(0.953, 0.988, 0.996, 0.98)
 
-[node name="WishBadge" type="Label" parent="."]
-visible = false
-offset_left = 192.0
-offset_top = 82.0
-offset_right = 240.0
-offset_bottom = 128.0
-mouse_filter = 2
-z_index = 101
-text = "🥕"
-horizontal_alignment = 1
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 22
-
 [node name="ContextMenu" type="PopupMenu" parent="."]

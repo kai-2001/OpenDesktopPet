@@ -5,8 +5,8 @@ extends Node2D
 @onready var bubble: PanelContainer = $SpeechBubble
 @onready var bubble_label: Label = $SpeechBubble/Margin/Label
 @onready var bubble_tail: Polygon2D = $SpeechTail
-@onready var wish_badge: Label = $WishBadge
 @onready var context_menu: PopupMenu = $ContextMenu
+var _speech_window: Window
 var _stats_window: Window
 var _stats_status: Label
 var _wish_status: Label
@@ -32,10 +32,7 @@ var _last_state_message := "尚無紀錄"
 var _interaction_region_applied := false
 
 var _pet_hit_polygon := PackedVector2Array([
-	# Keep one stable native hit-test outline for the entire lifetime of the
-	# window. The small upper-right extension contains the optional wish badge.
-	Vector2(70, 100), Vector2(184, 100), Vector2(192, 82),
-	Vector2(240, 82), Vector2(240, 132), Vector2(245, 170),
+	Vector2(70, 100), Vector2(210, 100), Vector2(245, 170),
 	Vector2(220, 310), Vector2(60, 310), Vector2(35, 170)
 ])
 
@@ -44,6 +41,7 @@ func _ready() -> void:
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
 	_style_bubble()
+	_build_speech_window()
 	_build_stats_window()
 	_setup_stats_open_timer()
 	_connect_signals()
@@ -58,6 +56,8 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_restore_from_system_minimize()
+	if is_instance_valid(_speech_window) and _speech_window.visible:
+		_position_speech_window()
 	var mouse := DisplayServer.mouse_get_position()
 	if mouse.distance_to(_last_global_mouse) > 1.0:
 		_last_user_activity_ms = Time.get_ticks_msec()
@@ -140,20 +140,25 @@ func say(text: String, seconds := 6.0) -> void:
 	# so the compositor never displays the temporary polygon-shaped state.
 	bubble.visible = false
 	bubble_tail.visible = false
+	_speech_window.hide()
 	bubble_label.text = text
+	bubble_label.add_theme_font_size_override(
+		"font_size", 28 if text in ["🥕", "💧", "💤", "🪙", "✋"] else 13
+	)
 	_layout_speech_bubble(text)
 	await get_tree().process_frame
 	if token != _bubble_token:
 		return
 	_layout_speech_bubble(text)
+	_position_speech_window()
+	_speech_window.show()
 	bubble.visible = true
 	bubble_tail.visible = true
-	_update_window_interaction_region()
 	await get_tree().create_timer(seconds).timeout
 	if token == _bubble_token:
 		bubble.visible = false
 		bubble_tail.visible = false
-		_update_window_interaction_region()
+		_speech_window.hide()
 
 
 func _restore_from_system_minimize() -> void:
@@ -177,7 +182,7 @@ func _layout_speech_bubble(text: String) -> void:
 		).x
 		line_count += maxi(ceili(text_width / TEXT_WIDTH), 1)
 	var bubble_height := clampf(20.0 + line_count * 20.0, 50.0, 120.0)
-	var bubble_left := (280.0 - BUBBLE_WIDTH) / 2.0
+	var bubble_left := (220.0 - BUBBLE_WIDTH) / 2.0
 	# Explicit offsets are required here. PanelContainer recalculates `size`
 	# from its original offsets after child layout, which previously stretched
 	# short messages down over the pet.
@@ -186,10 +191,27 @@ func _layout_speech_bubble(text: String) -> void:
 	bubble.offset_right = bubble_left + BUBBLE_WIDTH
 	bubble.offset_bottom = BUBBLE_BOTTOM
 	bubble_tail.polygon = PackedVector2Array([
-		Vector2(132, BUBBLE_BOTTOM - 2),
-		Vector2(148, BUBBLE_BOTTOM - 2),
-		Vector2(140, BUBBLE_BOTTOM + 11),
+		Vector2(102, BUBBLE_BOTTOM - 2),
+		Vector2(118, BUBBLE_BOTTOM - 2),
+		Vector2(110, BUBBLE_BOTTOM + 11),
 	])
+
+
+func _build_speech_window() -> void:
+	_speech_window = Window.new()
+	_speech_window.size = Vector2i(220, 140)
+	_speech_window.transparent = true
+	_speech_window.borderless = true
+	_speech_window.unfocusable = true
+	_speech_window.mouse_passthrough = true
+	_speech_window.visible = false
+	add_child(_speech_window)
+	bubble.reparent(_speech_window, false)
+	bubble_tail.reparent(_speech_window, false)
+
+
+func _position_speech_window() -> void:
+	_speech_window.position = DisplayServer.window_get_position() + Vector2i(30, 0)
 
 
 func _finish_window_setup() -> void:
@@ -222,10 +244,16 @@ func _connect_signals() -> void:
 	state.changed.connect(_refresh_ui)
 	state.message_requested.connect(_show_state_message)
 	state.action_requested.connect(pet.play_action)
+	state.wish_started.connect(_show_wish_notice)
 	# PetState becomes ready before its parent, so its first `changed` signal is
 	# emitted before this node can connect. Ask it for a complete snapshot here
 	# instead of passing the raw dictionary, which does not contain `wish_text`.
-	state.emit_changed()
+	var snapshot: Dictionary = state.get_snapshot()
+	_refresh_ui(snapshot)
+	var active_wish := String(snapshot.get("wish_action", ""))
+	if not active_wish.is_empty() \
+			and int(snapshot.get("wish_expires_at", 0)) > int(Time.get_unix_time_from_system()):
+		call_deferred("_show_wish_notice", active_wish)
 
 
 func _show_state_message(text: String) -> void:
@@ -233,6 +261,10 @@ func _show_state_message(text: String) -> void:
 	if is_instance_valid(_last_message_status):
 		_last_message_status.text = "最近訊息：%s" % _last_state_message
 	say(text, 6.0)
+
+
+func _show_wish_notice(action: String) -> void:
+	say(_wish_icon(action), 6.0)
 
 
 func _setup_context_menu() -> void:
@@ -536,19 +568,6 @@ func _prime_stats_window() -> void:
 func _refresh_ui(snapshot: Dictionary) -> void:
 	pet.set_progression(snapshot)
 	_update_unlock_tracking()
-	var wish_action := String(snapshot.get("wish_action", ""))
-	var wish_is_active := not wish_action.is_empty() \
-		and int(snapshot.get("wish_expires_at", 0)) > int(Time.get_unix_time_from_system())
-	if wish_is_active:
-		wish_badge.text = _wish_icon(wish_action)
-		wish_badge.visible = true
-	else:
-		# Clear the glyph before removing it from the transparent window. This
-		# prevents Windows from retaining the final rendered frame as the native
-		# hit-test region shrinks back around the pet.
-		wish_badge.text = ""
-		wish_badge.visible = false
-	_update_window_interaction_region()
 	var level_text := "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
 		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20
 	]
