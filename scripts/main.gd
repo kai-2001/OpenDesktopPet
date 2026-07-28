@@ -56,7 +56,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_restore_from_system_minimize()
-	if is_instance_valid(_speech_window) and _speech_window.visible:
+	if is_instance_valid(_speech_window):
 		_position_speech_window()
 	var mouse := DisplayServer.mouse_get_position()
 	if mouse.distance_to(_last_global_mouse) > 1.0:
@@ -140,7 +140,6 @@ func say(text: String, seconds := 6.0) -> void:
 	# so the compositor never displays the temporary polygon-shaped state.
 	bubble.visible = false
 	bubble_tail.visible = false
-	_speech_window.hide()
 	bubble_label.text = text
 	bubble_label.add_theme_font_size_override(
 		"font_size", 28 if text in ["🥕", "💧", "💤", "🪙", "✋"] else 13
@@ -151,14 +150,12 @@ func say(text: String, seconds := 6.0) -> void:
 		return
 	_layout_speech_bubble(text)
 	_position_speech_window()
-	_speech_window.show()
 	bubble.visible = true
 	bubble_tail.visible = true
 	await get_tree().create_timer(seconds).timeout
 	if token == _bubble_token:
 		bubble.visible = false
 		bubble_tail.visible = false
-		_speech_window.hide()
 
 
 func _restore_from_system_minimize() -> void:
@@ -201,10 +198,14 @@ func _build_speech_window() -> void:
 	_speech_window = Window.new()
 	_speech_window.size = Vector2i(220, 140)
 	_speech_window.transparent = true
+	_speech_window.transparent_bg = true
 	_speech_window.borderless = true
 	_speech_window.unfocusable = true
 	_speech_window.mouse_passthrough = true
-	_speech_window.visible = false
+	# Keep the native window alive and fully transparent. Repeatedly showing a
+	# transparent Windows window can expose one opaque compositor frame before
+	# its child controls are ready.
+	_speech_window.visible = true
 	add_child(_speech_window)
 	bubble.reparent(_speech_window, false)
 	bubble_tail.reparent(_speech_window, false)
