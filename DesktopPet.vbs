@@ -1,17 +1,18 @@
 Option Explicit
 
-Dim shell, fso, base, godot, logFile, command
+Dim shell, fso, base, executable, command
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
 base = fso.GetParentFolderName(WScript.ScriptFullName)
-godot = "C:\Apache24\tools\godot-4.6.3\Godot_v4.6.3-stable_win64.exe"
-logFile = base & "\godot-launch.log"
+executable = base & "\build\local\OpenDesktopPet-Local.exe"
 
-If Not fso.FileExists(godot) Then
-  MsgBox "Godot 4.6.3 portable editor not found:" & vbCrLf & godot, vbCritical, "Open Desktop Pet"
+If Not fso.FileExists(executable) Then
+  MsgBox "The packaged desktop pet was not found:" & vbCrLf & executable & vbCrLf & vbCrLf & _
+    "Export Windows Local first, or use Run_Godot_Dev.cmd for source development.", _
+    vbCritical, "Open Desktop Pet"
   WScript.Quit 1
 End If
 
-command = """" & godot & """ --path """ & base & """ --log-file """ & logFile & """"
-shell.Run command, 0, False
+command = """" & executable & """"
+shell.Run command, 1, False
