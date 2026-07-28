@@ -15,7 +15,11 @@ func _init() -> void:
 	_assert_true(main.pet.contains_point(Vector2(140, 190)), "pet center is interactive")
 	_assert_true(not main.pet.contains_point(Vector2(5, 5)), "transparent corner is not interactive")
 
-	main._show_stats_window()
+	main._show_context_menu(Vector2i(140, 190))
+	await process_frame
+	main.context_menu.id_pressed.emit(6)
+	main.context_menu.hide()
+	await process_frame
 	await process_frame
 	await process_frame
 	_assert_true(main._stats_window.visible, "details window opens on first request")
