@@ -53,6 +53,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	_restore_from_system_minimize()
 	var mouse := DisplayServer.mouse_get_position()
 	if mouse.distance_to(_last_global_mouse) > 1.0:
 		_last_user_activity_ms = Time.get_ticks_msec()
@@ -130,16 +131,33 @@ func _notification(what: int) -> void:
 func say(text: String, seconds := 6.0) -> void:
 	_bubble_token += 1
 	var token := _bubble_token
+	# Container layout and the native Windows hit-test region are both applied
+	# asynchronously. Keep the bubble hidden until one layout frame has passed
+	# so the compositor never displays the temporary polygon-shaped state.
+	bubble.visible = false
+	bubble_tail.visible = false
 	bubble_label.text = text
+	_layout_speech_bubble(text)
+	await get_tree().process_frame
+	if token != _bubble_token:
+		return
+	_layout_speech_bubble(text)
 	bubble.visible = true
 	bubble_tail.visible = true
-	_layout_speech_bubble(text)
 	_update_window_interaction_region()
 	await get_tree().create_timer(seconds).timeout
 	if token == _bubble_token:
 		bubble.visible = false
 		bubble_tail.visible = false
 		_update_window_interaction_region()
+
+
+func _restore_from_system_minimize() -> void:
+	# This borderless desktop pet has no user-facing minimize command. Windows
+	# still minimizes ordinary top-level windows when Show Desktop is invoked,
+	# so restore only that otherwise-unreachable state without taking focus.
+	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 
 
 func _layout_speech_bubble(text: String) -> void:

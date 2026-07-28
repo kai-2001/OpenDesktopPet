@@ -15,6 +15,7 @@ position = Vector2(140, 190)
 script = ExtResource("3_visual")
 
 [node name="SpeechBubble" type="PanelContainer" parent="."]
+visible = false
 offset_left = 30.0
 offset_top = 54.0
 offset_right = 250.0
