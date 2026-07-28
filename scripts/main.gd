@@ -256,7 +256,7 @@ func _setup_context_menu() -> void:
 	context_menu.add_separator()
 	context_menu.add_item("❌  儲存並離開", 7)
 	context_menu.id_pressed.connect(_on_context_action)
-	_refresh_ui(state.data)
+	_refresh_ui(state.get_snapshot())
 
 
 func _show_context_menu(at: Vector2i) -> void:
@@ -505,7 +505,7 @@ func _new_label(text: String, font_size: int, color: Color) -> Label:
 
 
 func _show_stats_window() -> void:
-	_refresh_ui(state.data)
+	_refresh_ui(state.get_snapshot())
 	var pet_position := DisplayServer.window_get_position()
 	var pet_size := DisplayServer.window_get_size()
 	var screen := DisplayServer.window_get_current_screen()

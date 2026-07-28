@@ -27,6 +27,17 @@ func _init() -> void:
 	_assert_true(first_wait >= 30 and first_wait <= 60, "first wish migration schedule")
 	_assert_equal(state.data.wish_notice_version, 1, "wish notification migration version")
 
+	state.data.wish_action = "sleep"
+	state.data.wish_expires_at = state._now() + 60
+	var snapshot: Dictionary = state.get_snapshot()
+	_assert_equal(snapshot.wish_action, "sleep", "snapshot wish action")
+	_assert_true(
+		String(snapshot.wish_text).contains("睡"),
+		"snapshot should include derived wish text"
+	)
+	state.data.wish_action = ""
+	state.data.wish_expires_at = 0
+
 	state._decay_accumulator = 0.0
 	state._process(600.0)
 	_assert_equal(state.data.hunger, 78.0, "hunger decay")

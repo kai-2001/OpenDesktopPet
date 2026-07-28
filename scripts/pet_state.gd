@@ -339,9 +339,13 @@ func load_state() -> void:
 
 
 func emit_changed() -> void:
+	changed.emit(get_snapshot())
+
+
+func get_snapshot() -> Dictionary:
 	var snapshot := data.duplicate(true)
 	snapshot.wish_text = wish_text()
-	changed.emit(snapshot)
+	return snapshot
 
 
 func _commit() -> void:
