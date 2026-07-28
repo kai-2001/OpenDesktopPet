@@ -6,7 +6,6 @@ extends Node2D
 @onready var bubble_label: Label = $SpeechBubble/Margin/Label
 @onready var bubble_tail: Polygon2D = $SpeechTail
 @onready var context_menu: PopupMenu = $ContextMenu
-var _speech_window: Window
 var _stats_window: Window
 var _stats_status: Label
 var _wish_status: Label
@@ -29,7 +28,6 @@ var _auto_move_tween: Tween
 var _known_unlocked_actions: Dictionary = {}
 var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
-var _interaction_region_applied := false
 
 var _pet_hit_polygon := PackedVector2Array([
 	Vector2(70, 100), Vector2(210, 100), Vector2(245, 170),
@@ -44,7 +42,6 @@ func _ready() -> void:
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
 	_style_bubble()
-	_build_speech_window()
 	_build_stats_window()
 	_setup_stats_open_timer()
 	_connect_signals()
@@ -58,8 +55,6 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_restore_from_system_minimize()
-	if is_instance_valid(_speech_window):
-		_position_speech_window()
 	var mouse := DisplayServer.mouse_get_position()
 	if mouse.distance_to(_last_global_mouse) > 1.0:
 		_last_user_activity_ms = Time.get_ticks_msec()
@@ -68,6 +63,7 @@ func _process(_delta: float) -> void:
 			_auto_move_tween = null
 			pet.cancel_roll()
 	_last_global_mouse = mouse
+	_update_window_passthrough(mouse)
 	_update_cursor(mouse)
 	if _left_press_pending and not _dragging:
 		var held_ms := Time.get_ticks_msec() - _left_press_started_ms
@@ -144,14 +140,13 @@ func say(text: String, seconds := 6.0) -> void:
 	bubble_tail.visible = false
 	bubble_label.text = text
 	bubble_label.add_theme_font_size_override(
-		"font_size", 28 if text in ["🥕", "💧", "💤", "🪙", "✋"] else 13
+		"font_size", 20 if text in ["🥕", "💧", "💤", "🪙", "✋"] else 13
 	)
 	_layout_speech_bubble(text)
 	await get_tree().process_frame
 	if token != _bubble_token:
 		return
 	_layout_speech_bubble(text)
-	_position_speech_window()
 	bubble.visible = true
 	bubble_tail.visible = true
 	await get_tree().create_timer(seconds).timeout
@@ -181,7 +176,7 @@ func _layout_speech_bubble(text: String) -> void:
 		).x
 		line_count += maxi(ceili(text_width / TEXT_WIDTH), 1)
 	var bubble_height := clampf(20.0 + line_count * 20.0, 50.0, 120.0)
-	var bubble_left := (220.0 - BUBBLE_WIDTH) / 2.0
+	var bubble_left := (280.0 - BUBBLE_WIDTH) / 2.0
 	# Explicit offsets are required here. PanelContainer recalculates `size`
 	# from its original offsets after child layout, which previously stretched
 	# short messages down over the pet.
@@ -190,55 +185,28 @@ func _layout_speech_bubble(text: String) -> void:
 	bubble.offset_right = bubble_left + BUBBLE_WIDTH
 	bubble.offset_bottom = BUBBLE_BOTTOM
 	bubble_tail.polygon = PackedVector2Array([
-		Vector2(102, BUBBLE_BOTTOM - 2),
-		Vector2(118, BUBBLE_BOTTOM - 2),
-		Vector2(110, BUBBLE_BOTTOM + 11),
+		Vector2(132, BUBBLE_BOTTOM - 3),
+		Vector2(148, BUBBLE_BOTTOM - 3),
+		Vector2(140, BUBBLE_BOTTOM + 11),
 	])
-
-
-func _build_speech_window() -> void:
-	_speech_window = Window.new()
-	_speech_window.size = Vector2i(220, 140)
-	_speech_window.transparent = true
-	_speech_window.transparent_bg = true
-	_speech_window.borderless = true
-	_speech_window.unfocusable = true
-	_speech_window.mouse_passthrough = true
-	# Keep the native window alive and fully transparent. Repeatedly showing a
-	# transparent Windows window can expose one opaque compositor frame before
-	# its child controls are ready.
-	_speech_window.visible = false
-	add_child(_speech_window)
-	bubble.reparent(_speech_window, false)
-	bubble_tail.reparent(_speech_window, false)
-
-
-func _position_speech_window() -> void:
-	_speech_window.position = DisplayServer.window_get_position() + Vector2i(30, 0)
 
 
 func _finish_window_setup() -> void:
 	_place_bottom_right()
-	# Only the visible pet region captures the mouse; transparent corners click through.
-	_set_pet_passthrough()
-	_position_speech_window()
-	_speech_window.show()
+	# Rendering remains a normal transparent rectangle. Mouse input alone is
+	# toggled as the pointer enters or leaves the pet, so speech is never clipped.
+	get_window().mouse_passthrough_polygon = PackedVector2Array()
 	# Give Windows one compositor frame to apply the final position and native
-	# region, then reveal the already-loaded sprite in one complete frame.
+	# transparency, then reveal the already-loaded sprite in one complete frame.
 	await get_tree().process_frame
 	pet.visible = true
 	say("右鍵操作・雙擊摸摸", 5.0)
 
 
-func _set_pet_passthrough() -> void:
-	_update_window_interaction_region()
-
-
-func _update_window_interaction_region() -> void:
-	if _interaction_region_applied:
-		return
-	get_window().mouse_passthrough_polygon = _pet_hit_polygon
-	_interaction_region_applied = true
+func _update_window_passthrough(global_mouse: Vector2i) -> void:
+	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
+	var over_pet := Geometry2D.is_point_in_polygon(local_mouse, _pet_hit_polygon)
+	get_window().mouse_passthrough = not (over_pet or _dragging or _left_press_pending)
 
 
 func _update_cursor(global_mouse: Vector2i) -> void:
