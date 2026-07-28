@@ -4,6 +4,13 @@
   "name": "新角色",
   "scale": 0.31,
   "fallback_action": "idle",
+  "interactions": {
+    "feed": {"label": "餵食", "icon": "🥕", "wish": "想吃東西（剩餘約 {minutes} 分鐘）"},
+    "water": {"label": "喝水", "icon": "💧", "wish": "想喝水（剩餘約 {minutes} 分鐘）"},
+    "pet": {"label": "摸摸", "icon": "✋", "wish": "想被摸摸（剩餘約 {minutes} 分鐘）"},
+    "work": {"label": "工作", "icon": "🪙", "wish": "想工作（剩餘約 {minutes} 分鐘）"},
+    "sleep": {"label": "睡覺", "icon": "💤", "wish": "想睡覺（剩餘約 {minutes} 分鐘）"}
+  },
   "dialogue": {
     "startup": "右鍵操作・雙擊摸摸",
     "single_click": ["嗯？", "找我嗎？"],

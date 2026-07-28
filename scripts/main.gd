@@ -306,11 +306,21 @@ func _setup_context_menu() -> void:
 	context_menu.add_item("Lv.1  ·  20 金幣", 100)
 	context_menu.set_item_disabled(0, true)
 	context_menu.add_separator()
-	context_menu.add_item("🥕  餵食（2 金幣）", 1)
-	context_menu.add_item("💧  喝水（1 金幣）", 2)
-	context_menu.add_item("✋  摸摸", 3)
-	context_menu.add_item("🪙  工作（賺 7 金幣）", 4)
-	context_menu.add_item("💤  睡覺", 5)
+	context_menu.add_item("%s  %s（2 金幣）" % [
+		_interaction_icon("feed"), _interaction_label("feed")
+	], 1)
+	context_menu.add_item("%s  %s（1 金幣）" % [
+		_interaction_icon("water"), _interaction_label("water")
+	], 2)
+	context_menu.add_item("%s  %s" % [
+		_interaction_icon("pet"), _interaction_label("pet")
+	], 3)
+	context_menu.add_item("%s  %s（賺 7 金幣）" % [
+		_interaction_icon("work"), _interaction_label("work")
+	], 4)
+	context_menu.add_item("%s  %s" % [
+		_interaction_icon("sleep"), _interaction_label("sleep")
+	], 5)
 	context_menu.add_separator()
 	context_menu.add_item("📊  開啟詳細面板", 6)
 	context_menu.add_item("🔎  角色縮小", 20)
@@ -501,15 +511,21 @@ func _build_stats_window() -> void:
 	action_grid.alignment = FlowContainer.ALIGNMENT_CENTER
 	action_grid.add_theme_constant_override("h_separation", 7)
 	action_grid.add_theme_constant_override("v_separation", 7)
-	var panel_actions := {
-		"🥕 餵食": 1, "💧 喝水": 2, "✋ 摸摸": 3,
-		"🪙 工作": 4, "💤 睡覺": 5
-	}
-	for button_text: String in panel_actions:
+	var panel_actions: Array[Dictionary] = [
+		{"action": "feed", "id": 1},
+		{"action": "water", "id": 2},
+		{"action": "pet", "id": 3},
+		{"action": "work", "id": 4},
+		{"action": "sleep", "id": 5},
+	]
+	for definition: Dictionary in panel_actions:
+		var action := String(definition.action)
 		var action_button := Button.new()
-		action_button.text = button_text
+		action_button.text = "%s %s" % [
+			_interaction_icon(action), _interaction_label(action)
+		]
 		action_button.custom_minimum_size = Vector2(100, 38)
-		var action_id: int = panel_actions[button_text]
+		var action_id := int(definition.id)
 		action_button.pressed.connect(func() -> void: _run_care_action(action_id))
 		action_grid.add_child(action_button)
 	content.add_child(action_grid)
@@ -664,7 +680,7 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 	]
 	if is_instance_valid(_stats_status):
 		_stats_status.text = level_text
-		_wish_status.text = "願望：%s" % String(snapshot.get("wish_text", "目前沒有願望"))
+		_wish_status.text = "願望：%s" % _formatted_wish_text(snapshot)
 		var next_unlock: Dictionary = pet.get_next_unlock()
 		if next_unlock.is_empty():
 			_unlock_status.text = "目前已解鎖所有角色動作"
@@ -679,6 +695,34 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 
 
 func _wish_icon(action: String) -> String:
+	return pet.get_interaction_icon(action, _default_interaction_icon(action))
+
+
+func _interaction_label(action: String) -> String:
+	return pet.get_interaction_label(action, _default_interaction_label(action))
+
+
+func _interaction_icon(action: String) -> String:
+	return pet.get_interaction_icon(action, _default_interaction_icon(action))
+
+
+func _default_interaction_label(action: String) -> String:
+	match action:
+		"feed":
+			return "餵食"
+		"water":
+			return "喝水"
+		"pet":
+			return "摸摸"
+		"work":
+			return "工作"
+		"sleep":
+			return "睡覺"
+		_:
+			return action
+
+
+func _default_interaction_icon(action: String) -> String:
 	match action:
 		"feed":
 			return "🥕"
@@ -692,6 +736,19 @@ func _wish_icon(action: String) -> String:
 			return "✋"
 		_:
 			return ""
+
+
+func _formatted_wish_text(snapshot: Dictionary) -> String:
+	var action := String(snapshot.get("wish_action", ""))
+	if action.is_empty() or not bool(snapshot.get("has_active_wish", false)):
+		return "目前沒有願望"
+	var remaining := maxi(
+		int(snapshot.get("wish_expires_at", 0)) - int(Time.get_unix_time_from_system()),
+		0
+	)
+	var minutes := maxi(ceili(remaining / 60.0), 1)
+	var fallback := String(snapshot.get("wish_text", "目前沒有願望"))
+	return pet.get_interaction_wish(action, fallback, minutes)
 
 
 func _update_unlock_tracking() -> void:

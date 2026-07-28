@@ -290,6 +290,33 @@ func get_dialogue(key: String, fallback: String) -> String:
 	return fallback
 
 
+func get_interaction_label(action: String, fallback: String) -> String:
+	return String(_interaction_value(action, "label", fallback))
+
+
+func get_interaction_icon(action: String, fallback: String) -> String:
+	return String(_interaction_value(action, "icon", fallback))
+
+
+func get_interaction_wish(
+	action: String,
+	fallback: String,
+	minutes: int
+) -> String:
+	var template := String(_interaction_value(action, "wish", fallback))
+	return template.replace("{minutes}", str(minutes))
+
+
+func _interaction_value(action: String, key: String, fallback: Variant) -> Variant:
+	var interactions: Variant = _manifest.get("interactions", {})
+	if interactions is not Dictionary:
+		return fallback
+	var definition: Variant = interactions.get(action, {})
+	if definition is not Dictionary:
+		return fallback
+	return definition.get(key, fallback)
+
+
 func is_action_unlocked(action: String) -> bool:
 	if not _actions.has(action):
 		return false

@@ -21,6 +21,17 @@ func _init() -> void:
 		"fallback",
 		"missing character dialogue uses the built-in fallback"
 	)
+	_assert_equal(
+		main.pet.get_interaction_label("feed", "__fallback__"),
+		"餵食",
+		"active character pack supplies interaction labels"
+	)
+	_assert_true(
+		"3" in main.pet.get_interaction_wish(
+			"feed", "fallback {minutes}", 3
+		),
+		"character wish template replaces the minutes placeholder"
+	)
 	_assert_true(main.pet.contains_point(Vector2(140, 190)), "pet center is interactive")
 	_assert_true(not main.pet.contains_point(Vector2(5, 5)), "transparent corner is not interactive")
 	main.pet.play_action("move")
