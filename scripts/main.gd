@@ -668,7 +668,7 @@ func _place_bottom_right() -> void:
 	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
 	DisplayServer.window_set_position(Vector2i(
 		usable.end.x - ceili(visual_bounds.end.x) - 24,
-		usable.end.y - ceili(visual_bounds.end.y) - 24
+		usable.end.y - ceili(visual_bounds.end.y)
 	))
 
 

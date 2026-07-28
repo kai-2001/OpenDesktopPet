@@ -152,6 +152,16 @@ func contains_point(point_in_canvas: Vector2) -> bool:
 func get_visual_bounds_in_canvas() -> Rect2:
 	if not is_instance_valid(_sprite) or _sprite.texture == null:
 		return Rect2(position, Vector2.ONE)
+	# Use the opaque sprite contour rather than the full texture rectangle.
+	# The animation sheets contain transparent padding, which previously made
+	# the pet stop noticeably above the taskbar even though the window itself
+	# had already reached the usable-screen boundary.
+	var visible_polygon := get_interaction_polygon()
+	if not visible_polygon.is_empty():
+		var visible_bounds := Rect2(visible_polygon[0], Vector2.ZERO)
+		for point: Vector2 in visible_polygon:
+			visible_bounds = visible_bounds.expand(point)
+		return visible_bounds
 	var sprite_rect := _sprite.get_rect()
 	var transform := _sprite.get_global_transform()
 	var corners := [

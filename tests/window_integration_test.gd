@@ -77,6 +77,17 @@ func _init() -> void:
 			and visible_at_top_left.position.y >= drag_usable.position.y - 1,
 		"drag clamp uses visible pet bounds at the top-left"
 	)
+	var clamped_bottom_right: Vector2i = main._clamp_window_position(
+		drag_usable.end + Vector2i(10000, 10000)
+	)
+	var visible_at_bottom_right := Rect2(
+		Vector2(clamped_bottom_right) + visual_bounds.position,
+		visual_bounds.size
+	)
+	_assert_true(
+		absf(visible_at_bottom_right.end.y - drag_usable.end.y) <= 1.0,
+		"pet bottom can reach the taskbar edge without entering it"
+	)
 
 	main._show_context_menu(Vector2i(140, 190))
 	await process_frame
