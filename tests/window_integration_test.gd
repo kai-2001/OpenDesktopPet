@@ -17,13 +17,19 @@ func _init() -> void:
 
 	main._show_stats_window()
 	await process_frame
+	await process_frame
 	_assert_true(main._stats_window.visible, "details window opens on first request")
+	_assert_true(not main._stats_window.transient, "details window is an independent native window")
+	_assert_true(main._stats_window.always_on_top, "details window remains above normal windows")
 	var screen := DisplayServer.window_get_current_screen()
 	if screen < 0:
 		screen = DisplayServer.get_primary_screen()
 	var usable := DisplayServer.screen_get_usable_rect(screen)
 	var stats_rect := Rect2i(main._stats_window.position, main._stats_window.size)
 	_assert_true(usable.encloses(stats_rect), "details window remains inside usable screen")
+	main._bring_stats_window_forward()
+	await process_frame
+	_assert_true(main._stats_window.visible, "an existing details window can be brought forward")
 	main._stats_window.hide()
 
 	main.say("快速訊息一", 0.1)

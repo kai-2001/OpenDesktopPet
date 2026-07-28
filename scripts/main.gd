@@ -99,7 +99,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_left_press_pending = false
 		_dragging = false
 		pet.set_dragging(false)
-		if not _stats_window.visible:
+		if _stats_window.visible:
+			# A native details window can lose focus behind another always-on-top
+			# application. Never swallow the right-click without a recovery path.
+			_bring_stats_window_forward()
+		else:
 			_show_context_menu(Vector2i(event.position))
 
 
@@ -366,9 +370,10 @@ func _build_stats_window() -> void:
 	_stats_window.size = Vector2i(400, 720)
 	_stats_window.min_size = Vector2i(360, 480)
 	_stats_window.unresizable = true
-	# A child Window is already transient to the desktop-pet window. Marking it
-	# always-on-top as well is invalid on Windows and prevents reliable popup.
-	_stats_window.always_on_top = false
+	# A transient child of the tiny borderless always-on-top pet window can be
+	# reported visible while remaining behind other windows on Windows.
+	_stats_window.transient = false
+	_stats_window.always_on_top = true
 	_stats_window.visible = false
 	_stats_window.close_requested.connect(func() -> void: _stats_window.hide())
 	add_child(_stats_window)
@@ -534,7 +539,16 @@ func _show_stats_window() -> void:
 	target.y = clampi(target.y, usable.position.y + 12, usable.end.y - _stats_window.size.y - 12)
 	_stats_window.position = target
 	_stats_window.show()
+	call_deferred("_bring_stats_window_forward")
+
+
+func _bring_stats_window_forward() -> void:
+	if not is_instance_valid(_stats_window):
+		return
+	if not _stats_window.visible:
+		_stats_window.show()
 	_stats_window.grab_focus()
+	DisplayServer.window_move_to_foreground(_stats_window.get_window_id())
 
 func _refresh_ui(snapshot: Dictionary) -> void:
 	pet.set_progression(snapshot)
