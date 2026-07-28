@@ -9,5 +9,5 @@ if not exist "%GODOT_EXE%" (
 )
 cd /d "%~dp0"
 echo [%date% %time%] Starting Open Desktop Pet...>>"godot-launch.log"
-start "" wscript.exe "%~dp0DesktopPet.vbs"
+start "" "%GODOT_EXE%" --path "%CD%"
 endlocal
