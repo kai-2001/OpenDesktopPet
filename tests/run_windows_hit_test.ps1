@@ -76,8 +76,8 @@ try {
     $bubbleTarget = [DesktopPetHitTestNative]::WindowFromPoint($bubblePoint)
     $petTarget = [DesktopPetHitTestNative]::WindowFromPoint($petPoint)
     $cornerTarget = [DesktopPetHitTestNative]::WindowFromPoint($cornerPoint)
-    if ($bubbleTarget -ne $helperProcess.MainWindowHandle) {
-        throw 'The speech bubble still intercepts native Windows input.'
+    if ($bubbleTarget -ne $petProcess.MainWindowHandle) {
+        throw 'The visible speech bubble does not receive native Windows input.'
     }
     if ($cornerTarget -ne $helperProcess.MainWindowHandle) {
         throw 'A transparent window corner still intercepts native Windows input.'

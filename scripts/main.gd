@@ -26,6 +26,7 @@ var _auto_move_tween: Tween
 var _known_unlocked_actions: Dictionary = {}
 var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
+var _pet_interaction_polygon := PackedVector2Array()
 var _cursor_shape := Input.CURSOR_ARROW
 
 func _ready() -> void:
@@ -128,6 +129,7 @@ func say(text: String, seconds := 6.0) -> void:
 	# so the compositor never displays the temporary polygon-shaped state.
 	bubble.visible = false
 	bubble_tail.visible = false
+	_refresh_interaction_polygon()
 	bubble_label.text = text
 	bubble_label.add_theme_font_size_override(
 		"font_size", 20 if text in ["🥕", "💧", "💤", "🪙", "✋"] else 13
@@ -139,10 +141,12 @@ func say(text: String, seconds := 6.0) -> void:
 	_layout_speech_bubble(text)
 	bubble.visible = true
 	bubble_tail.visible = true
+	_refresh_interaction_polygon()
 	await get_tree().create_timer(seconds).timeout
 	if token == _bubble_token:
 		bubble.visible = false
 		bubble_tail.visible = false
+		_refresh_interaction_polygon()
 
 
 func _restore_from_system_minimize() -> void:
@@ -204,7 +208,7 @@ func _update_cursor(global_mouse: Vector2i) -> void:
 
 func _is_pet_interactive_at(local_point: Vector2) -> bool:
 	if _is_speech_overlay_at(local_point):
-		return false
+		return true
 	return pet.contains_point(local_point)
 
 
@@ -220,8 +224,26 @@ func _is_speech_overlay_at(local_point: Vector2) -> bool:
 
 
 func _apply_interaction_polygon(polygon: PackedVector2Array) -> void:
+	_pet_interaction_polygon = polygon
+	_refresh_interaction_polygon()
+
+
+func _refresh_interaction_polygon() -> void:
 	get_window().mouse_passthrough = false
-	get_window().mouse_passthrough_polygon = polygon
+	if not bubble.visible:
+		get_window().mouse_passthrough_polygon = _pet_interaction_polygon
+		return
+	var combined_points := PackedVector2Array(_pet_interaction_polygon)
+	var bubble_rect := bubble.get_global_rect()
+	combined_points.append_array(PackedVector2Array([
+		bubble_rect.position,
+		Vector2(bubble_rect.end.x, bubble_rect.position.y),
+		bubble_rect.end,
+		Vector2(bubble_rect.position.x, bubble_rect.end.y),
+	]))
+	for point: Vector2 in bubble_tail.polygon:
+		combined_points.append(bubble_tail.to_global(point))
+	get_window().mouse_passthrough_polygon = Geometry2D.convex_hull(combined_points)
 
 
 func _set_cursor_shape(shape: Input.CursorShape) -> void:

@@ -16,6 +16,7 @@ func _init() -> void:
 	_assert_true(not main.pet.contains_point(Vector2(5, 5)), "transparent corner is not interactive")
 	main.bubble.visible = true
 	main.bubble_tail.visible = true
+	main._refresh_interaction_polygon()
 	var bubble_pet_overlap := Vector2(-1, -1)
 	var bubble_rect: Rect2 = main.bubble.get_global_rect()
 	for y in range(floori(bubble_rect.position.y), ceili(bubble_rect.end.y), 2):
@@ -33,21 +34,27 @@ func _init() -> void:
 		"speech pass-through test uses the visible bubble area"
 	)
 	_assert_true(
-		not main._is_pet_interactive_at(bubble_pet_overlap),
-		"visible speech bubble overrides the pet hit area"
+		main._is_pet_interactive_at(bubble_pet_overlap),
+		"visible speech bubble is handled as part of the pet"
 	)
 	var native_hit_polygon: PackedVector2Array = \
 		main.get_window().mouse_passthrough_polygon
 	_assert_true(
-		not Geometry2D.is_point_in_polygon(bubble_pet_overlap, native_hit_polygon),
-		"native desktop hit region excludes the speech bubble"
+		Geometry2D.is_point_in_polygon(bubble_pet_overlap, native_hit_polygon),
+		"native desktop hit region includes the visible speech bubble"
 	)
 	_assert_true(
-		not main._is_pet_interactive_at(Vector2(140, 128)),
-		"visible speech tail is click-through"
+		main._is_pet_interactive_at(Vector2(140, 128)),
+		"visible speech tail is handled as part of the pet"
 	)
 	main.bubble.visible = false
 	main.bubble_tail.visible = false
+	main._refresh_interaction_polygon()
+	native_hit_polygon = main.get_window().mouse_passthrough_polygon
+	_assert_true(
+		not Geometry2D.is_point_in_polygon(bubble_rect.get_center(), native_hit_polygon),
+		"hidden speech area is removed from the native hit region"
+	)
 	_assert_true(
 		Geometry2D.is_point_in_polygon(Vector2(140, 190), native_hit_polygon),
 		"native desktop hit region includes the visible pet"
