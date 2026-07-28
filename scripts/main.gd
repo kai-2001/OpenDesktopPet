@@ -52,7 +52,6 @@ func _ready() -> void:
 	_last_global_mouse = DisplayServer.mouse_get_position()
 	_last_user_activity_ms = Time.get_ticks_msec()
 	call_deferred("_finish_window_setup")
-	call_deferred("_prime_stats_window")
 
 
 func _process(_delta: float) -> void:
@@ -546,14 +545,6 @@ func _setup_stats_open_timer() -> void:
 	_stats_open_timer.wait_time = 0.35
 	_stats_open_timer.timeout.connect(_show_stats_window)
 	add_child(_stats_open_timer)
-
-
-func _prime_stats_window() -> void:
-	_stats_window.position = Vector2i(-10000, -10000)
-	_stats_window.popup()
-	await get_tree().process_frame
-	await get_tree().process_frame
-	_stats_window.hide()
 
 
 func _refresh_ui(snapshot: Dictionary) -> void:
