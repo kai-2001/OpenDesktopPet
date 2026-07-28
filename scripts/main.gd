@@ -29,9 +29,13 @@ var _auto_move_tween: Tween
 var _known_unlocked_actions: Dictionary = {}
 var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
+var _interaction_region_applied := false
 
 var _pet_hit_polygon := PackedVector2Array([
-	Vector2(70, 100), Vector2(210, 100), Vector2(245, 170),
+	# Keep one stable native hit-test outline for the entire lifetime of the
+	# window. The small upper-right extension contains the optional wish badge.
+	Vector2(70, 100), Vector2(184, 100), Vector2(192, 82),
+	Vector2(240, 82), Vector2(240, 132), Vector2(245, 170),
 	Vector2(220, 310), Vector2(60, 310), Vector2(35, 170)
 ])
 
@@ -199,19 +203,10 @@ func _set_pet_passthrough() -> void:
 
 
 func _update_window_interaction_region() -> void:
-	if bubble.visible:
-		# A concave native hit-test region distorts translucent controls on
-		# Windows. Use the normal rectangular window briefly while speech is
-		# visible; restore click-through shaping as soon as it disappears.
-		get_window().mouse_passthrough_polygon = PackedVector2Array()
-	elif wish_badge.visible:
-		get_window().mouse_passthrough_polygon = PackedVector2Array([
-			Vector2(70, 100), Vector2(184, 100), Vector2(192, 82),
-			Vector2(240, 82), Vector2(240, 132), Vector2(245, 170),
-			Vector2(220, 310), Vector2(60, 310), Vector2(35, 170),
-		])
-	else:
-		get_window().mouse_passthrough_polygon = _pet_hit_polygon
+	if _interaction_region_applied:
+		return
+	get_window().mouse_passthrough_polygon = _pet_hit_polygon
+	_interaction_region_applied = true
 
 
 func _update_cursor(global_mouse: Vector2i) -> void:
