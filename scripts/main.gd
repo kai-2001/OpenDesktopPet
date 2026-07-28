@@ -51,7 +51,6 @@ func _ready() -> void:
 	_last_user_activity_ms = Time.get_ticks_msec()
 	call_deferred("_finish_window_setup")
 	call_deferred("_prime_stats_window")
-	say("右鍵操作・雙擊摸摸", 5.0)
 
 
 func _process(_delta: float) -> void:
@@ -205,7 +204,7 @@ func _build_speech_window() -> void:
 	# Keep the native window alive and fully transparent. Repeatedly showing a
 	# transparent Windows window can expose one opaque compositor frame before
 	# its child controls are ready.
-	_speech_window.visible = true
+	_speech_window.visible = false
 	add_child(_speech_window)
 	bubble.reparent(_speech_window, false)
 	bubble_tail.reparent(_speech_window, false)
@@ -219,6 +218,9 @@ func _finish_window_setup() -> void:
 	_place_bottom_right()
 	# Only the visible pet region captures the mouse; transparent corners click through.
 	_set_pet_passthrough()
+	_position_speech_window()
+	_speech_window.show()
+	say("右鍵操作・雙擊摸摸", 5.0)
 
 
 func _set_pet_passthrough() -> void:
