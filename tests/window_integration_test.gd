@@ -13,6 +13,34 @@ func _init() -> void:
 
 	_assert_true(main.pet.visible, "pet is revealed after native window setup")
 	_assert_true(
+		is_instance_valid(main._visibility_watchdog),
+		"fixed-interval visibility watchdog is running"
+	)
+	_assert_equal(
+		main._visibility_watchdog.wait_time,
+		main.VISIBILITY_CHECK_INTERVAL,
+		"visibility watchdog uses the fixed 100 ms interval"
+	)
+	_assert_true(
+		not main._check_window_visibility(),
+		"visible window does not trigger redundant recovery"
+	)
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MINIMIZED)
+	var recovery_deadline := Time.get_ticks_msec() + 1500
+	while DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED \
+			and Time.get_ticks_msec() < recovery_deadline:
+		await create_timer(0.05).timeout
+	_assert_equal(
+		DisplayServer.window_get_mode(),
+		DisplayServer.WINDOW_MODE_WINDOWED,
+		"watchdog really restores a natively minimized pet window"
+	)
+	_assert_equal(
+		main._visibility_watchdog.wait_time,
+		main.VISIBILITY_CHECK_INTERVAL,
+		"successful recovery keeps the fixed 100 ms interval"
+	)
+	_assert_true(
 		main.pet.get_dialogue("startup", "__fallback__") != "__fallback__",
 		"active character pack supplies dialogue"
 	)

@@ -3,6 +3,7 @@ extends Node2D
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_STATS_SIZE := Vector2i(400, 720)
 const MIN_STATS_SIZE := Vector2i(360, 480)
+const VISIBILITY_CHECK_INTERVAL := 0.10
 
 @onready var state: Node = $PetState
 @onready var pet: Node2D = $PetVisual
@@ -32,6 +33,7 @@ var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
 var _pet_interaction_polygon := PackedVector2Array()
 var _cursor_shape := Input.CURSOR_ARROW
+var _visibility_watchdog: Timer
 
 func _ready() -> void:
 	# PetVisual is ready before this parent node. Keep its first loaded frame
@@ -43,13 +45,13 @@ func _ready() -> void:
 	_connect_signals()
 	_setup_context_menu()
 	_setup_idle_behavior()
+	_setup_visibility_watchdog()
 	_last_global_mouse = DisplayServer.mouse_get_position()
 	_last_user_activity_ms = Time.get_ticks_msec()
 	call_deferred("_finish_window_setup")
 
 
 func _process(_delta: float) -> void:
-	_restore_from_system_minimize()
 	var mouse := DisplayServer.mouse_get_position()
 	if mouse.distance_to(_last_global_mouse) > 1.0:
 		_last_user_activity_ms = Time.get_ticks_msec()
@@ -131,6 +133,13 @@ func _notification(what: int) -> void:
 		_save_stats_window_size()
 		state.save_state()
 		get_tree().quit()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN \
+			or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		# Godot does not expose Win32's foreground hook directly. These
+		# notifications provide the event-driven fast path; the lightweight
+		# watchdog remains the fallback for Show Desktop transitions that do
+		# not deliver a focus notification.
+		call_deferred("_check_window_visibility")
 
 
 func say(text: String, seconds := 6.0) -> void:
@@ -161,12 +170,36 @@ func say(text: String, seconds := 6.0) -> void:
 		_refresh_interaction_polygon()
 
 
-func _restore_from_system_minimize() -> void:
-	# This borderless desktop pet has no user-facing minimize command. Windows
-	# still minimizes ordinary top-level windows when Show Desktop is invoked,
-	# so restore only that otherwise-unreachable state without taking focus.
+func _setup_visibility_watchdog() -> void:
+	_visibility_watchdog = Timer.new()
+	_visibility_watchdog.name = "WindowVisibilityWatchdog"
+	_visibility_watchdog.one_shot = false
+	_visibility_watchdog.wait_time = VISIBILITY_CHECK_INTERVAL
+	_visibility_watchdog.timeout.connect(_check_window_visibility)
+	add_child(_visibility_watchdog)
+	_visibility_watchdog.start()
+
+
+func _check_window_visibility() -> bool:
+	# Show Desktop can minimize an always-on-top Godot window without a useful
+	# application event. Poll the cheap window mode at 10 Hz so recovery is
+	# effectively immediate without tying the check to every rendered frame.
+	var recovered := false
 	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		DisplayServer.window_set_flag(
+			DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, true
+		)
+		recovered = true
+
+	if is_instance_valid(_stats_window) \
+			and _stats_window.visible \
+			and _stats_window.mode == Window.MODE_MINIMIZED:
+		_stats_window.mode = Window.MODE_WINDOWED
+		_stats_window.always_on_top = true
+		recovered = true
+
+	return recovered
 
 
 func _layout_speech_bubble(text: String) -> void:
