@@ -104,6 +104,7 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	_assert_true(main._stats_window.visible, "details window opens on first request")
+	_assert_true(not main._stats_window.unresizable, "details window can be resized")
 	_assert_true(not main._stats_window.transient, "details window is an independent native window")
 	_assert_true(main._stats_window.always_on_top, "details window remains above normal windows")
 	var screen := DisplayServer.window_get_current_screen()
@@ -115,6 +116,9 @@ func _init() -> void:
 	main._bring_stats_window_forward()
 	await process_frame
 	_assert_true(main._stats_window.visible, "an existing details window can be brought forward")
+	var remembered_stats_size := Vector2i(380, 520)
+	main._stats_window.size = remembered_stats_size
+	await process_frame
 	var first_stats_window_id: int = main._stats_window.get_instance_id()
 	main._destroy_stats_window()
 	await process_frame
@@ -125,6 +129,11 @@ func _init() -> void:
 	_assert_true(
 		main._stats_window.get_instance_id() != first_stats_window_id,
 		"details window recreation uses a fresh native window"
+	)
+	_assert_equal(
+		main._stats_window.size,
+		remembered_stats_size,
+		"details window remembers the user-selected size"
 	)
 	main._destroy_stats_window()
 

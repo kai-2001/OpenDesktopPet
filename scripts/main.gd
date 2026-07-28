@@ -1,5 +1,9 @@
 extends Node2D
 
+const UI_SETTINGS_PATH := "user://ui_settings.cfg"
+const DEFAULT_STATS_SIZE := Vector2i(400, 720)
+const MIN_STATS_SIZE := Vector2i(360, 480)
+
 @onready var state: Node = $PetState
 @onready var pet: Node2D = $PetVisual
 @onready var bubble: PanelContainer = $SpeechBubble
@@ -124,6 +128,7 @@ func _can_begin_drag() -> bool:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_save_stats_window_size()
 		state.save_state()
 		get_tree().quit()
 
@@ -407,9 +412,9 @@ func _build_stats_window() -> void:
 	_stats_bars.clear()
 	_stats_window = Window.new()
 	_stats_window.title = "桌寵詳細狀態"
-	_stats_window.size = Vector2i(400, 720)
-	_stats_window.min_size = Vector2i(360, 480)
-	_stats_window.unresizable = true
+	_stats_window.size = DEFAULT_STATS_SIZE
+	_stats_window.min_size = MIN_STATS_SIZE
+	_stats_window.unresizable = false
 	# A transient child of the tiny borderless always-on-top pet window can be
 	# reported visible while remaining behind other windows on Windows.
 	_stats_window.transient = false
@@ -571,9 +576,10 @@ func _show_stats_window() -> void:
 	if screen < 0:
 		screen = DisplayServer.get_primary_screen()
 	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var preferred_size := _load_stats_window_size()
 	_stats_window.size = Vector2i(
-		mini(400, usable.size.x - 24),
-		mini(720, usable.size.y - 24)
+		clampi(preferred_size.x, MIN_STATS_SIZE.x, usable.size.x - 24),
+		clampi(preferred_size.y, MIN_STATS_SIZE.y, usable.size.y - 24)
 	)
 	var target := Vector2i(pet_position.x - _stats_window.size.x - 14, pet_position.y - 60)
 	if target.x < usable.position.x:
@@ -598,6 +604,7 @@ func _is_stats_window_open() -> bool:
 
 
 func _destroy_stats_window() -> void:
+	_save_stats_window_size()
 	if is_instance_valid(_stats_window):
 		_stats_window.queue_free()
 	_stats_window = null
@@ -606,6 +613,35 @@ func _destroy_stats_window() -> void:
 	_unlock_status = null
 	_last_message_status = null
 	_stats_bars.clear()
+
+
+func _load_stats_window_size() -> Vector2i:
+	var config := ConfigFile.new()
+	if config.load(UI_SETTINGS_PATH) != OK:
+		return DEFAULT_STATS_SIZE
+	var saved_width := int(config.get_value(
+		"details_window", "width", DEFAULT_STATS_SIZE.x
+	))
+	var saved_height := int(config.get_value(
+		"details_window", "height", DEFAULT_STATS_SIZE.y
+	))
+	return Vector2i(
+		maxi(saved_width, MIN_STATS_SIZE.x),
+		maxi(saved_height, MIN_STATS_SIZE.y)
+	)
+
+
+func _save_stats_window_size() -> void:
+	if not is_instance_valid(_stats_window):
+		return
+	var current_size := _stats_window.size
+	if current_size.x < MIN_STATS_SIZE.x or current_size.y < MIN_STATS_SIZE.y:
+		return
+	var config := ConfigFile.new()
+	config.load(UI_SETTINGS_PATH)
+	config.set_value("details_window", "width", current_size.x)
+	config.set_value("details_window", "height", current_size.y)
+	config.save(UI_SETTINGS_PATH)
 
 func _refresh_ui(snapshot: Dictionary) -> void:
 	pet.set_progression(snapshot)
