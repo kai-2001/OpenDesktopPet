@@ -4,6 +4,15 @@
   "name": "新角色",
   "scale": 0.31,
   "fallback_action": "idle",
+  "dialogue": {
+    "startup": "右鍵操作・雙擊摸摸",
+    "single_click": ["嗯？", "找我嗎？"],
+    "idle": ["我在這裡。", "今天也要照顧我。"],
+    "feed_complete": "好吃！",
+    "water_complete": "喝完水了！",
+    "work_complete": "工作完成！",
+    "action_unlocked": "學會新動作：{action}！"
+  },
   "aliases": {
     "clap": "pet",
     "roll": "move"

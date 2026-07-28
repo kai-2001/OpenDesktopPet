@@ -4,6 +4,20 @@
   "name": "Default Desktop Pet",
   "scale": 0.42,
   "fallback_action": "idle",
+  "dialogue": {
+    "startup": "右鍵操作・雙擊摸摸",
+    "single_click": ["嗯？", "我有在聽。", "想摸摸的話可以雙擊。"],
+    "idle": ["我在這裡。", "滾一下好了。", "今天也要照顧我。"],
+    "action_busy": "先等目前的動作完成～",
+    "feed_complete": "好吃！一下就吃光了！",
+    "water_complete": "咕嚕咕嚕，好清爽！",
+    "sleep_recovered": "呼嚕……睡成一顆麻糬。",
+    "sleep_full": "雖然很有精神，還是舒服地睡了一覺。",
+    "work_complete": "工作完成！賺到 7 枚金幣。",
+    "pet_rewarded": "嘿嘿！再摸一下！",
+    "pet_cooldown": "很舒服，不過先讓我休息一下～",
+    "action_unlocked": "解鎖了新的動作：{action}！"
+  },
   "actions": {
     "idle": {"file": "pet.svg", "columns": 1, "sequence": [0], "idle_interval": 2.6},
     "pet": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 4, "frame_time": 0.16},

@@ -206,7 +206,7 @@ func _finish_window_setup() -> void:
 	# transparency, then reveal the already-loaded sprite in one complete frame.
 	await get_tree().process_frame
 	pet.visible = true
-	say("右鍵操作・雙擊摸摸", 5.0)
+	_say_dialogue("startup", "右鍵操作・雙擊摸摸", 5.0)
 
 
 func _update_cursor(global_mouse: Vector2i) -> void:
@@ -283,11 +283,19 @@ func _connect_signals() -> void:
 		call_deferred("_show_wish_notice", active_wish)
 
 
-func _show_state_message(text: String) -> void:
+func _show_state_message(key: String, fallback: String) -> void:
+	var newline_at := fallback.find("\n")
+	var base_text := fallback if newline_at < 0 else fallback.left(newline_at)
+	var suffix := "" if newline_at < 0 else fallback.substr(newline_at)
+	var text: String = pet.get_dialogue(key, base_text) + suffix
 	_last_state_message = text.replace("\n", "　")
 	if is_instance_valid(_last_message_status):
 		_last_message_status.text = "最近訊息：%s" % _last_state_message
 	say(text, 6.0)
+
+
+func _say_dialogue(key: String, fallback: String, seconds: float) -> void:
+	say(pet.get_dialogue(key, fallback), seconds)
 
 
 func _show_wish_notice(action: String) -> void:
@@ -329,10 +337,10 @@ func _on_context_action(id: int) -> void:
 			get_tree().quit()
 		20:
 			state.change_visual_size(-0.1)
-			say("這個大小比較不擋路。", 2.0)
+			_say_dialogue("size_smaller", "這個大小比較不擋路。", 2.0)
 		21:
 			state.change_visual_size(0.1)
-			say("放大一點點。", 2.0)
+			_say_dialogue("size_larger", "放大一點點。", 2.0)
 
 
 func _single_click_reaction() -> void:
@@ -342,7 +350,7 @@ func _single_click_reaction() -> void:
 		"右鍵有快捷操作喔。",
 		"再點一下就要收費了。"
 	]
-	say(lines.pick_random(), 2.0)
+	_say_dialogue("single_click", lines.pick_random(), 2.0)
 	pet.play_action("wiggle")
 
 
@@ -355,7 +363,11 @@ func _setup_idle_behavior() -> void:
 		if _can_act_autonomously():
 			_run_autonomous_action()
 			if _idle_count % 3 == 0:
-				say(["我在這裡。", "滾一下好了。", "今天也要照顧我。"].pick_random(), 2.5)
+				_say_dialogue(
+					"idle",
+					["我在這裡。", "滾一下好了。", "今天也要照顧我。"].pick_random(),
+					2.5
+				)
 		timer.wait_time = randf_range(11.0, 19.0)
 		timer.start()
 	)
@@ -517,7 +529,7 @@ func _build_stats_window() -> void:
 
 func _run_care_action(id: int) -> void:
 	if state.is_action_busy() or pet.is_busy():
-		say("先等目前的動作完成～", 1.5)
+		_say_dialogue("action_busy", "先等目前的動作完成～", 1.5)
 		return
 	match id:
 		1:
@@ -698,7 +710,8 @@ func _update_unlock_tracking() -> void:
 
 func _celebrate_unlock(action: String) -> void:
 	await get_tree().create_timer(0.4).timeout
-	say("解鎖了新的動作：%s！" % action, 4.0)
+	var unlock_fallback := "解鎖了新的動作：%s！" % action
+	say(pet.get_dialogue("action_unlocked", unlock_fallback).replace("{action}", action), 4.0)
 	if not pet.is_busy() and not state.is_action_busy():
 		pet.play_action(action)
 

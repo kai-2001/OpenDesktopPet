@@ -278,6 +278,18 @@ func get_next_unlock() -> Dictionary:
 	return best
 
 
+func get_dialogue(key: String, fallback: String) -> String:
+	var dialogue: Variant = _manifest.get("dialogue", {})
+	if dialogue is not Dictionary or not dialogue.has(key):
+		return fallback
+	var entry: Variant = dialogue[key]
+	if entry is String:
+		return String(entry)
+	if entry is Array and not entry.is_empty():
+		return String(entry.pick_random())
+	return fallback
+
+
 func is_action_unlocked(action: String) -> bool:
 	if not _actions.has(action):
 		return false

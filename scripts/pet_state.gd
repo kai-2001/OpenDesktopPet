@@ -2,7 +2,7 @@ class_name PetState
 extends Node
 
 signal changed(snapshot: Dictionary)
-signal message_requested(text: String)
+signal message_requested(key: String, fallback: String)
 signal action_requested(action: String, request_id: int)
 signal wish_started(action: String)
 signal action_result_available(request_id: int)
@@ -71,7 +71,7 @@ func pet() -> void:
 		return
 	var played: bool = await _wait_for_action_result(request_id)
 	if not played:
-		_abort_action("摸摸動畫無法播放，請檢查角色包。")
+		_abort_action("pet_failed", "摸摸動畫無法播放，請檢查角色包。")
 		return
 	var now := _now()
 	var rewarded := now >= int(data.last_pet_reward_at) + PET_REWARD_COOLDOWN_SECONDS
@@ -85,25 +85,25 @@ func pet() -> void:
 		data.mood = _limit(data.mood + 1.0)
 	var message := "嘿嘿！再摸一下！" if rewarded else "很舒服，不過先讓我休息一下～"
 	message += _complete_wish("pet")
-	_finish_action(message)
+	_finish_action("pet_rewarded" if rewarded else "pet_cooldown", message)
 
 
 func feed() -> void:
 	if _action_busy:
-		message_requested.emit("先等目前的動作完成～")
+		_request_message("action_busy", "先等目前的動作完成～")
 		return
 	if data.hunger >= 92.0:
-		message_requested.emit("肚子已經很飽了，晚點再吃吧。")
+		_request_message("feed_full", "肚子已經很飽了，晚點再吃吧。")
 		return
 	if data.coins < 2:
-		message_requested.emit("需要 2 枚金幣，先去工作吧。")
+		_request_message("feed_no_coins", "需要 2 枚金幣，先去工作吧。")
 		return
 	var request_id := _begin_action("eat")
 	if request_id <= 0:
 		return
 	var played: bool = await _wait_for_action_result(request_id)
 	if not played:
-		_abort_action("餵食動畫無法播放，沒有扣除金幣。")
+		_abort_action("feed_failed", "餵食動畫無法播放，沒有扣除金幣。")
 		return
 	data.coins -= 2
 	data.hunger = _limit(data.hunger + 28.0)
@@ -111,25 +111,25 @@ func feed() -> void:
 	data.care += 1
 	_add_affection(1)
 	_add_xp(2)
-	_finish_action("好吃！一下就吃光了！" + _complete_wish("feed"))
+	_finish_action("feed_complete", "好吃！一下就吃光了！" + _complete_wish("feed"))
 
 
 func water() -> void:
 	if _action_busy:
-		message_requested.emit("先等目前的動作完成～")
+		_request_message("action_busy", "先等目前的動作完成～")
 		return
 	if data.thirst >= 92.0:
-		message_requested.emit("現在不渴，晚點再喝吧。")
+		_request_message("water_full", "現在不渴，晚點再喝吧。")
 		return
 	if data.coins < 1:
-		message_requested.emit("需要 1 枚金幣，先去工作吧。")
+		_request_message("water_no_coins", "需要 1 枚金幣，先去工作吧。")
 		return
 	var request_id := _begin_action("drink")
 	if request_id <= 0:
 		return
 	var played: bool = await _wait_for_action_result(request_id)
 	if not played:
-		_abort_action("喝水動畫無法播放，沒有扣除金幣。")
+		_abort_action("water_failed", "喝水動畫無法播放，沒有扣除金幣。")
 		return
 	data.coins -= 1
 	data.thirst = _limit(data.thirst + 30.0)
@@ -137,7 +137,7 @@ func water() -> void:
 	data.care += 1
 	_add_affection(1)
 	_add_xp(1)
-	_finish_action("咕嚕咕嚕，好清爽！" + _complete_wish("water"))
+	_finish_action("water_complete", "咕嚕咕嚕，好清爽！" + _complete_wish("water"))
 
 
 func sleep() -> void:
@@ -146,35 +146,35 @@ func sleep() -> void:
 		return
 	var played: bool = await _wait_for_action_result(request_id)
 	if not played:
-		_abort_action("睡覺動畫無法播放。")
+		_abort_action("sleep_failed", "睡覺動畫無法播放。")
 		return
 	var recovered: bool = _apply_sleep_result()
 	var message := "呼嚕……睡成一顆麻糬。" if recovered else "雖然很有精神，還是舒服地睡了一覺。"
-	_finish_action(message + _complete_wish("sleep"))
+	_finish_action("sleep_recovered" if recovered else "sleep_full", message + _complete_wish("sleep"))
 
 
 func work() -> void:
 	if _action_busy:
-		message_requested.emit("先等目前的動作完成～")
+		_request_message("action_busy", "先等目前的動作完成～")
 		return
 	if data.energy < 18.0:
-		message_requested.emit("太累了，先睡一下吧。")
+		_request_message("work_tired", "太累了，先睡一下吧。")
 		return
 	if data.hunger < 8.0:
-		message_requested.emit("肚子太餓了，吃飽再工作吧。")
+		_request_message("work_hungry", "肚子太餓了，吃飽再工作吧。")
 		return
 	if data.thirst < 10.0:
-		message_requested.emit("太渴了，喝水後再工作吧。")
+		_request_message("work_thirsty", "太渴了，喝水後再工作吧。")
 		return
 	var request_id := _begin_action("work")
 	if request_id <= 0:
 		return
 	var played: bool = await _wait_for_action_result(request_id)
 	if not played:
-		_abort_action("工作動畫無法播放，沒有結算獎勵。")
+		_abort_action("work_failed", "工作動畫無法播放，沒有結算獎勵。")
 		return
 	_apply_work_result()
-	_finish_action("工作完成！賺到 7 枚金幣。" + _complete_wish("work"))
+	_finish_action("work_complete", "工作完成！賺到 7 枚金幣。" + _complete_wish("work"))
 
 
 func _apply_sleep_result() -> bool:
@@ -224,7 +224,7 @@ func has_active_wish(now := -1) -> bool:
 
 func _begin_action(action: String) -> int:
 	if _action_busy:
-		message_requested.emit("先等目前的動作完成～")
+		_request_message("action_busy", "先等目前的動作完成～")
 		return 0
 	_action_busy = true
 	var request_id := _next_request_id
@@ -248,16 +248,20 @@ func _wait_for_action_result(request_id: int) -> bool:
 	return success
 
 
-func _finish_action(message: String) -> void:
+func _finish_action(key: String, message: String) -> void:
 	_action_busy = false
-	message_requested.emit(message)
+	_request_message(key, message)
 	_commit()
 
 
-func _abort_action(message: String) -> void:
+func _abort_action(key: String, message: String) -> void:
 	_action_busy = false
-	message_requested.emit(message)
+	_request_message(key, message)
 	emit_changed()
+
+
+func _request_message(key: String, fallback: String) -> void:
+	message_requested.emit(key, fallback)
 
 
 func _complete_wish(action: String) -> String:
@@ -420,7 +424,7 @@ func _add_xp(amount: int) -> void:
 		data.xp -= data.level * 20
 		data.level += 1
 		data.mood = _limit(data.mood + 12.0)
-		message_requested.emit("升級了！現在是第 %d 級。" % data.level)
+		_request_message("level_up", "升級了！現在是第 %d 級。" % data.level)
 
 
 func change_visual_size(delta: float) -> void:

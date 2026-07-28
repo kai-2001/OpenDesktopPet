@@ -12,6 +12,15 @@ func _init() -> void:
 	await process_frame
 
 	_assert_true(main.pet.visible, "pet is revealed after native window setup")
+	_assert_true(
+		main.pet.get_dialogue("startup", "__fallback__") != "__fallback__",
+		"active character pack supplies dialogue"
+	)
+	_assert_equal(
+		main.pet.get_dialogue("__missing_dialogue__", "fallback"),
+		"fallback",
+		"missing character dialogue uses the built-in fallback"
+	)
 	_assert_true(main.pet.contains_point(Vector2(140, 190)), "pet center is interactive")
 	_assert_true(not main.pet.contains_point(Vector2(5, 5)), "transparent corner is not interactive")
 	main.pet.play_action("move")

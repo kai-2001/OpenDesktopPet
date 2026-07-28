@@ -126,6 +126,40 @@ characters/custom/
 }
 ```
 
+## 泡泡台詞
+
+角色包可在頂層加入 `dialogue`。每個項目可以是固定字串，也可以是字串
+陣列；陣列會在每次顯示時隨機挑選一句。所有項目皆可省略，程式會使用
+內建台詞，因此舊角色包仍可直接使用。
+
+```json
+{
+  "dialogue": {
+    "startup": "右鍵操作・雙擊摸摸",
+    "single_click": ["嗯？", "找我嗎？"],
+    "idle": ["我在這裡。", "今天也要照顧我。"],
+    "feed_complete": "好吃！",
+    "water_complete": "喝完水了！",
+    "work_complete": "工作完成！",
+    "action_unlocked": "學會新動作：{action}！"
+  }
+}
+```
+
+常用鍵包括：
+
+- `startup`、`single_click`、`idle`
+- `size_smaller`、`size_larger`、`action_busy`
+- `pet_rewarded`、`pet_cooldown`、`pet_failed`
+- `feed_complete`、`feed_full`、`feed_no_coins`、`feed_failed`
+- `water_complete`、`water_full`、`water_no_coins`、`water_failed`
+- `sleep_recovered`、`sleep_full`、`sleep_failed`
+- `work_complete`、`work_tired`、`work_hungry`、`work_thirsty`、`work_failed`
+- `level_up`、`action_unlocked`
+
+`action_unlocked` 可使用 `{action}` 代表解鎖的動作名稱。養育行為若同時
+完成願望，願望獎勵提示會接在角色包台詞後方。
+
 ## 最低製作流程
 
 1. 複製 `examples/character-pack/pet.json`。
