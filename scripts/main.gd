@@ -853,8 +853,11 @@ func _update_character_buttons() -> void:
 	var entry := _selected_character_entry()
 	var has_entry := not entry.is_empty()
 	if is_instance_valid(_character_use_button):
-		_character_use_button.disabled = not has_entry \
-			or String(entry.id) == pet.get_character_id()
+		var is_active: bool = has_entry \
+			and String(entry.id) == pet.get_character_id()
+		_character_use_button.text = "重新載入角色" if is_active \
+			else "使用選取角色"
+		_character_use_button.disabled = not has_entry
 	if is_instance_valid(_character_delete_button):
 		_character_delete_button.disabled = not has_entry \
 			or not bool(entry.get("installed", false))
@@ -917,10 +920,13 @@ func _use_selected_character() -> void:
 	var entry := _selected_character_entry()
 	if entry.is_empty():
 		return
+	var is_reload: bool = String(entry.id) == pet.get_character_id()
 	_set_selected_character_id(String(entry.id))
 	state.save_state()
 	if OS.has_feature("editor"):
-		_character_feedback.text = "已儲存角色選擇；開發模式下請重新啟動場景。"
+		_character_feedback.text = "正在重新載入角色…" if is_reload \
+			else "正在切換角色…"
+		get_tree().reload_current_scene()
 		return
 	_restart_after_character_change()
 

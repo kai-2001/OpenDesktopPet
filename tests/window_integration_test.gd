@@ -182,6 +182,27 @@ func _init() -> void:
 		main._character_entries.size() >= 1,
 		"character tab always lists the built-in public character"
 	)
+	_assert_equal(
+		main._character_use_button.text,
+		"重新載入角色",
+		"active character selection offers an explicit reload"
+	)
+	_assert_true(
+		not main._character_use_button.disabled,
+		"active character reload remains available"
+	)
+	for character_index in main._character_entries.size():
+		if String(main._character_entries[character_index].id) \
+				== main.pet.get_character_id():
+			continue
+		main._character_list.select(character_index)
+		main._update_character_buttons()
+		_assert_equal(
+			main._character_use_button.text,
+			"使用選取角色",
+			"inactive character selection keeps the switch action"
+		)
+		break
 	main._stats_window.mode = Window.MODE_MINIMIZED
 	var stats_recovery_deadline := Time.get_ticks_msec() + 1500
 	while main._stats_window.mode == Window.MODE_MINIMIZED \
