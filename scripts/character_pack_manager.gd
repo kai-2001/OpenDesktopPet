@@ -72,7 +72,10 @@ static func install_archive(archive_path: String) -> Dictionary:
 
 	if was_update and DirAccess.rename_absolute(target_absolute, backup_absolute) != OK:
 		_remove_tree(staging_absolute)
-		return _failure("無法備份目前安裝的角色包。")
+		return _failure(
+			"無法更新角色包：角色資料夾可能正被檔案總管、"
+			+ "圖片預覽或其他程式使用，請關閉後重試。"
+		)
 	if DirAccess.rename_absolute(staging_absolute, target_absolute) != OK:
 		if was_update:
 			DirAccess.rename_absolute(backup_absolute, target_absolute)
