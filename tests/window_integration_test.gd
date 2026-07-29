@@ -349,6 +349,34 @@ func _init() -> void:
 		restart_script.contains("'C:\\Pets\\Kai''s Pet.exe'"),
 		"character restart safely quotes the executable path"
 	)
+	_assert_true(
+		restart_script.contains("restart.log")
+			and restart_script.contains("-WorkingDirectory")
+			and restart_script.contains("FAILED "),
+		"character restart records helper progress and launch failures"
+	)
+	main._append_restart_log("integration marker")
+	_assert_true(
+		FileAccess.file_exists(main.RESTART_LOG_PATH)
+			and FileAccess.get_file_as_string(main.RESTART_LOG_PATH).contains(
+				"integration marker"
+			),
+		"character restart appends application-side diagnostics"
+	)
+	var oversized_log := FileAccess.open(main.RESTART_LOG_PATH, FileAccess.WRITE)
+	oversized_log.store_string(
+		"old entry\n".repeat(main.RESTART_LOG_MAX_BYTES / 5)
+	)
+	oversized_log.close()
+	main._append_restart_log("newest marker")
+	_assert_true(
+		FileAccess.get_file_as_bytes(main.RESTART_LOG_PATH).size()
+				<= main.RESTART_LOG_MAX_BYTES
+			and FileAccess.get_file_as_string(main.RESTART_LOG_PATH).ends_with(
+				"newest marker\n"
+			),
+		"character restart log discards oldest complete lines at its size limit"
+	)
 
 	var energy_before := float(main.state.data.energy)
 	main._show_context_menu(Vector2i(140, 190))

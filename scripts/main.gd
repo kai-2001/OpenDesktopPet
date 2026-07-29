@@ -2,6 +2,8 @@ extends Node2D
 
 const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
+const RESTART_LOG_PATH := "user://logs/restart.log"
+const RESTART_LOG_MAX_BYTES := 1024 * 1024
 const DEFAULT_STATS_SIZE := Vector2i(400, 720)
 const MIN_STATS_SIZE := Vector2i(360, 480)
 const DEFAULT_TARGET_FPS := 30
@@ -791,7 +793,7 @@ func _refresh_character_list(message := "") -> void:
 	_character_list.clear()
 	_character_entries.append({
 		"id": "open_desktop_pet_default",
-		"name": "公開海豹球",
+		"name": "預設桌寵",
 		"version": "內建",
 		"installed": false,
 		"builtin": true,
@@ -925,13 +927,16 @@ func _use_selected_character() -> void:
 
 func _restart_after_character_change() -> void:
 	var executable := OS.get_executable_path()
+	_append_restart_log("restart requested old_pid=%d" % OS.get_process_id())
 	var launcher_process_id := _schedule_restart_after_exit(
 		executable,
 		OS.get_process_id()
 	)
 	if launcher_process_id <= 0:
+		_append_restart_log("failed to create restart helper")
 		_character_feedback.text = "角色已選擇，但自動重啟失敗；請手動重開桌寵。"
 		return
+	_append_restart_log("restart helper created helper_pid=%d" % launcher_process_id)
 	_left_press_pending = false
 	_dragging = false
 	pet.set_dragging(false)
@@ -964,12 +969,55 @@ func _schedule_restart_after_exit(executable: String, old_process_id: int) -> in
 
 func _restart_wait_script(executable: String, old_process_id: int) -> String:
 	var quoted_executable := executable.replace("'", "''")
+	var quoted_working_directory := executable.get_base_dir().replace("'", "''")
+	var quoted_log_path := ProjectSettings.globalize_path(
+		RESTART_LOG_PATH
+	).replace("'", "''")
 	return (
-		"$ErrorActionPreference='SilentlyContinue'; "
-		+ "Wait-Process -Id %d; " % old_process_id
-		+ "if (-not (Get-Process -Id %d)) { " % old_process_id
-		+ "Start-Process -FilePath '%s' }" % quoted_executable
+		"$ErrorActionPreference='Stop'; "
+		+ "$log='%s'; " % quoted_log_path
+		+ "function Write-Log($message) { "
+		+ "Add-Content -LiteralPath $log -Encoding UTF8 "
+		+ "-Value ((Get-Date).ToString('o') + ' [helper] ' + $message) }; "
+		+ "try { "
+		+ "Write-Log 'started old_pid=%d'; " % old_process_id
+		+ "$old=Get-Process -Id %d -ErrorAction SilentlyContinue; " % old_process_id
+		+ "if ($null -ne $old) { "
+		+ "Write-Log 'waiting for old process'; "
+		+ "Wait-Process -Id %d -ErrorAction Stop }; " % old_process_id
+		+ "Write-Log 'old process exited'; "
+		+ "$new=Start-Process -FilePath '%s' " % quoted_executable
+		+ "-WorkingDirectory '%s' -PassThru -ErrorAction Stop; " % quoted_working_directory
+		+ "Write-Log ('new process started pid=' + $new.Id) "
+		+ "} catch { Write-Log ('FAILED ' + ($_ | Out-String).Trim()) }"
 	)
+
+
+func _append_restart_log(message: String) -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(
+		RESTART_LOG_PATH.get_base_dir()
+	))
+	var new_line := ("%s [app] %s\n" % [
+		Time.get_datetime_string_from_system(),
+		message,
+	]).to_utf8_buffer()
+	var contents := PackedByteArray()
+	if FileAccess.file_exists(RESTART_LOG_PATH):
+		contents = FileAccess.get_file_as_bytes(RESTART_LOG_PATH)
+	contents.append_array(new_line)
+	if contents.size() > RESTART_LOG_MAX_BYTES:
+		var first_kept_byte := contents.size() - RESTART_LOG_MAX_BYTES
+		while first_kept_byte < contents.size() \
+				and contents[first_kept_byte] != 10:
+			first_kept_byte += 1
+		if first_kept_byte < contents.size():
+			first_kept_byte += 1
+		contents = contents.slice(first_kept_byte)
+	var file := FileAccess.open(RESTART_LOG_PATH, FileAccess.WRITE)
+	if file == null:
+		return
+	file.store_buffer(contents)
+	file.close()
 
 
 func _set_selected_character_id(character_id: String) -> void:
