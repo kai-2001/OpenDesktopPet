@@ -57,6 +57,24 @@ func _init() -> void:
 		default_visual._load_pack_from(PetVisualScript.PUBLIC_PACK_ROOT),
 		"public default character pack must validate and load"
 	)
+	var duration_visual := PetVisualScript.new()
+	duration_visual._actions = {
+		"move": {
+			"sequence": [0, 1, 2, 3],
+			"behavior": "pulse",
+			"pulses": 8,
+			"frame_time": 0.3,
+		},
+	}
+	_assert_true(
+		is_equal_approx(duration_visual.get_action_duration("move"), 2.4),
+		"pulse move duration uses pulses multiplied by frame time"
+	)
+	duration_visual._actions.move.erase("behavior")
+	_assert_true(
+		is_equal_approx(duration_visual.get_action_duration("move"), 1.2),
+		"sequence move duration uses sequence length multiplied by frame time"
+	)
 	_assert_equal(
 		default_visual._pack_root,
 		PetVisualScript.PUBLIC_PACK_ROOT,

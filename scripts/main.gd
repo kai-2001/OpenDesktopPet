@@ -454,6 +454,7 @@ func _autonomous_small_roll() -> void:
 	if target_x == start.x:
 		target_x = clampi(start.x - distance, usable.position.x, usable.end.x - window_size.x)
 	var target := Vector2i(target_x, start.y)
+	var move_duration: float = pet.get_action_duration("move")
 	pet.set_facing_direction(1 if target_x > start.x else -1)
 	pet.play_action("move")
 	_auto_move_tween = create_tween()
@@ -461,7 +462,7 @@ func _autonomous_small_roll() -> void:
 	_auto_move_tween.tween_method(
 		func(weight: float) -> void:
 			DisplayServer.window_set_position(Vector2i(Vector2(start).lerp(Vector2(target), weight))),
-		0.0, 1.0, 0.9
+		0.0, 1.0, move_duration
 	)
 	await _auto_move_tween.finished
 	_auto_move_tween = null
