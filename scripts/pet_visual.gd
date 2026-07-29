@@ -10,6 +10,7 @@ const INSTALLED_PACKS_ROOT := "user://character_packs/"
 const CHARACTER_SETTINGS_PATH := "user://ui_settings.cfg"
 const PUBLIC_CHARACTER_ID := "open_desktop_pet_default"
 const REQUIRED_ACTIONS := ["idle", "pet", "eat", "drink", "sleep", "move", "drag", "work"]
+const FRAME_VIEWPORT_PADDING := 2.0
 
 var _sprite: Sprite2D
 var _manifest: Dictionary = {}
@@ -36,6 +37,7 @@ var _active_request_id := 0
 var _active_requested_action := ""
 var _hit_image_cache: Dictionary = {}
 var _hit_polygon_cache: Dictionary = {}
+var _opaque_bounds_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -437,6 +439,8 @@ func _show_action_frame(action: String, frame: int) -> void:
 	)
 	_sprite.position = _frame_offset(definition, safe_frame)
 	_apply_sprite_scale(definition)
+	_grow_window_to_fit_frame()
+	_keep_frame_inside_viewport()
 	_emit_interaction_region()
 
 
@@ -703,12 +707,19 @@ func _source_hit_polygon() -> PackedVector2Array:
 			Rect2i(Vector2i.ZERO, frame_image.get_size()),
 			2.0
 		)
-		var largest_area := -1.0
+		var all_points := PackedVector2Array()
 		for candidate: PackedVector2Array in polygons:
-			var area := absf(_polygon_area(candidate))
-			if area > largest_area:
-				largest_area = area
-				pixel_polygon = candidate
+			all_points.append_array(candidate)
+		if not all_points.is_empty():
+			var content_bounds := Rect2(all_points[0], Vector2.ZERO)
+			for point: Vector2 in all_points:
+				content_bounds = content_bounds.expand(point)
+			pixel_polygon = PackedVector2Array([
+				content_bounds.position,
+				Vector2(content_bounds.end.x, content_bounds.position.y),
+				content_bounds.end,
+				Vector2(content_bounds.position.x, content_bounds.end.y),
+			])
 		_hit_polygon_cache[cache_key] = pixel_polygon
 	var sprite_rect := _sprite.get_rect()
 	var result := PackedVector2Array()
@@ -721,6 +732,140 @@ func _source_hit_polygon() -> PackedVector2Array:
 			normalized_point.x = 1.0 - normalized_point.x
 		result.append(sprite_rect.position + normalized_point * sprite_rect.size)
 	return result
+
+
+func _keep_frame_inside_viewport() -> void:
+	var visible_bounds := _opaque_frame_bounds_in_canvas()
+	if visible_bounds.size == Vector2.ZERO:
+		return
+	var viewport_rect := get_viewport().get_visible_rect().grow(-FRAME_VIEWPORT_PADDING)
+	if viewport_rect.size.x <= 0.0 or viewport_rect.size.y <= 0.0:
+		return
+	var canvas_shift := Vector2(
+		_axis_containment_shift(
+			visible_bounds.position.x,
+			visible_bounds.end.x,
+			viewport_rect.position.x,
+			viewport_rect.end.x
+		),
+		_axis_containment_shift(
+			visible_bounds.position.y,
+			visible_bounds.end.y,
+			viewport_rect.position.y,
+			viewport_rect.end.y
+		)
+	)
+	if not canvas_shift.is_zero_approx():
+		_sprite.position += global_transform.basis_xform_inv(canvas_shift)
+
+
+func _grow_window_to_fit_frame() -> void:
+	var visible_bounds := _opaque_frame_bounds_in_canvas()
+	if visible_bounds.size == Vector2.ZERO:
+		return
+	var window := get_window()
+	if window == null:
+		return
+	var current_size := Vector2(window.size)
+	var required_start := Vector2(
+		minf(visible_bounds.position.x - FRAME_VIEWPORT_PADDING, 0.0),
+		minf(visible_bounds.position.y - FRAME_VIEWPORT_PADDING, 0.0)
+	)
+	var required_end := Vector2(
+		maxf(visible_bounds.end.x + FRAME_VIEWPORT_PADDING, current_size.x),
+		maxf(visible_bounds.end.y + FRAME_VIEWPORT_PADDING, current_size.y)
+	)
+	var required_size := Vector2i(
+		ceili(required_end.x - required_start.x),
+		ceili(required_end.y - required_start.y)
+	)
+	if required_size == window.size:
+		return
+	# When content extends past the left or top edge, move the native window
+	# outward and shift the whole scene by the opposite amount. This grows the
+	# transparent canvas without making the pet jump on the desktop.
+	if required_start != Vector2.ZERO:
+		var root_canvas := get_parent() as Node2D
+		if root_canvas:
+			root_canvas.position -= required_start
+		window.position += Vector2i(floori(required_start.x), floori(required_start.y))
+	window.size = required_size
+
+
+func _axis_containment_shift(
+	content_start: float,
+	content_end: float,
+	limit_start: float,
+	limit_end: float
+) -> float:
+	var content_size := content_end - content_start
+	var limit_size := limit_end - limit_start
+	if content_size > limit_size:
+		return (limit_start + limit_end - content_start - content_end) * 0.5
+	if content_start < limit_start:
+		return limit_start - content_start
+	if content_end > limit_end:
+		return limit_end - content_end
+	return 0.0
+
+
+func _opaque_frame_bounds_in_canvas() -> Rect2:
+	if not is_instance_valid(_sprite) or _sprite.texture == null:
+		return Rect2()
+	var source_rect := _sprite.region_rect if _sprite.region_enabled \
+		else Rect2(Vector2.ZERO, Vector2(_sprite.texture.get_size()))
+	var pixel_rect := Rect2i(
+		Vector2i(floori(source_rect.position.x), floori(source_rect.position.y)),
+		Vector2i(ceili(source_rect.size.x), ceili(source_rect.size.y))
+	)
+	var cache_key := "%s:%s" % [_sprite.texture.get_rid().get_id(), pixel_rect]
+	var opaque_bounds: Rect2
+	if _opaque_bounds_cache.has(cache_key):
+		opaque_bounds = _opaque_bounds_cache[cache_key] as Rect2
+	else:
+		var image := _hit_image_for(_sprite.texture)
+		if image == null or image.is_empty():
+			return Rect2()
+		var frame_image := image.get_region(pixel_rect)
+		var bitmap := BitMap.new()
+		bitmap.create_from_image_alpha(frame_image, 0.08)
+		var polygons := bitmap.opaque_to_polygons(
+			Rect2i(Vector2i.ZERO, frame_image.get_size()),
+			2.0
+		)
+		var has_point := false
+		for polygon: PackedVector2Array in polygons:
+			for point: Vector2 in polygon:
+				if has_point:
+					opaque_bounds = opaque_bounds.expand(point)
+				else:
+					opaque_bounds = Rect2(point, Vector2.ZERO)
+					has_point = true
+		_opaque_bounds_cache[cache_key] = opaque_bounds
+	if opaque_bounds.size == Vector2.ZERO:
+		return Rect2()
+	var sprite_rect := _sprite.get_rect()
+	var normalized_start := opaque_bounds.position / source_rect.size
+	var normalized_end := opaque_bounds.end / source_rect.size
+	if _sprite.flip_h:
+		var flipped_start := 1.0 - normalized_end.x
+		normalized_end.x = 1.0 - normalized_start.x
+		normalized_start.x = flipped_start
+	var local_rect := Rect2(
+		sprite_rect.position + normalized_start * sprite_rect.size,
+		(normalized_end - normalized_start) * sprite_rect.size
+	)
+	var transform := _sprite.get_global_transform()
+	var corners := [
+		transform * local_rect.position,
+		transform * Vector2(local_rect.end.x, local_rect.position.y),
+		transform * local_rect.end,
+		transform * Vector2(local_rect.position.x, local_rect.end.y),
+	]
+	var canvas_bounds := Rect2(corners[0], Vector2.ZERO)
+	for corner: Vector2 in corners:
+		canvas_bounds = canvas_bounds.expand(corner)
+	return canvas_bounds
 
 
 func _polygon_area(polygon: PackedVector2Array) -> float:

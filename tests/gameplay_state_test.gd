@@ -47,6 +47,7 @@ func _init() -> void:
 		Vector2(-12.0, -3.0),
 		"horizontal frame offset mirrors with the character"
 	)
+	_test_frame_viewport_containment(visual)
 	_assert_true(
 		not visual._load_pack_from(invalid_pack_root),
 		"invalid external character pack must be rejected"
@@ -172,6 +173,47 @@ func _init() -> void:
 	else:
 		print("GAMEPLAY_STATE_TEST_OK")
 		quit(0)
+
+
+func _test_frame_viewport_containment(visual: Node2D) -> void:
+	var image := Image.create(240, 100, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	image.fill_rect(Rect2i(0, 20, 45, 60), Color.WHITE)
+	image.fill_rect(Rect2i(195, 25, 45, 50), Color.WHITE)
+	var texture := ImageTexture.create_from_image(image)
+	var action := "viewport_clamp_test"
+	var file := "viewport_clamp_test.png"
+	var texture_path: String = visual._pack_root.path_join(file)
+	visual._actions[action] = {
+		"file": file,
+		"columns": 1,
+		"rows": 1,
+		"offsets": [[100.0, 0.0]],
+		"scale": 1.0,
+	}
+	visual._texture_cache[texture_path] = texture
+	visual.set_facing_direction(-1)
+	visual._show_action_frame(action, 0)
+	var bounds: Rect2 = visual._opaque_frame_bounds_in_canvas()
+	var limits := visual.get_viewport().get_visible_rect().grow(
+		-PetVisualScript.FRAME_VIEWPORT_PADDING
+	)
+	_assert_true(
+		bounds.position.x >= limits.position.x - 0.01
+			and bounds.end.x <= limits.end.x + 0.01,
+		"separated character and prop pixels remain inside the viewport"
+	)
+	var interaction_polygon: PackedVector2Array = visual.get_interaction_polygon()
+	var interaction_bounds := Rect2(interaction_polygon[0], Vector2.ZERO)
+	for point: Vector2 in interaction_polygon:
+		interaction_bounds = interaction_bounds.expand(point)
+	_assert_true(
+		interaction_bounds.size.x >= 230.0,
+		"native window shape includes separated character and prop islands"
+	)
+	visual._actions.erase(action)
+	visual._texture_cache.erase(texture_path)
+	visual._show_action_frame("idle", visual._first_frame("idle"))
 
 
 func _test_character_pack_lifecycle() -> void:
