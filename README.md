@@ -11,6 +11,7 @@
 - 餵食、喝水、睡覺、工作和拍手互動
 - JSON 自動存檔與有限度離線狀態推進
 - 可公開散佈的通用預設角色
+- 遊戲內匯入、更新、切換與刪除角色包
 - 與 Git 完全隔離的私人角色包
 
 ## 開發
@@ -40,14 +41,15 @@ godot --path .
 characters/custom/pet.json
 ```
 
-打包後的使用者角色包放在：
+正式版本可從詳細面板的「角色」頁匯入 `.petpack` 或 ZIP。程式驗證後會安裝到：
 
 ```text
-%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\custom\pet.json
+%APPDATA%\Godot\app_userdata\Open Desktop Pet\character_packs\<角色ID>\
 ```
 
-載入優先順序為外部使用者角色、開發用私人角色、最後是公開版內建的
-中性預設角色。無效或缺少必要動作的角色包會被拒絕並自動回退。
+目前角色由 `ui_settings.cfg` 內的角色 ID 明確選擇；找不到或無法載入時會回退到
+公開版內建角色。相同 ID 的匯入包會視為更新，替換角色圖片與設定但保留進度。
+角色清單只在使用者開啟角色頁時掃描，不增加平常常駐輪詢。
 
 角色包包含八個基本動作，也能加入受等級與親密度限制的額外動作。完整格式請參考 [`docs/CHARACTER_PACK.md`](docs/CHARACTER_PACK.md) 與 [`examples/character-pack/pet.json`](examples/character-pack/pet.json)。
 

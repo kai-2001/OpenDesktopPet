@@ -2,6 +2,8 @@
   "format_version": 1,
   "id": "open_desktop_pet_default",
   "name": "Default Desktop Pet",
+  "version": "1.0.0",
+  "preview": "pet.svg",
   "scale": 0.42,
   "fallback_action": "idle",
   "interactions": {

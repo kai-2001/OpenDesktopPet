@@ -1,10 +1,23 @@
 # 角色包格式 v1
 
-每個角色包是一個資料夾。將使用中的角色包內容放到：
+Open Desktop Pet 的正式版本只需要內建公開角色。使用者可在詳細面板的「角色」頁匯入
+`.petpack`或`.zip`角色包，程式會將通過驗證的內容安裝到：
 
 ```text
-characters/custom/
+%APPDATA%\Godot\app_userdata\Open Desktop Pet\character_packs\<角色ID>\
+```
+
+一般使用者不需要手動操作 AppData。角色頁提供匯入、切換、逐一刪除與開啟角色資料夾。
+角色清單只在開啟該頁時掃描，不會增加桌寵平常常駐的輪詢負擔。
+
+## 封裝結構
+
+`.petpack`實際上是 ZIP 檔，`pet.json`必須直接位於壓縮檔根目錄：
+
+```text
+PinkGirl.petpack
 ├─ pet.json
+├─ preview.png
 └─ animations/
    ├─ idle.png
    ├─ pet.png
@@ -16,87 +29,96 @@ characters/custom/
    └─ work.png
 ```
 
-`characters/custom/` 已被 Git 忽略，自訂角色圖片不會包含在開源程式碼或公開 Release。
+不要把最外層角色資料夾一起壓入 ZIP。
 
-已打包 EXE 的外部角色包則放到：
-
-```text
-%APPDATA%\Godot\app_userdata\Open Desktop Pet\characters\custom\
-├─ pet.json
-└─ animations\
-```
-
-角色包只有兩種類別：自訂角色與公開角色。程式依序嘗試外部自訂
-`user://characters/custom/`、本機打包自訂 `res://characters/custom/`，
-最後才使用公開內建 `res://characters/public/`。
-前一個角色包驗證失敗時會回退到下一個，不會帶著半套設定繼續執行。
-
-## 必要動作
-
-`pet.json` 的 `actions` 必須包含以下八個 ID：
-
-| ID | 用途 |
-|---|---|
-| `idle` | 待機與眨眼 |
-| `pet` | 被摸後的反應 |
-| `eat` | 吃東西 |
-| `drink` | 喝水 |
-| `sleep` | 睡覺 |
-| `move` | 自主移動 |
-| `drag` | 被拖曳 |
-| `work` | 工作 |
-
-圖片可以使用任意檔名，但建議和動作 ID 相同。不同動作也可以引用同一張 Sprite Sheet 的不同影格。
-
-## 動作設定
+## 基本資訊
 
 ```json
 {
   "format_version": 1,
-  "id": "my_pet",
-  "name": "我的桌寵",
-  "scale": 0.31,
+  "id": "pink_cat_headset_girl",
+  "name": "粉紅貓耳耳機少女",
+  "version": "1.1.0",
+  "preview": "preview.png",
+  "scale": 0.36,
+  "source_facing": "left",
   "fallback_action": "idle",
-  "actions": {
-    "idle": {
-      "file": "animations/idle.png",
-      "columns": 4,
-      "rows": 1,
-      "sequence": [0, 1, 2, 1],
-      "idle_interval": 2.6,
-      "frame_time": 0.15,
-      "offsets": [[0, 0], [0, 0], [0, 0], [0, 0]]
-    }
-  }
+  "actions": {}
 }
 ```
 
-- `file`：相對於角色包根目錄的 PNG 路徑。
-- `columns`、`rows`：Sprite Sheet 的欄數與列數。
-- `sequence`：播放的影格索引，可重複或跳過影格。
-- `frame_time`：每格秒數。
-- `idle_interval`：待機表情切換間隔，僅用於 `idle`。
-- `scale`：此動作的顯示比例；省略時使用角色包的全域 `scale`。
-- `offsets`：每格 `[x, y]` 校正值，用於消除生成圖片中心不一致造成的跳動。
-- `behavior: "pulse"`：固定姿勢搭配輕微呼吸縮放，適合只有一格的吃飯或喝水。
-- `pulses`：`pulse` 重複次數。
+- `format_version`：目前固定為`1`。
+- `id`：永久識別碼，只能使用小寫英文字母、數字、底線與連字號。
+- `name`：顯示名稱，可以在更新時修改。
+- `version`：顯示用角色包版本，建議採`主版.次版.修正版`。
+- `preview`：選填的小型預覽圖，建議不超過256×256。
+- `scale`：角色顯示比例。
+- `source_facing`：原圖面向，可使用`left`或`right`。
+- `fallback_action`：缺少選填動作時使用的替代動作。
 
-角色包會在載入時驗證檔案存在、相對路徑安全、欄列數、影格範圍、
-播放速度、pulse 次數、offset 格式與 fallback。`frame_time` 必須大於
-0 且不超過 5 秒，單一 sequence 與 pulses 最多 120 次。
+判斷是否為同一角色只看`id`：
 
-照顧獎勵會等角色包的實際動畫播放完成後才結算，不需要在遊戲邏輯中
-另外填寫動作秒數。
+```text
+ID不同 → 安裝新角色
+ID相同 → 顯示確認後更新／重新安裝
+```
 
-## 額外動作與解鎖
+更新只替換`character_packs/<ID>`，不會修改`profiles/<ID>/save_v2.json`。
 
-八個必要動作以外的 ID 都視為額外動作：
+## 必要動作
+
+`actions`必須包含：
+
+| ID | 用途 |
+|---|---|
+| `idle` | 待機 |
+| `pet` | 摸頭 |
+| `eat` | 吃東西 |
+| `drink` | 喝水 |
+| `sleep` | 睡覺 |
+| `move` | 自主移動 |
+| `drag` | 拖曳 |
+| `work` | 工作 |
+
+每個動作至少需要`file`，並可設定Sprite Sheet格線與播放順序：
+
+```json
+{
+  "file": "animations/idle.png",
+  "columns": 2,
+  "rows": 2,
+  "sequence": [0, 1, 2, 3, 2, 1],
+  "frame_time": 0.16,
+  "idle_interval": 0.22
+}
+```
+
+- `file`必須是角色包內的相對路徑，不能使用`..`、絕對路徑或反斜線。
+- 外部角色包支援PNG、JPG、JPEG、WebP與SVG。
+- `columns`、`rows`描述Sprite Sheet格線。
+- `sequence`描述播放影格索引，最多120項。
+- `frame_time`為每個影格秒數。
+- `behavior: "pulse"`可搭配`pulses`使用。
+- `autonomous_weight`大於0時，該動作可由桌寵自主觸發。
+
+動作可單獨覆寫原圖面向：
+
+```json
+{
+  "file": "animations/move.png",
+  "source_facing": "right"
+}
+```
+
+## 解鎖條件
+
+額外動作可設定等級及親密度：
 
 ```json
 {
   "file": "animations/belly_clap.png",
   "columns": 4,
-  "sequence": [0, 1, 2, 3, 2, 3, 1, 0],
+  "sequence": [0, 1, 2, 3],
   "frame_time": 0.17,
   "autonomous_weight": 20,
   "unlock": {
@@ -106,96 +128,22 @@ characters/custom/
 }
 ```
 
-- `autonomous_weight` 大於 0 時，該動作會加入自主動作抽選；數字越大越常出現。
-- `unlock.level` 是最低等級。
-- `unlock.affection` 是最低親密度。
-- 未達條件的動作不會被自主抽中，直接要求播放時則改播 `fallback_action`。
-- `move` 只有在滑鼠停止時才會被抽中；其他原地動作不受滑鼠移動限制。
+## 互動文字與對話
 
-## 別名
+角色包可透過`interactions`自訂五種互動的名稱、圖示與願望文字，也能透過
+`dialogue`自訂啟動、單擊、待機及動作完成訊息。完整欄位可參考
+`examples/character-pack/pet.json`。
 
-舊名稱或多個事件可以指向同一個動作：
+## 安全限制
 
-```json
-{
-  "aliases": {
-    "clap": "pet",
-    "happy": "pet",
-    "roll": "move"
-  }
-}
-```
+匯入器會先解壓到暫存資料夾並完整驗證，成功後才替換正式角色包：
 
-## 互動名稱、圖示與願望
+- 最多2048個檔案。
+- 解壓後最多256MB。
+- 單一檔案最多32MB。
+- 禁止絕對路徑、`..`與跨資料夾寫入。
+- 必須包含八個必要動作及其圖片。
+- 更新失敗時保留原本已安裝版本。
 
-五種養育互動的遊戲語意固定不變，但角色包可以改變右鍵選單、詳細面板、
-願望文字與泡泡圖示的呈現：
-
-```json
-{
-  "interactions": {
-    "feed": {
-      "label": "充電",
-      "icon": "⚡",
-      "wish": "想補充能源（剩餘約 {minutes} 分鐘）"
-    },
-    "water": {
-      "label": "補充冷卻液",
-      "icon": "💧",
-      "wish": "冷卻液不足（剩餘約 {minutes} 分鐘）"
-    }
-  }
-}
-```
-
-可設定的固定 ID 是 `feed`、`water`、`pet`、`work`、`sleep`。
-`{minutes}` 會替換成願望剩餘分鐘。省略任何項目時，程式會使用預設的
-餵食、喝水、摸摸、工作或睡覺名稱與圖示。
-
-這些設定只改變呈現，不會改變金幣消耗、狀態增減、願望完成條件或動畫
-ID，因此不同角色包仍遵循同一套養成規則。
-
-## 泡泡台詞
-
-角色包可在頂層加入 `dialogue`。每個項目可以是固定字串，也可以是字串
-陣列；陣列會在每次顯示時隨機挑選一句。所有項目皆可省略，程式會使用
-內建台詞，因此舊角色包仍可直接使用。
-
-```json
-{
-  "dialogue": {
-    "startup": "右鍵操作・雙擊摸摸",
-    "single_click": ["嗯？", "找我嗎？"],
-    "idle": ["我在這裡。", "今天也要照顧我。"],
-    "feed_complete": "好吃！",
-    "water_complete": "喝完水了！",
-    "work_complete": "工作完成！",
-    "action_unlocked": "學會新動作：{action}！"
-  }
-}
-```
-
-常用鍵包括：
-
-- `startup`、`single_click`、`idle`
-- `size_smaller`、`size_larger`、`action_busy`
-- `pet_rewarded`、`pet_cooldown`、`pet_failed`
-- `feed_complete`、`feed_full`、`feed_no_coins`、`feed_failed`
-- `water_complete`、`water_full`、`water_no_coins`、`water_failed`
-- `sleep_recovered`、`sleep_full`、`sleep_failed`
-- `work_complete`、`work_tired`、`work_hungry`、`work_thirsty`、`work_failed`
-- `level_up`、`action_unlocked`
-
-`action_unlocked` 可使用 `{action}` 代表解鎖的動作名稱。養育行為若同時
-完成願望，願望獎勵提示會接在角色包台詞後方。
-
-## 最低製作流程
-
-1. 複製 `examples/character-pack/pet.json`。
-2. 準備八組基本 Sprite Sheet。
-3. 修改每組的欄列數、播放順序與速度。
-4. 將角色包內容放入 `characters/custom/`。
-5. 原始碼開發使用 `DesktopPet.vbs`；已打包版本放入 AppData 路徑後重啟 EXE。
-6. 若眨眼或動作發生位移，填寫每格 `offsets`。
-
-食物替換、配件掛點和造型圖層不屬於格式 v1，會在下一階段擴充，避免目前角色作者需要處理組合爆炸。
+刪除角色包時只移除圖片與設定，角色進度會保留。若刪除的是目前角色，程式會切回
+公開海豹球並重新啟動。

@@ -1,5 +1,6 @@
 extends Node2D
 
+const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_STATS_SIZE := Vector2i(400, 720)
 const MIN_STATS_SIZE := Vector2i(360, 480)
@@ -22,6 +23,17 @@ var _last_message_status: Label
 var _fps_option_button: OptionButton
 var _autostart_check_box: CheckBox
 var _settings_feedback: Label
+var _character_list: ItemList
+var _character_feedback: Label
+var _character_use_button: Button
+var _character_delete_button: Button
+var _character_tab_index := -1
+var _character_tab_loaded := false
+var _character_entries: Array[Dictionary] = []
+var _character_import_dialog: FileDialog
+var _character_update_dialog: ConfirmationDialog
+var _character_delete_dialog: ConfirmationDialog
+var _pending_character_archive := ""
 var _stats_bars: Dictionary = {}
 var _autostart_threads: Dictionary = {}
 var _autostart_operation_serial := 0
@@ -32,6 +44,7 @@ var _left_press_started_ms := 0
 var _drag_offset := Vector2i.ZERO
 var _drag_origin := Vector2i.ZERO
 var _bubble_token := 0
+var _shutting_down := false
 var _idle_count := 0
 var _last_global_mouse := Vector2i.ZERO
 var _last_drag_mouse := Vector2i.ZERO
@@ -44,6 +57,7 @@ var _pet_interaction_polygon := PackedVector2Array()
 var _cursor_shape := Input.CURSOR_ARROW
 
 func _ready() -> void:
+	get_tree().auto_accept_quit = false
 	# PetVisual is ready before this parent node. Keep its first loaded frame
 	# hidden until the native transparent window has been positioned and shaped.
 	pet.visible = false
@@ -144,10 +158,7 @@ func _can_begin_drag() -> bool:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		_save_stats_window_size()
-		state.save_state()
-		_finish_all_autostart_threads()
-		get_tree().quit()
+		call_deferred("_request_shutdown")
 
 
 func say(text: String, seconds := 6.0) -> void:
@@ -365,8 +376,9 @@ func _on_context_action(id: int) -> void:
 		6:
 			call_deferred("_show_stats_window")
 		7:
-			state.save_state()
-			get_tree().quit()
+			# Let the native PopupMenu finish dispatching `id_pressed` before
+			# destroying either native window.
+			call_deferred("_request_shutdown")
 		20:
 			state.change_visual_size(-0.1)
 			_say_dialogue("size_smaller", "這個大小比較不擋路。", 2.0)
@@ -663,6 +675,352 @@ func _build_stats_window() -> void:
 	settings_close_button.pressed.connect(_destroy_stats_window)
 	settings_content.add_child(settings_close_button)
 
+	_build_character_tab(tabs)
+	tabs.tab_changed.connect(_on_stats_tab_changed)
+
+
+func _build_character_tab(tabs: TabContainer) -> void:
+	var character_scroll := ScrollContainer.new()
+	character_scroll.name = "角色"
+	character_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_character_tab_index = tabs.get_tab_count()
+	tabs.add_child(character_scroll)
+
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	character_scroll.add_child(margin)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 12)
+	margin.add_child(content)
+
+	var title := _new_label("角色管理", 24, Color("#e9fbff"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(title)
+	var hint := _new_label(
+		"角色清單只會在開啟這個頁面時讀取，不會增加平常常駐耗能。",
+		13,
+		Color("#b9ced5")
+	)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(hint)
+
+	_character_list = ItemList.new()
+	_character_list.custom_minimum_size = Vector2(0, 260)
+	_character_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_character_list.item_selected.connect(_on_character_selected)
+	content.add_child(_character_list)
+
+	var action_row := HFlowContainer.new()
+	action_row.alignment = FlowContainer.ALIGNMENT_CENTER
+	action_row.add_theme_constant_override("h_separation", 8)
+	_character_use_button = Button.new()
+	_character_use_button.text = "使用選取角色"
+	_character_use_button.custom_minimum_size = Vector2(145, 40)
+	_character_use_button.disabled = true
+	_character_use_button.pressed.connect(_use_selected_character)
+	action_row.add_child(_character_use_button)
+	_character_delete_button = Button.new()
+	_character_delete_button.text = "刪除角色包"
+	_character_delete_button.custom_minimum_size = Vector2(125, 40)
+	_character_delete_button.disabled = true
+	_character_delete_button.pressed.connect(_confirm_delete_selected_character)
+	action_row.add_child(_character_delete_button)
+	content.add_child(action_row)
+
+	var import_row := HFlowContainer.new()
+	import_row.alignment = FlowContainer.ALIGNMENT_CENTER
+	import_row.add_theme_constant_override("h_separation", 8)
+	var import_button := Button.new()
+	import_button.text = "匯入角色包"
+	import_button.custom_minimum_size = Vector2(135, 40)
+	import_button.pressed.connect(_open_character_import_dialog)
+	import_row.add_child(import_button)
+	var open_folder_button := Button.new()
+	open_folder_button.text = "開啟角色資料夾"
+	open_folder_button.custom_minimum_size = Vector2(145, 40)
+	open_folder_button.pressed.connect(_open_character_packs_folder)
+	import_row.add_child(open_folder_button)
+	content.add_child(import_row)
+
+	_character_feedback = _new_label(
+		"切換角色會儲存目前進度並重新啟動桌寵。",
+		13,
+		Color("#8ed9e8")
+	)
+	_character_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_character_feedback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(_character_feedback)
+
+	_character_import_dialog = FileDialog.new()
+	_character_import_dialog.title = "匯入角色包"
+	_character_import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	_character_import_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	_character_import_dialog.use_native_dialog = true
+	_character_import_dialog.add_filter("*.petpack, *.zip", "桌寵角色包")
+	_character_import_dialog.file_selected.connect(_install_character_archive)
+	_stats_window.add_child(_character_import_dialog)
+
+	_character_update_dialog = ConfirmationDialog.new()
+	_character_update_dialog.title = "更新角色包"
+	_character_update_dialog.confirmed.connect(_install_pending_character_archive)
+	_stats_window.add_child(_character_update_dialog)
+
+	_character_delete_dialog = ConfirmationDialog.new()
+	_character_delete_dialog.title = "刪除角色包"
+	_character_delete_dialog.confirmed.connect(_delete_selected_character)
+	_stats_window.add_child(_character_delete_dialog)
+
+
+func _on_stats_tab_changed(tab_index: int) -> void:
+	if tab_index != _character_tab_index or _character_tab_loaded:
+		return
+	_refresh_character_list()
+
+
+func _refresh_character_list(message := "") -> void:
+	if not is_instance_valid(_character_list):
+		return
+	_character_tab_loaded = true
+	_character_entries.clear()
+	_character_list.clear()
+	_character_entries.append({
+		"id": "open_desktop_pet_default",
+		"name": "公開海豹球",
+		"version": "內建",
+		"installed": false,
+		"builtin": true,
+	})
+	for entry: Dictionary in CharacterPackManagerScript.list_installed():
+		var installed_entry := entry.duplicate()
+		installed_entry.installed = true
+		installed_entry.builtin = false
+		_character_entries.append(installed_entry)
+	var active_id: String = pet.get_character_id()
+	var active_found := false
+	for entry: Dictionary in _character_entries:
+		if String(entry.id) == active_id:
+			active_found = true
+			break
+	if not active_found:
+		_character_entries.append({
+			"id": active_id,
+			"name": pet.get_character_name(),
+			"version": pet.get_character_version(),
+			"installed": false,
+			"builtin": true,
+		})
+	for index in _character_entries.size():
+		var entry: Dictionary = _character_entries[index]
+		var active_marker := " 〔使用中〕" if String(entry.id) == active_id else ""
+		_character_list.add_item("%s  v%s%s\nID: %s" % [
+			String(entry.name),
+			String(entry.version),
+			active_marker,
+			String(entry.id),
+		])
+		if String(entry.id) == active_id:
+			_character_list.select(index)
+	if not message.is_empty():
+		_character_feedback.text = message
+	_update_character_buttons()
+
+
+func _on_character_selected(_index: int) -> void:
+	_update_character_buttons()
+
+
+func _selected_character_entry() -> Dictionary:
+	if not is_instance_valid(_character_list):
+		return {}
+	var selected := _character_list.get_selected_items()
+	if selected.is_empty():
+		return {}
+	var index := int(selected[0])
+	if index < 0 or index >= _character_entries.size():
+		return {}
+	return _character_entries[index]
+
+
+func _update_character_buttons() -> void:
+	var entry := _selected_character_entry()
+	var has_entry := not entry.is_empty()
+	if is_instance_valid(_character_use_button):
+		_character_use_button.disabled = not has_entry \
+			or String(entry.id) == pet.get_character_id()
+	if is_instance_valid(_character_delete_button):
+		_character_delete_button.disabled = not has_entry \
+			or not bool(entry.get("installed", false))
+
+
+func _open_character_import_dialog() -> void:
+	if is_instance_valid(_character_import_dialog):
+		_character_import_dialog.popup_centered_ratio(0.75)
+
+
+func _install_character_archive(path: String) -> void:
+	var inspection: Dictionary = CharacterPackManagerScript.inspect_archive(path)
+	if not bool(inspection.get("ok", false)):
+		_character_feedback.text = "匯入失敗：%s" % String(inspection.get(
+			"message", "未知錯誤"
+		))
+		return
+	for entry: Dictionary in CharacterPackManagerScript.list_installed():
+		if String(entry.id) != String(inspection.id):
+			continue
+		_pending_character_archive = path
+		_character_update_dialog.dialog_text = (
+			"已安裝「%s」v%s。\n準備匯入同一角色ID的v%s。\n\n"
+			+ "更新會替換角色圖片與設定，但保留遊戲進度。"
+		) % [
+			String(entry.name),
+			String(entry.version),
+			String(inspection.version),
+		]
+		_character_update_dialog.popup_centered()
+		return
+	_install_character_archive_now(path)
+
+
+func _install_pending_character_archive() -> void:
+	if _pending_character_archive.is_empty():
+		return
+	var path := _pending_character_archive
+	_pending_character_archive = ""
+	_install_character_archive_now(path)
+
+
+func _install_character_archive_now(path: String) -> void:
+	_character_feedback.text = "正在驗證並安裝角色包…"
+	var result: Dictionary = CharacterPackManagerScript.install_archive(path)
+	if not bool(result.get("ok", false)):
+		_character_feedback.text = "匯入失敗：%s" % String(result.get(
+			"message", "未知錯誤"
+		))
+		return
+	var verb := "更新" if bool(result.get("updated", false)) else "安裝"
+	_refresh_character_list("已%s「%s」v%s；角色進度保持不變。" % [
+		verb,
+		String(result.name),
+		String(result.version),
+	])
+
+
+func _use_selected_character() -> void:
+	var entry := _selected_character_entry()
+	if entry.is_empty():
+		return
+	_set_selected_character_id(String(entry.id))
+	state.save_state()
+	if OS.has_feature("editor"):
+		_character_feedback.text = "已儲存角色選擇；開發模式下請重新啟動場景。"
+		return
+	_restart_after_character_change()
+
+
+func _restart_after_character_change() -> void:
+	var executable := OS.get_executable_path()
+	var launcher_process_id := _schedule_restart_after_exit(
+		executable,
+		OS.get_process_id()
+	)
+	if launcher_process_id <= 0:
+		_character_feedback.text = "角色已選擇，但自動重啟失敗；請手動重開桌寵。"
+		return
+	_left_press_pending = false
+	_dragging = false
+	pet.set_dragging(false)
+	_save_stats_window_size()
+	state.save_state()
+	_finish_all_autostart_threads()
+	_destroy_stats_window()
+	get_tree().quit()
+
+
+func _schedule_restart_after_exit(executable: String, old_process_id: int) -> int:
+	if OS.get_name() != "Windows":
+		return OS.create_process(executable, PackedStringArray())
+	var windows_root := OS.get_environment("SystemRoot")
+	if windows_root.is_empty():
+		windows_root = "C:\\Windows"
+	var powershell := windows_root.path_join(
+		"System32/WindowsPowerShell/v1.0/powershell.exe"
+	)
+	var arguments := PackedStringArray([
+		"-NoProfile",
+		"-NonInteractive",
+		"-WindowStyle",
+		"Hidden",
+		"-Command",
+		_restart_wait_script(executable, old_process_id),
+	])
+	return OS.create_process(powershell, arguments, false)
+
+
+func _restart_wait_script(executable: String, old_process_id: int) -> String:
+	var quoted_executable := executable.replace("'", "''")
+	return (
+		"$ErrorActionPreference='SilentlyContinue'; "
+		+ "Wait-Process -Id %d; " % old_process_id
+		+ "if (-not (Get-Process -Id %d)) { " % old_process_id
+		+ "Start-Process -FilePath '%s' }" % quoted_executable
+	)
+
+
+func _set_selected_character_id(character_id: String) -> void:
+	var config := ConfigFile.new()
+	config.load(UI_SETTINGS_PATH)
+	config.set_value("character", "selected_id", character_id)
+	config.save(UI_SETTINGS_PATH)
+
+
+func _confirm_delete_selected_character() -> void:
+	var entry := _selected_character_entry()
+	if entry.is_empty() or not bool(entry.get("installed", false)):
+		return
+	_character_delete_dialog.dialog_text = (
+		"確定要刪除「%s」嗎？\n\n角色包會被移除，但遊戲進度會保留。"
+		% String(entry.name)
+	)
+	_character_delete_dialog.popup_centered()
+
+
+func _delete_selected_character() -> void:
+	var entry := _selected_character_entry()
+	if entry.is_empty() or not bool(entry.get("installed", false)):
+		return
+	var character_id := String(entry.id)
+	var was_active: bool = character_id == pet.get_character_id()
+	if was_active:
+		_set_selected_character_id("open_desktop_pet_default")
+		state.save_state()
+	var result: Dictionary = CharacterPackManagerScript.remove_pack(character_id)
+	if not bool(result.get("ok", false)):
+		_character_feedback.text = "刪除失敗：%s" % String(result.get(
+			"message", "未知錯誤"
+		))
+		return
+	_refresh_character_list("已刪除角色包；遊戲進度仍保留。")
+	if was_active:
+		if OS.has_feature("editor"):
+			_character_feedback.text += " 開發模式下請重新啟動場景。"
+		else:
+			_restart_after_character_change()
+
+
+func _open_character_packs_folder() -> void:
+	if CharacterPackManagerScript.ensure_packs_root() != OK:
+		_character_feedback.text = "無法建立角色包資料夾。"
+		return
+	OS.shell_open(ProjectSettings.globalize_path(
+		CharacterPackManagerScript.PACKS_ROOT
+	))
+
 
 func _run_care_action(id: int) -> void:
 	if state.is_action_busy() or pet.is_busy():
@@ -764,6 +1122,17 @@ func _destroy_stats_window() -> void:
 	_fps_option_button = null
 	_autostart_check_box = null
 	_settings_feedback = null
+	_character_list = null
+	_character_feedback = null
+	_character_use_button = null
+	_character_delete_button = null
+	_character_import_dialog = null
+	_character_update_dialog = null
+	_character_delete_dialog = null
+	_pending_character_archive = ""
+	_character_entries.clear()
+	_character_tab_index = -1
+	_character_tab_loaded = false
 	_stats_bars.clear()
 
 
@@ -1034,6 +1403,32 @@ func _finish_autostart_thread(operation_id: int) -> void:
 func _finish_all_autostart_threads() -> void:
 	for operation_id: int in _autostart_threads.keys():
 		_finish_autostart_thread(operation_id)
+
+
+func _request_shutdown() -> void:
+	if _shutting_down:
+		return
+	_prepare_shutdown()
+	get_tree().quit()
+
+
+func _prepare_shutdown() -> void:
+	if _shutting_down:
+		return
+	_shutting_down = true
+	set_process(false)
+	set_process_unhandled_input(false)
+	_left_press_pending = false
+	_dragging = false
+	pet.set_dragging(false)
+	context_menu.hide()
+	_bubble_token += 1
+	bubble.visible = false
+	bubble_tail.visible = false
+	_save_stats_window_size()
+	state.save_state()
+	_finish_all_autostart_threads()
+	_destroy_stats_window()
 
 
 func _save_stats_window_size() -> void:

@@ -6,7 +6,9 @@ signal interaction_region_changed(polygon: PackedVector2Array)
 
 const BUNDLED_CUSTOM_PACK_ROOT := "res://characters/custom/"
 const PUBLIC_PACK_ROOT := "res://characters/public/"
-const USER_CUSTOM_PACK_ROOT := "user://characters/custom/"
+const INSTALLED_PACKS_ROOT := "user://character_packs/"
+const CHARACTER_SETTINGS_PATH := "user://ui_settings.cfg"
+const PUBLIC_CHARACTER_ID := "open_desktop_pet_default"
 const REQUIRED_ACTIONS := ["idle", "pet", "eat", "drink", "sleep", "move", "drag", "work"]
 
 var _sprite: Sprite2D
@@ -43,6 +45,9 @@ func _ready() -> void:
 	add_child(_sprite)
 	if _load_pack():
 		_show_action_frame("idle", _first_frame("idle"))
+		print("CHARACTER_PACK_LOADED id=%s root=%s" % [
+			get_character_id(), _pack_root
+		])
 	else:
 		push_error("No valid character pack was found.")
 		queue_redraw()
@@ -83,6 +88,8 @@ func set_progression(snapshot: Dictionary) -> void:
 
 
 func set_dragging(value: bool) -> void:
+	if _dragging == value:
+		return
 	if value:
 		_cancel_active_request()
 	_animation_serial += 1
@@ -162,6 +169,8 @@ func contains_point(point_in_canvas: Vector2) -> bool:
 	if image == null or image.is_empty():
 		return true
 	var normalized := (sprite_point - sprite_rect.position) / sprite_rect.size
+	if _sprite.flip_h:
+		normalized.x = 1.0 - normalized.x
 	var source_rect := _sprite.region_rect if _sprite.region_enabled \
 		else Rect2(Vector2.ZERO, Vector2(_sprite.texture.get_size()))
 	var pixel := Vector2i(
@@ -325,6 +334,18 @@ func get_character_id() -> String:
 	return character_id if not character_id.is_empty() else "default"
 
 
+func get_character_name() -> String:
+	return String(_manifest.get("name", get_character_id()))
+
+
+func get_character_version() -> String:
+	return String(_manifest.get("version", "1.0.0"))
+
+
+func get_pack_root() -> String:
+	return _pack_root
+
+
 func get_interaction_label(action: String, fallback: String) -> String:
 	return String(_interaction_value(action, "label", fallback))
 
@@ -425,14 +446,8 @@ func _apply_sprite_scale(definition: Dictionary) -> void:
 	var action_scale := float(definition.get("scale", _pack_scale)) \
 		if not definition.is_empty() \
 		else _pack_scale
-	var source_facing := String(definition.get(
-		"source_facing", _manifest.get("source_facing", "left")
-	)).to_lower()
-	if source_facing not in ["left", "right"]:
-		source_facing = "left"
-	var desired_facing := "right" if _facing_direction > 0 else "left"
-	var horizontal := -1.0 if source_facing != desired_facing else 1.0
-	_sprite.scale = Vector2(horizontal, 1.0) * action_scale
+	_sprite.flip_h = _is_action_flipped(definition)
+	_sprite.scale = Vector2.ONE * action_scale
 
 
 func _frame_offset(definition: Dictionary, frame: int) -> Vector2:
@@ -442,7 +457,18 @@ func _frame_offset(definition: Dictionary, frame: int) -> Vector2:
 	var pair: Array = offsets[frame]
 	if pair.size() < 2:
 		return Vector2.ZERO
-	return Vector2(float(pair[0]), float(pair[1]))
+	var horizontal := -1.0 if _is_action_flipped(definition) else 1.0
+	return Vector2(float(pair[0]) * horizontal, float(pair[1]))
+
+
+func _is_action_flipped(definition: Dictionary) -> bool:
+	var source_facing := String(definition.get(
+		"source_facing", _manifest.get("source_facing", "left")
+	)).to_lower()
+	if source_facing not in ["left", "right"]:
+		source_facing = "left"
+	var desired_facing := "right" if _facing_direction > 0 else "left"
+	return source_facing != desired_facing
 
 
 func _sequence_for(definition: Dictionary) -> Array:
@@ -476,14 +502,37 @@ func _texture_for(definition: Dictionary) -> Texture2D:
 
 
 func _load_pack() -> bool:
-	for candidate_root: String in [
-		USER_CUSTOM_PACK_ROOT,
-		BUNDLED_CUSTOM_PACK_ROOT,
-		PUBLIC_PACK_ROOT,
-	]:
+	var candidates: Array[String] = []
+	var selected_id := _selected_character_id()
+	if selected_id == PUBLIC_CHARACTER_ID:
+		candidates.append(PUBLIC_PACK_ROOT)
+	elif not selected_id.is_empty():
+		candidates.append(INSTALLED_PACKS_ROOT.path_join(selected_id))
+	if selected_id != PUBLIC_CHARACTER_ID:
+		candidates.append(BUNDLED_CUSTOM_PACK_ROOT)
+		candidates.append(PUBLIC_PACK_ROOT)
+	for candidate_root: String in candidates:
 		if _load_pack_from(candidate_root):
 			return true
 	return false
+
+
+func _selected_character_id() -> String:
+	var config := ConfigFile.new()
+	if config.load(CHARACTER_SETTINGS_PATH) != OK:
+		return ""
+	var selected := String(config.get_value("character", "selected_id", ""))
+	if selected.is_empty():
+		return ""
+	var sanitized := selected.to_lower()
+	var safe := ""
+	for index in sanitized.length():
+		var character := sanitized.substr(index, 1)
+		if character >= "a" and character <= "z" \
+				or character >= "0" and character <= "9" \
+				or character == "_" or character == "-":
+			safe += character
+	return safe if safe == selected else ""
 
 
 func _load_pack_from(candidate_root: String) -> bool:
@@ -607,6 +656,13 @@ func _load_texture(path: String) -> Texture2D:
 	if path.begins_with("res://") and ResourceLoader.exists(path):
 		return load(path) as Texture2D
 	if FileAccess.file_exists(path):
+		if path.get_extension().to_lower() == "svg":
+			var svg_image := Image.new()
+			var svg_error := svg_image.load_svg_from_buffer(
+				FileAccess.get_file_as_bytes(path)
+			)
+			if svg_error == OK and not svg_image.is_empty():
+				return ImageTexture.create_from_image(svg_image)
 		var image := Image.load_from_file(path)
 		if image and not image.is_empty():
 			return ImageTexture.create_from_image(image)
@@ -657,10 +713,13 @@ func _source_hit_polygon() -> PackedVector2Array:
 	var sprite_rect := _sprite.get_rect()
 	var result := PackedVector2Array()
 	for point: Vector2 in pixel_polygon:
-		result.append(sprite_rect.position + Vector2(
-			point.x / source_rect.size.x * sprite_rect.size.x,
-			point.y / source_rect.size.y * sprite_rect.size.y
-		))
+		var normalized_point := Vector2(
+			point.x / source_rect.size.x,
+			point.y / source_rect.size.y
+		)
+		if _sprite.flip_h:
+			normalized_point.x = 1.0 - normalized_point.x
+		result.append(sprite_rect.position + normalized_point * sprite_rect.size)
 	return result
 
 

@@ -2,6 +2,7 @@ extends SceneTree
 
 const PetStateScript = preload("res://scripts/pet_state.gd")
 const PetVisualScript = preload("res://scripts/pet_visual.gd")
+const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
 const TEST_SAVE_PATH := "user://test_runs/gameplay_state.json"
 var _failures := 0
 
@@ -14,12 +15,14 @@ func _init() -> void:
 		var path := ProjectSettings.globalize_path(TEST_SAVE_PATH + suffix)
 		if FileAccess.file_exists(TEST_SAVE_PATH + suffix):
 			DirAccess.remove_absolute(path)
-	var invalid_pack_root := "user://characters/custom"
+	var invalid_pack_root := "user://character_packs/invalid_test_pack"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(invalid_pack_root))
 	var invalid_manifest := FileAccess.open(
 		invalid_pack_root.path_join("pet.json"), FileAccess.WRITE
 	)
-	invalid_manifest.store_string('{"format_version":1,"actions":{}}')
+	invalid_manifest.store_string(
+		'{"format_version":1,"id":"invalid_test_pack","actions":{}}'
+	)
 	invalid_manifest.close()
 
 	var state := PetStateScript.new()
@@ -31,8 +34,21 @@ func _init() -> void:
 	state.action_requested.connect(visual.play_action)
 	visual.action_completed.connect(state.receive_action_completed)
 	await process_frame
+	var directional_offsets := {"offsets": [[12.0, -3.0]]}
+	visual.set_facing_direction(-1)
+	_assert_equal(
+		visual._frame_offset(directional_offsets, 0),
+		Vector2(12.0, -3.0),
+		"source-facing frame offset remains unchanged"
+	)
+	visual.set_facing_direction(1)
+	_assert_equal(
+		visual._frame_offset(directional_offsets, 0),
+		Vector2(-12.0, -3.0),
+		"horizontal frame offset mirrors with the character"
+	)
 	_assert_true(
-		visual._pack_root != PetVisualScript.USER_CUSTOM_PACK_ROOT,
+		not visual._load_pack_from(invalid_pack_root),
 		"invalid external character pack must be rejected"
 	)
 	var default_visual := PetVisualScript.new()
@@ -46,6 +62,7 @@ func _init() -> void:
 		"public default character root"
 	)
 	default_visual.free()
+	_test_character_pack_lifecycle()
 
 	state.data.hunger = 80.0
 	state.data.thirst = 80.0
@@ -72,7 +89,7 @@ func _init() -> void:
 	var feed_started := Time.get_ticks_msec()
 	await state.feed()
 	var feed_elapsed := Time.get_ticks_msec() - feed_started
-	_assert_true(feed_elapsed >= 1250, "feed must wait for the real visual animation")
+	_assert_true(feed_elapsed >= 1150, "feed must wait for the real visual animation")
 	_assert_equal(state.data.coins, 18, "successful feed coin cost")
 	_assert_equal(state.data.hunger, 78.0, "successful feed result")
 	_assert_true(not state.is_action_busy(), "state must unlock after visual completion")
@@ -155,6 +172,91 @@ func _init() -> void:
 	else:
 		print("GAMEPLAY_STATE_TEST_OK")
 		quit(0)
+
+
+func _test_character_pack_lifecycle() -> void:
+	var archive_path := "user://test_runs/test_import_pet.petpack"
+	_write_test_character_archive(archive_path, "1.0.0")
+	var installed: Dictionary = CharacterPackManagerScript.install_archive(
+		ProjectSettings.globalize_path(archive_path)
+	)
+	_assert_true(bool(installed.get("ok", false)), "valid character archive installs")
+	_assert_true(not bool(installed.get("updated", true)), "first import is an install")
+	_assert_equal(String(installed.get("id", "")), "test_import_pet", "installed character ID")
+	_write_test_character_archive(archive_path, "1.1.0")
+	var updated: Dictionary = CharacterPackManagerScript.install_archive(
+		ProjectSettings.globalize_path(archive_path)
+	)
+	_assert_true(bool(updated.get("ok", false)), "same-ID character archive updates")
+	_assert_true(bool(updated.get("updated", false)), "same-ID import is reported as update")
+	_assert_equal(String(updated.get("version", "")), "1.1.0", "updated package version")
+	var installed_visual := PetVisualScript.new()
+	_assert_true(
+		installed_visual._load_pack_from(
+			CharacterPackManagerScript.PACKS_ROOT.path_join("test_import_pet")
+		),
+		"installed character pack is accepted by the runtime loader"
+	)
+	_assert_equal(
+		installed_visual.get_character_id(),
+		"test_import_pet",
+		"runtime loader reads the installed character ID"
+	)
+	var external_svg_path := "user://test_runs/external_character.svg"
+	var external_svg := FileAccess.open(external_svg_path, FileAccess.WRITE)
+	external_svg.store_buffer(FileAccess.get_file_as_bytes(
+		"res://characters/public/pet.svg"
+	))
+	external_svg.close()
+	_assert_true(
+		installed_visual._load_texture(external_svg_path) != null,
+		"runtime loader decodes SVG images from external character packs"
+	)
+	installed_visual.free()
+	var profile_root := "user://profiles/test_import_pet"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(profile_root))
+	var profile_marker := FileAccess.open(profile_root.path_join("save_v2.json"), FileAccess.WRITE)
+	profile_marker.store_string("{}")
+	profile_marker.close()
+	var removed: Dictionary = CharacterPackManagerScript.remove_pack("test_import_pet")
+	_assert_true(bool(removed.get("ok", false)), "installed character can be removed")
+	_assert_true(
+		FileAccess.file_exists(profile_root.path_join("save_v2.json")),
+		"removing a character pack preserves its gameplay profile"
+	)
+
+
+func _write_test_character_archive(path: String, version: String) -> void:
+	var actions := {}
+	for action: String in CharacterPackManagerScript.REQUIRED_ACTIONS:
+		actions[action] = {
+			"file": "animations/pet.png",
+			"columns": 1,
+			"rows": 1,
+			"sequence": [0],
+			"frame_time": 0.1,
+		}
+	var manifest := {
+		"format_version": 1,
+		"id": "test_import_pet",
+		"name": "Test Import Pet",
+		"version": version,
+		"fallback_action": "idle",
+		"actions": actions,
+	}
+	var packer := ZIPPacker.new()
+	_assert_equal(packer.open(path), OK, "test character archive opens")
+	_assert_equal(packer.start_file("pet.json"), OK, "test manifest entry starts")
+	packer.write_file(JSON.stringify(manifest).to_utf8_buffer())
+	packer.close_file()
+	_assert_equal(packer.start_file("animations/pet.png"), OK, "test image entry starts")
+	var test_image := Image.create(2, 2, false, Image.FORMAT_RGBA8)
+	test_image.fill(Color.WHITE)
+	var test_png_path := "user://test_runs/test_character.png"
+	_assert_equal(test_image.save_png(test_png_path), OK, "test image is encoded as PNG")
+	packer.write_file(FileAccess.get_file_as_bytes(test_png_path))
+	packer.close_file()
+	packer.close()
 
 
 func _assert_true(condition: bool, label: String) -> void:

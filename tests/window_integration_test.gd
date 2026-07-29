@@ -71,18 +71,18 @@ func _init() -> void:
 	main.pet.set_dragging(false)
 	main.pet.set_facing_direction(-1)
 	_assert_true(
-		main.pet._sprite.scale.x > 0.0,
+		not main.pet._sprite.flip_h and main.pet._sprite.scale.x > 0.0,
 		"left-facing movement uses the source artwork"
 	)
 	main.pet.set_facing_direction(1)
 	_assert_true(
-		main.pet._sprite.scale.x < 0.0,
-		"right-facing movement mirrors the artwork"
+		main.pet._sprite.flip_h and main.pet._sprite.scale.x > 0.0,
+		"right-facing movement mirrors without a negative transform"
 	)
 	main.pet._facing_direction = 1
 	main.pet._apply_sprite_scale({"scale": 1.0, "source_facing": "right"})
 	_assert_true(
-		main.pet._sprite.scale.x > 0.0,
+		not main.pet._sprite.flip_h and main.pet._sprite.scale.x > 0.0,
 		"right-facing source artwork is not mirrored when moving right"
 	)
 	main.pet.set_facing_direction(-1)
@@ -172,6 +172,16 @@ func _init() -> void:
 	_assert_true(not main._stats_window.unresizable, "details window can be resized")
 	_assert_true(not main._stats_window.transient, "details window is an independent native window")
 	_assert_true(main._stats_window.always_on_top, "details window remains above normal windows")
+	_assert_true(
+		not main._character_tab_loaded,
+		"character packs are not scanned when the details window first opens"
+	)
+	main._on_stats_tab_changed(main._character_tab_index)
+	_assert_true(main._character_tab_loaded, "character tab scans only when selected")
+	_assert_true(
+		main._character_entries.size() >= 1,
+		"character tab always lists the built-in public character"
+	)
 	main._stats_window.mode = Window.MODE_MINIMIZED
 	var stats_recovery_deadline := Time.get_ticks_msec() + 1500
 	while main._stats_window.mode == Window.MODE_MINIMIZED \
@@ -327,14 +337,51 @@ func _init() -> void:
 	await create_timer(0.2).timeout
 	_assert_true(not main.bubble.visible, "speech hides after its duration")
 
+	var restart_script: String = main._restart_wait_script(
+		"C:\\Pets\\Kai's Pet.exe",
+		24680
+	)
+	_assert_true(
+		restart_script.contains("Wait-Process -Id 24680"),
+		"character restart waits for the old process"
+	)
+	_assert_true(
+		restart_script.contains("'C:\\Pets\\Kai''s Pet.exe'"),
+		"character restart safely quotes the executable path"
+	)
+
 	var energy_before := float(main.state.data.energy)
-	main._run_care_action(5)
+	main._show_context_menu(Vector2i(140, 190))
+	main.context_menu.id_pressed.emit(5)
+	main.context_menu.hide()
+	await create_timer(0.1).timeout
+	var right_click := InputEventMouseButton.new()
+	right_click.button_index = MOUSE_BUTTON_RIGHT
+	right_click.pressed = true
+	main._unhandled_input(right_click)
+	main.context_menu.hide()
+	main._show_context_menu(Vector2i(140, 190))
+	main.context_menu.id_pressed.emit(3)
+	main.context_menu.hide()
 	while main.state.is_action_busy():
 		await process_frame
+	_assert_true(
+		not main.pet.is_busy(),
+		"busy-menu rejection does not leave the visual action locked"
+	)
 	_assert_true(float(main.state.data.energy) >= energy_before, "sleep settles after animation")
 	# Allow startup/action speech SceneTreeTimers to finish before teardown so
 	# the integration run also verifies clean resource ownership.
 	await create_timer(6.3).timeout
+	main.bubble.visible = true
+	var shutdown_bubble_token: int = main._bubble_token
+	main._prepare_shutdown()
+	_assert_true(main._shutting_down, "shutdown preparation is idempotently guarded")
+	_assert_true(not main.bubble.visible, "shutdown hides an active speech bubble")
+	_assert_true(
+		main._bubble_token > shutdown_bubble_token,
+		"shutdown invalidates pending speech timers"
+	)
 	main.queue_free()
 	await process_frame
 	await process_frame
