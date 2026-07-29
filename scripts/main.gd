@@ -10,6 +10,7 @@ const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 const AUTOSTART_REGISTRY_KEY := "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
 const AUTOSTART_VALUE_NAME := "Open Desktop Pet"
+const STATUS_ICON = preload("res://characters/public/pet.svg")
 
 @onready var state: Node = $PetState
 @onready var pet: Node2D = $PetVisual
@@ -57,6 +58,8 @@ var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
 var _pet_interaction_polygon := PackedVector2Array()
 var _cursor_shape := Input.CURSOR_ARROW
+var _status_indicator_id := -1
+
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
@@ -71,6 +74,7 @@ func _ready() -> void:
 	_connect_signals()
 	_refresh_ui(state.get_snapshot())
 	_setup_context_menu()
+	_setup_status_indicator()
 	_setup_idle_behavior()
 	_last_global_mouse = DisplayServer.mouse_get_position()
 	_last_user_activity_ms = Time.get_ticks_msec()
@@ -134,10 +138,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_dragging = false
 		pet.set_dragging(false)
 		if _is_stats_window_open():
-			# Do not trust a stale native `visible` flag. Recreate the native
-			# window so a panel lost by Windows is always recoverable.
-			_destroy_stats_window()
-			call_deferred("_show_stats_window")
+			call_deferred("_bring_stats_window_forward")
 		else:
 			_show_context_menu(Vector2i(event.position))
 
@@ -197,12 +198,6 @@ func _restore_from_system_minimize() -> void:
 	# missed between slower timer ticks.
 	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-
-	if is_instance_valid(_stats_window) \
-			and _stats_window.visible \
-			and _stats_window.mode == Window.MODE_MINIMIZED:
-		_stats_window.mode = Window.MODE_WINDOWED
-
 
 func _layout_speech_bubble(text: String) -> void:
 	const BUBBLE_WIDTH := 200.0
@@ -371,6 +366,35 @@ func _show_context_menu(at: Vector2i) -> void:
 	context_menu.popup()
 
 
+func _show_context_menu_at_screen(at: Vector2i) -> void:
+	context_menu.position = at
+	context_menu.popup()
+
+
+func _setup_status_indicator() -> void:
+	if not DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR):
+		return
+	_status_indicator_id = DisplayServer.create_status_indicator(
+		STATUS_ICON,
+		"Open Desktop Pet",
+		_on_status_indicator_pressed
+	)
+
+
+func _on_status_indicator_pressed(button: int, position: Vector2i) -> void:
+	if button == MOUSE_BUTTON_LEFT:
+		call_deferred("_show_stats_window")
+	elif button == MOUSE_BUTTON_RIGHT:
+		call_deferred("_show_context_menu_at_screen", position)
+
+
+func _remove_status_indicator() -> void:
+	if _status_indicator_id < 0:
+		return
+	DisplayServer.delete_status_indicator(_status_indicator_id)
+	_status_indicator_id = -1
+
+
 func _on_context_action(id: int) -> void:
 	match id:
 		1, 2, 3, 4, 5:
@@ -475,10 +499,8 @@ func _build_stats_window() -> void:
 	_stats_window.size = DEFAULT_STATS_SIZE
 	_stats_window.min_size = MIN_STATS_SIZE
 	_stats_window.unresizable = false
-	# A transient child of the tiny borderless always-on-top pet window can be
-	# reported visible while remaining behind other windows on Windows.
 	_stats_window.transient = false
-	_stats_window.always_on_top = true
+	_stats_window.always_on_top = false
 	_stats_window.visible = false
 	_stats_window.close_requested.connect(_destroy_stats_window)
 	add_child(_stats_window)
@@ -950,6 +972,7 @@ func _restart_after_character_change() -> void:
 	_save_stats_window_size()
 	state.save_state()
 	_finish_all_autostart_threads()
+	_remove_status_indicator()
 	_destroy_stats_window()
 	get_tree().quit()
 
@@ -1129,8 +1152,11 @@ func _new_label(text: String, font_size: int, color: Color) -> Label:
 
 
 func _show_stats_window() -> void:
-	if not is_instance_valid(_stats_window):
-		_build_stats_window()
+	if is_instance_valid(_stats_window):
+		_refresh_ui(state.get_snapshot())
+		call_deferred("_bring_stats_window_forward")
+		return
+	_build_stats_window()
 	_refresh_ui(state.get_snapshot())
 	var pet_position := DisplayServer.window_get_position()
 	var pet_size := DisplayServer.window_get_size()
@@ -1155,6 +1181,8 @@ func _show_stats_window() -> void:
 func _bring_stats_window_forward() -> void:
 	if not is_instance_valid(_stats_window):
 		return
+	if _stats_window.mode == Window.MODE_MINIMIZED:
+		_stats_window.mode = Window.MODE_WINDOWED
 	if not _stats_window.visible:
 		_stats_window.show()
 	_stats_window.grab_focus()
@@ -1483,6 +1511,7 @@ func _prepare_shutdown() -> void:
 	_save_stats_window_size()
 	state.save_state()
 	_finish_all_autostart_threads()
+	_remove_status_indicator()
 	_destroy_stats_window()
 
 

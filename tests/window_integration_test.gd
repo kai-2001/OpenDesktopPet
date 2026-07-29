@@ -11,6 +11,10 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 
+	_assert_true(
+		bool(ProjectSettings.get_setting("display/window/size/no_focus", false)),
+		"desktop pet overlay stays out of the taskbar and task switcher"
+	)
 	_assert_true(main.pet.visible, "pet is revealed after native window setup")
 	_assert_equal(
 		main.state.save_path,
@@ -171,7 +175,7 @@ func _init() -> void:
 	_assert_true(main._stats_window.visible, "details window opens on first request")
 	_assert_true(not main._stats_window.unresizable, "details window can be resized")
 	_assert_true(not main._stats_window.transient, "details window is an independent native window")
-	_assert_true(main._stats_window.always_on_top, "details window remains above normal windows")
+	_assert_true(not main._stats_window.always_on_top, "details window behaves like a normal window")
 	_assert_true(
 		not main._character_tab_loaded,
 		"character packs are not scanned when the details window first opens"
@@ -204,14 +208,21 @@ func _init() -> void:
 		)
 		break
 	main._stats_window.mode = Window.MODE_MINIMIZED
-	var stats_recovery_deadline := Time.get_ticks_msec() + 1500
-	while main._stats_window.mode == Window.MODE_MINIMIZED \
-			and Time.get_ticks_msec() < stats_recovery_deadline:
-		await create_timer(0.05).timeout
+	await process_frame
 	_assert_equal(
 		main._stats_window.mode,
-		Window.MODE_WINDOWED,
-		"per-frame check restores an open minimized details window"
+		Window.MODE_MINIMIZED,
+		"details window remains minimized until explicitly opened"
+	)
+	var minimized_stats_window_id: int = main._stats_window.get_instance_id()
+	main._show_stats_window()
+	await process_frame
+	await process_frame
+	_assert_equal(main._stats_window.mode, Window.MODE_WINDOWED, "opening restores a minimized details window")
+	_assert_equal(
+		main._stats_window.get_instance_id(),
+		minimized_stats_window_id,
+		"opening focuses the existing details window instead of recreating it"
 	)
 	_assert_true(
 		is_instance_valid(main._fps_option_button),
