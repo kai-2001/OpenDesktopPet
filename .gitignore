@@ -4,3 +4,5 @@ private_pets/
 characters/custom/
 素材/
 *.log
+tests/trash_window_diagnostic.gd
+tests/trash_window_diagnostic.gd.uid

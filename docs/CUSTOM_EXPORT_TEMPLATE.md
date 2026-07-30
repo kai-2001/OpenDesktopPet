@@ -29,5 +29,6 @@ Expected SHA-256 for the current template:
 
 `6088b821a63166d155c7f7cc176fdae5d8ba0a314ceb3290cb6ef8e8fbacda84`
 
-Both Windows export presets reference this custom template and should fail
-rather than silently switching back to the official template if it is absent.
+The Windows Public export preset references this custom template and should
+fail rather than silently switching back to the official template if it is
+absent.

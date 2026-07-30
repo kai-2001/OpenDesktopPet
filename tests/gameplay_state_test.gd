@@ -27,9 +27,11 @@ func _init() -> void:
 
 	var state := PetStateScript.new()
 	state.save_path = TEST_SAVE_PATH
+	var visual_root := Node2D.new()
 	var visual := PetVisualScript.new()
 	visual.position = Vector2(140, 190)
-	root.add_child(visual)
+	root.add_child(visual_root)
+	visual_root.add_child(visual)
 	root.add_child(state)
 	state.action_requested.connect(visual.play_action)
 	visual.action_completed.connect(state.receive_action_completed)
@@ -178,7 +180,7 @@ func _init() -> void:
 	profile_b.free()
 	reloaded_profile_a.free()
 	state.queue_free()
-	visual.queue_free()
+	visual_root.queue_free()
 	DirAccess.remove_absolute(
 		ProjectSettings.globalize_path(invalid_pack_root.path_join("pet.json"))
 	)
@@ -211,7 +213,13 @@ func _test_frame_viewport_containment(visual: Node2D) -> void:
 	}
 	visual._texture_cache[texture_path] = texture
 	visual.set_facing_direction(-1)
+	var base_window_size: Vector2i = visual.get_window().size
+	var base_root_position: Vector2 = (visual.get_parent() as Node2D).position
 	visual._show_action_frame(action, 0)
+	_assert_true(
+		visual.get_window().size.x > base_window_size.x,
+		"oversized action frame grows the shared pet window"
+	)
 	var bounds: Rect2 = visual._opaque_frame_bounds_in_canvas()
 	var limits := visual.get_viewport().get_visible_rect().grow(
 		-PetVisualScript.FRAME_VIEWPORT_PADDING
@@ -232,6 +240,16 @@ func _test_frame_viewport_containment(visual: Node2D) -> void:
 	visual._actions.erase(action)
 	visual._texture_cache.erase(texture_path)
 	visual._show_action_frame("idle", visual._first_frame("idle"))
+	_assert_equal(
+		visual.get_window().size,
+		base_window_size,
+		"returning to a smaller frame restores the base window size"
+	)
+	_assert_equal(
+		(visual.get_parent() as Node2D).position,
+		base_root_position,
+		"returning to a smaller frame restores the base canvas position"
+	)
 
 
 func _test_character_pack_lifecycle() -> void:

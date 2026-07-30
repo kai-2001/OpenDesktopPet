@@ -2,15 +2,13 @@ extends Node2D
 
 const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
-const RESTART_LOG_PATH := "user://logs/restart.log"
-const RESTART_LOG_MAX_BYTES := 1024 * 1024
 const DEFAULT_STATS_SIZE := Vector2i(400, 720)
 const MIN_STATS_SIZE := Vector2i(360, 480)
 const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 const AUTOSTART_REGISTRY_KEY := "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
 const AUTOSTART_VALUE_NAME := "Open Desktop Pet"
-const STATUS_ICON = preload("res://characters/public/pet.svg")
+const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 
 @onready var state: Node = $PetState
 @onready var pet: Node2D = $PetVisual
@@ -38,6 +36,7 @@ var _character_update_dialog: ConfirmationDialog
 var _character_delete_dialog: ConfirmationDialog
 var _pending_character_archive := ""
 var _stats_bars: Dictionary = {}
+var _care_action_buttons: Dictionary = {}
 var _autostart_threads: Dictionary = {}
 var _autostart_operation_serial := 0
 var _latest_autostart_operation_id := 0
@@ -494,6 +493,7 @@ func _autonomous_small_roll() -> void:
 
 func _build_stats_window() -> void:
 	_stats_bars.clear()
+	_care_action_buttons.clear()
 	_stats_window = Window.new()
 	_stats_window.title = "桌寵詳細狀態"
 	_stats_window.size = DEFAULT_STATS_SIZE
@@ -612,6 +612,7 @@ func _build_stats_window() -> void:
 		var action_id := int(definition.id)
 		action_button.pressed.connect(func() -> void: _run_care_action(action_id))
 		action_grid.add_child(action_button)
+		_care_action_buttons[action] = action_button
 	content.add_child(action_grid)
 	content.add_child(HSeparator.new())
 
@@ -774,7 +775,7 @@ func _build_character_tab(tabs: TabContainer) -> void:
 	content.add_child(import_row)
 
 	_character_feedback = _new_label(
-		"切換角色會儲存目前進度並重新啟動桌寵。",
+		"切換角色會儲存目前進度，並直接在目前視窗載入。",
 		13,
 		Color("#8ed9e8")
 	)
@@ -944,110 +945,73 @@ func _use_selected_character() -> void:
 	if entry.is_empty():
 		return
 	var is_reload: bool = String(entry.id) == pet.get_character_id()
-	_set_selected_character_id(String(entry.id))
 	state.save_state()
-	if OS.has_feature("editor"):
-		_character_feedback.text = "正在重新載入角色…" if is_reload \
-			else "正在切換角色…"
-		get_tree().reload_current_scene()
-		return
-	_restart_after_character_change()
+	_apply_character_without_restart(String(entry.id), is_reload)
 
 
-func _restart_after_character_change() -> void:
-	var executable := OS.get_executable_path()
-	_append_restart_log("restart requested old_pid=%d" % OS.get_process_id())
-	var launcher_process_id := _schedule_restart_after_exit(
-		executable,
-		OS.get_process_id()
+func _apply_character_without_restart(character_id: String, is_reload: bool) -> bool:
+	var previous_character_id: String = pet.get_character_id()
+	_set_selected_character_id(character_id)
+	if not pet.reload_character() or pet.get_character_id() != character_id:
+		_set_selected_character_id(previous_character_id)
+		pet.reload_character()
+		state.configure_profile(pet.get_character_id())
+		_character_feedback.text = "角色載入失敗，已恢復原本角色。"
+		_refresh_interaction_polygon()
+		return false
+	_known_unlocked_actions.clear()
+	_unlock_tracking_ready = false
+	# configure_profile() emits changed immediately. Reset tracking first so
+	# actions already unlocked in the newly selected profile establish the
+	# baseline instead of being mistaken for fresh unlocks.
+	state.configure_profile(character_id)
+	_refresh_json_driven_ui()
+	_refresh_ui(state.get_snapshot())
+	_refresh_interaction_polygon()
+	_refresh_character_list(
+		"已重新載入「%s」。" % pet.get_character_name()
+		if is_reload
+		else "已切換為「%s」。" % pet.get_character_name()
 	)
-	if launcher_process_id <= 0:
-		_append_restart_log("failed to create restart helper")
-		_character_feedback.text = "角色已選擇，但自動重啟失敗；請手動重開桌寵。"
-		return
-	_append_restart_log("restart helper created helper_pid=%d" % launcher_process_id)
-	_left_press_pending = false
-	_dragging = false
-	pet.set_dragging(false)
-	_save_stats_window_size()
-	state.save_state()
-	_finish_all_autostart_threads()
-	_remove_status_indicator()
-	_destroy_stats_window()
-	get_tree().quit()
+	return true
 
 
-func _schedule_restart_after_exit(executable: String, old_process_id: int) -> int:
-	if OS.get_name() != "Windows":
-		return OS.create_process(executable, PackedStringArray())
-	var windows_root := OS.get_environment("SystemRoot")
-	if windows_root.is_empty():
-		windows_root = "C:\\Windows"
-	var powershell := windows_root.path_join(
-		"System32/WindowsPowerShell/v1.0/powershell.exe"
+func _refresh_json_driven_ui() -> void:
+	var labels := {
+		1: "%s  %s（2 金幣）" % [
+			_interaction_icon("feed"), _interaction_label("feed")
+		],
+		2: "%s  %s（1 金幣）" % [
+			_interaction_icon("water"), _interaction_label("water")
+		],
+		3: "%s  %s" % [
+			_interaction_icon("pet"), _interaction_label("pet")
+		],
+		4: "%s  %s（賺 7 金幣）" % [
+			_interaction_icon("work"), _interaction_label("work")
+		],
+		5: "%s  %s" % [
+			_interaction_icon("sleep"), _interaction_label("sleep")
+		],
+	}
+	for id: int in labels:
+		var index := context_menu.get_item_index(id)
+		if index >= 0:
+			context_menu.set_item_text(index, String(labels[id]))
+	for action: String in _care_action_buttons:
+		var button: Button = _care_action_buttons[action]
+		if is_instance_valid(button):
+			button.text = "%s %s" % [
+				_interaction_icon(action), _interaction_label(action)
+			]
+	_bubble_token += 1
+	bubble.visible = false
+	bubble_tail.visible = false
+	_last_state_message = pet.get_dialogue(
+		"startup", "右鍵操作・雙擊摸摸"
 	)
-	var arguments := PackedStringArray([
-		"-NoProfile",
-		"-NonInteractive",
-		"-WindowStyle",
-		"Hidden",
-		"-Command",
-		_restart_wait_script(executable, old_process_id),
-	])
-	return OS.create_process(powershell, arguments, false)
-
-
-func _restart_wait_script(executable: String, old_process_id: int) -> String:
-	var quoted_executable := executable.replace("'", "''")
-	var quoted_working_directory := executable.get_base_dir().replace("'", "''")
-	var quoted_log_path := ProjectSettings.globalize_path(
-		RESTART_LOG_PATH
-	).replace("'", "''")
-	return (
-		"$ErrorActionPreference='Stop'; "
-		+ "$log='%s'; " % quoted_log_path
-		+ "function Write-Log($message) { "
-		+ "Add-Content -LiteralPath $log -Encoding UTF8 "
-		+ "-Value ((Get-Date).ToString('o') + ' [helper] ' + $message) }; "
-		+ "try { "
-		+ "Write-Log 'started old_pid=%d'; " % old_process_id
-		+ "$old=Get-Process -Id %d -ErrorAction SilentlyContinue; " % old_process_id
-		+ "if ($null -ne $old) { "
-		+ "Write-Log 'waiting for old process'; "
-		+ "Wait-Process -Id %d -ErrorAction Stop }; " % old_process_id
-		+ "Write-Log 'old process exited'; "
-		+ "$new=Start-Process -FilePath '%s' " % quoted_executable
-		+ "-WorkingDirectory '%s' -PassThru -ErrorAction Stop; " % quoted_working_directory
-		+ "Write-Log ('new process started pid=' + $new.Id) "
-		+ "} catch { Write-Log ('FAILED ' + ($_ | Out-String).Trim()) }"
-	)
-
-
-func _append_restart_log(message: String) -> void:
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(
-		RESTART_LOG_PATH.get_base_dir()
-	))
-	var new_line := ("%s [app] %s\n" % [
-		Time.get_datetime_string_from_system(),
-		message,
-	]).to_utf8_buffer()
-	var contents := PackedByteArray()
-	if FileAccess.file_exists(RESTART_LOG_PATH):
-		contents = FileAccess.get_file_as_bytes(RESTART_LOG_PATH)
-	contents.append_array(new_line)
-	if contents.size() > RESTART_LOG_MAX_BYTES:
-		var first_kept_byte := contents.size() - RESTART_LOG_MAX_BYTES
-		while first_kept_byte < contents.size() \
-				and contents[first_kept_byte] != 10:
-			first_kept_byte += 1
-		if first_kept_byte < contents.size():
-			first_kept_byte += 1
-		contents = contents.slice(first_kept_byte)
-	var file := FileAccess.open(RESTART_LOG_PATH, FileAccess.WRITE)
-	if file == null:
-		return
-	file.store_buffer(contents)
-	file.close()
+	if is_instance_valid(_last_message_status):
+		_last_message_status.text = "最近訊息：%s" % _last_state_message
 
 
 func _set_selected_character_id(character_id: String) -> void:
@@ -1085,10 +1049,7 @@ func _delete_selected_character() -> void:
 		return
 	_refresh_character_list("已刪除角色包；遊戲進度仍保留。")
 	if was_active:
-		if OS.has_feature("editor"):
-			_character_feedback.text += " 開發模式下請重新啟動場景。"
-		else:
-			_restart_after_character_change()
+		_apply_character_without_restart("open_desktop_pet_default", false)
 
 
 func _open_character_packs_folder() -> void:
@@ -1217,6 +1178,7 @@ func _destroy_stats_window() -> void:
 	_character_tab_index = -1
 	_character_tab_loaded = false
 	_stats_bars.clear()
+	_care_action_buttons.clear()
 
 
 func _load_stats_window_size() -> Vector2i:

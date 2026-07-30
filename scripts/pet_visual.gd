@@ -38,10 +38,13 @@ var _active_requested_action := ""
 var _hit_image_cache: Dictionary = {}
 var _hit_polygon_cache: Dictionary = {}
 var _opaque_bounds_cache: Dictionary = {}
+var _base_window_size := Vector2i.ZERO
+var _base_root_position := Vector2.ZERO
 
 
 func _ready() -> void:
 	_home_position = position
+	_capture_base_geometry()
 	_sprite = Sprite2D.new()
 	_sprite.z_index = 1
 	add_child(_sprite)
@@ -89,6 +92,41 @@ func set_progression(snapshot: Dictionary) -> void:
 	_progression.affection = int(snapshot.get("affection", 0))
 
 
+func reload_character() -> bool:
+	_animation_serial += 1
+	_cancel_active_request()
+	_dragging = false
+	_busy = false
+	_drag_moving = false
+	_drag_frame_clock = 0.0
+	_drag_frame_step = 0
+	_current_action = ""
+	_active_request_id = 0
+	_active_requested_action = ""
+	position = _home_position
+	rotation = 0.0
+	scale = Vector2.ONE * _visual_size
+	_restore_base_geometry()
+	_sprite.texture = null
+	_manifest.clear()
+	_actions.clear()
+	_aliases.clear()
+	_texture_cache.clear()
+	_hit_image_cache.clear()
+	_hit_polygon_cache.clear()
+	_opaque_bounds_cache.clear()
+	_pack_root = ""
+	if not _load_pack():
+		queue_redraw()
+		_emit_interaction_region()
+		return false
+	_idle_clock = 0.0
+	_idle_step = 0
+	_show_action_frame("idle", _first_frame("idle"))
+	queue_redraw()
+	return true
+
+
 func set_dragging(value: bool) -> void:
 	if _dragging == value:
 		return
@@ -107,6 +145,33 @@ func set_dragging(value: bool) -> void:
 	else:
 		_restore_idle()
 	_emit_interaction_region()
+
+
+func _capture_base_geometry() -> void:
+	var window := get_window()
+	if window:
+		_base_window_size = window.size
+	var root_canvas := get_parent() as Node2D
+	if root_canvas:
+		_base_root_position = root_canvas.position
+
+
+func _restore_base_geometry() -> void:
+	var window := get_window()
+	var root_canvas := get_parent() as Node2D
+	if root_canvas:
+		# A previous oversized frame may have shifted the root canvas. Move the
+		# native window by the inverse correction so the pet keeps the same
+		# desktop position while returning to the common baseline.
+		var canvas_delta := root_canvas.position - _base_root_position
+		root_canvas.position = _base_root_position
+		if window and not canvas_delta.is_zero_approx():
+			window.position += Vector2i(
+				roundi(canvas_delta.x),
+				roundi(canvas_delta.y)
+			)
+	if window and _base_window_size.x > 0 and _base_window_size.y > 0:
+		window.size = _base_window_size
 
 
 func set_drag_motion(is_moving: bool) -> void:
@@ -439,6 +504,7 @@ func _show_action_frame(action: String, frame: int) -> void:
 	)
 	_sprite.position = _frame_offset(definition, safe_frame)
 	_apply_sprite_scale(definition)
+	_restore_base_geometry()
 	_grow_window_to_fit_frame()
 	_keep_frame_inside_viewport()
 	_emit_interaction_region()

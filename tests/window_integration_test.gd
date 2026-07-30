@@ -369,46 +369,68 @@ func _init() -> void:
 	await create_timer(0.2).timeout
 	_assert_true(not main.bubble.visible, "speech hides after its duration")
 
-	var restart_script: String = main._restart_wait_script(
-		"C:\\Pets\\Kai's Pet.exe",
-		24680
+	_assert_true(
+		not main.has_method("_schedule_restart_after_exit")
+			and not main.has_method("_restart_wait_script"),
+		"character changes do not use an external restart helper"
+	)
+	var main_process_id := OS.get_process_id()
+	var active_character_id: String = main.pet.get_character_id()
+	_assert_true(
+		main._apply_character_without_restart(active_character_id, true),
+		"active character reload succeeds in the current process"
+	)
+	_assert_equal(
+		OS.get_process_id(),
+		main_process_id,
+		"active character reload keeps the same process"
+	)
+	_assert_equal(
+		main.pet.get_character_id(),
+		active_character_id,
+		"active character reload preserves the selected character"
+	)
+	main._build_stats_window()
+	main._known_unlocked_actions = {"idle": true}
+	main._unlock_tracking_ready = true
+	_assert_true(
+		main._apply_character_without_restart("open_desktop_pet_default", false),
+		"switching to the public character succeeds without restarting"
+	)
+	await create_timer(0.5).timeout
+	_assert_true(
+		not main.bubble.visible,
+		"switching profiles does not celebrate actions that were already unlocked"
+	)
+	for action: String in ["feed", "water", "pet", "work", "sleep"]:
+		var button: Button = main._care_action_buttons[action]
+		_assert_equal(
+			button.text,
+			"%s %s" % [
+				main._interaction_icon(action),
+				main._interaction_label(action),
+			],
+			"details-panel %s text refreshes from the active character JSON" % action
+		)
+	var feed_menu_index: int = main.context_menu.get_item_index(1)
+	_assert_true(
+		main.context_menu.get_item_text(feed_menu_index).contains(
+			main._interaction_icon("feed")
+		) and main.context_menu.get_item_text(feed_menu_index).contains(
+			main._interaction_label("feed")
+		),
+		"context-menu care text refreshes from the active character JSON"
+	)
+	_assert_equal(
+		main._last_state_message,
+		main.pet.get_dialogue("startup", "右鍵操作・雙擊摸摸"),
+		"cached character dialogue refreshes from the active character JSON"
 	)
 	_assert_true(
-		restart_script.contains("Wait-Process -Id 24680"),
-		"character restart waits for the old process"
+		main._apply_character_without_restart(active_character_id, false),
+		"switching back to the original character succeeds without restarting"
 	)
-	_assert_true(
-		restart_script.contains("'C:\\Pets\\Kai''s Pet.exe'"),
-		"character restart safely quotes the executable path"
-	)
-	_assert_true(
-		restart_script.contains("restart.log")
-			and restart_script.contains("-WorkingDirectory")
-			and restart_script.contains("FAILED "),
-		"character restart records helper progress and launch failures"
-	)
-	main._append_restart_log("integration marker")
-	_assert_true(
-		FileAccess.file_exists(main.RESTART_LOG_PATH)
-			and FileAccess.get_file_as_string(main.RESTART_LOG_PATH).contains(
-				"integration marker"
-			),
-		"character restart appends application-side diagnostics"
-	)
-	var oversized_log := FileAccess.open(main.RESTART_LOG_PATH, FileAccess.WRITE)
-	oversized_log.store_string(
-		"old entry\n".repeat(main.RESTART_LOG_MAX_BYTES / 5)
-	)
-	oversized_log.close()
-	main._append_restart_log("newest marker")
-	_assert_true(
-		FileAccess.get_file_as_bytes(main.RESTART_LOG_PATH).size()
-				<= main.RESTART_LOG_MAX_BYTES
-			and FileAccess.get_file_as_string(main.RESTART_LOG_PATH).ends_with(
-				"newest marker\n"
-			),
-		"character restart log discards oldest complete lines at its size limit"
-	)
+	main._destroy_stats_window()
 
 	var energy_before := float(main.state.data.energy)
 	main._show_context_menu(Vector2i(140, 190))
