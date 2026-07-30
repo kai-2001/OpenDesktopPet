@@ -26,7 +26,7 @@ godot --path .
 完整自動驗證會使用獨立的暫存 AppData，不會讀寫正式進度：
 
 ```powershell
-.\tests\run_validation.ps1 -GodotExe C:\path\to\Godot_v4.6.3-stable_win64_console.exe
+.\tests\run_validation.ps1 -GodotExe (Get-Command godot).Source
 ```
 
 驗證包含真實動畫完成結算、動畫拒絕、願望到期、安全存檔與備份、

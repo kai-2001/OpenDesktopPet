@@ -18,7 +18,7 @@
 
 ```powershell
 .\tests\run_validation.ps1 `
-  -GodotExe C:\path\to\Godot_v4.6.3-stable_win64_console.exe
+  -GodotExe (Get-Command godot).Source
 ```
 
 ## 程式碼與素材
