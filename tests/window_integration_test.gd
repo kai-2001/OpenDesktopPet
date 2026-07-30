@@ -42,6 +42,23 @@ func _init() -> void:
 		"fallback",
 		"missing character dialogue uses the built-in fallback"
 	)
+	if DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR):
+		_assert_true(
+			is_instance_valid(main._status_indicator)
+				and is_instance_valid(main._tray_exit_menu)
+				and main._status_indicator.menu != NodePath(),
+			"status indicator uses a dedicated native exit menu"
+		)
+		_assert_equal(
+			main._tray_exit_menu.item_count,
+			1,
+			"status indicator menu contains only the exit command"
+		)
+		_assert_equal(
+			main._tray_exit_menu.get_item_id(0),
+			7,
+			"status indicator exit command uses the shutdown action"
+		)
 	_assert_equal(
 		main.pet.get_interaction_label("feed", "__fallback__"),
 		"餵食",

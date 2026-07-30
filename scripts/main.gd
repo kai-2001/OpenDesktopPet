@@ -57,7 +57,8 @@ var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
 var _pet_interaction_polygon := PackedVector2Array()
 var _cursor_shape := Input.CURSOR_ARROW
-var _status_indicator_id := -1
+var _status_indicator: StatusIndicator
+var _tray_exit_menu: PopupMenu
 
 
 func _ready() -> void:
@@ -370,33 +371,33 @@ func _show_context_menu(at: Vector2i) -> void:
 	context_menu.popup()
 
 
-func _show_context_menu_at_screen(at: Vector2i) -> void:
-	context_menu.position = at
-	context_menu.popup()
-
-
 func _setup_status_indicator() -> void:
 	if not DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR):
 		return
-	_status_indicator_id = DisplayServer.create_status_indicator(
-		STATUS_ICON,
-		"Open Desktop Pet",
-		_on_status_indicator_pressed
-	)
+	_tray_exit_menu = PopupMenu.new()
+	_tray_exit_menu.add_item("❌  儲存並離開", 7)
+	_tray_exit_menu.id_pressed.connect(_on_context_action)
+	add_child(_tray_exit_menu)
+	_status_indicator = StatusIndicator.new()
+	_status_indicator.icon = STATUS_ICON
+	_status_indicator.tooltip = "Open Desktop Pet"
+	add_child(_status_indicator)
+	_status_indicator.menu = _status_indicator.get_path_to(_tray_exit_menu)
+	_status_indicator.pressed.connect(_on_status_indicator_pressed)
 
 
-func _on_status_indicator_pressed(button: int, position: Vector2i) -> void:
+func _on_status_indicator_pressed(button: int, _position: Vector2i) -> void:
 	if button == MOUSE_BUTTON_LEFT:
 		call_deferred("_show_stats_window")
-	elif button == MOUSE_BUTTON_RIGHT:
-		call_deferred("_show_context_menu_at_screen", position)
 
 
 func _remove_status_indicator() -> void:
-	if _status_indicator_id < 0:
-		return
-	DisplayServer.delete_status_indicator(_status_indicator_id)
-	_status_indicator_id = -1
+	if is_instance_valid(_status_indicator):
+		_status_indicator.queue_free()
+	_status_indicator = null
+	if is_instance_valid(_tray_exit_menu):
+		_tray_exit_menu.queue_free()
+	_tray_exit_menu = null
 
 
 func _on_context_action(id: int) -> void:
