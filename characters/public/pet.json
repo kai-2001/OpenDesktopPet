@@ -1,40 +1,121 @@
 {
   "format_version": 1,
   "id": "open_desktop_pet_default",
-  "name": "Default Desktop Pet",
-  "version": "1.0.0",
-  "preview": "pet.svg",
-  "scale": 0.42,
+  "name": "莓角守宮",
+  "version": "2.0.0",
+  "scale": 0.31,
+  "source_facing": "left",
   "fallback_action": "idle",
   "interactions": {
-    "feed": {"label": "餵食", "icon": "🥕", "wish": "想吃東西（剩餘約 {minutes} 分鐘）"},
+    "feed": {"label": "餵莓果", "icon": "🫐", "wish": "想吃莓果（剩餘約 {minutes} 分鐘）"},
     "water": {"label": "喝水", "icon": "💧", "wish": "想喝水（剩餘約 {minutes} 分鐘）"},
     "pet": {"label": "摸摸", "icon": "✋", "wish": "想被摸摸（剩餘約 {minutes} 分鐘）"},
-    "work": {"label": "工作", "icon": "🪙", "wish": "想工作（剩餘約 {minutes} 分鐘）"},
+    "work": {"label": "狩獵", "icon": "🪲", "wish": "想去狩獵（剩餘約 {minutes} 分鐘）"},
     "sleep": {"label": "睡覺", "icon": "💤", "wish": "想睡覺（剩餘約 {minutes} 分鐘）"}
   },
   "dialogue": {
-    "startup": "右鍵操作・雙擊摸摸",
-    "single_click": ["嗯？", "我有在聽。", "想摸摸的話可以雙擊。"],
-    "idle": ["我在這裡。", "滾一下好了。", "今天也要照顧我。"],
-    "action_busy": "先等目前的動作完成～",
-    "feed_complete": "好吃！一下就吃光了！",
-    "water_complete": "咕嚕咕嚕，好清爽！",
-    "sleep_recovered": "呼嚕……睡成一顆麻糬。",
-    "sleep_full": "雖然很有精神，還是舒服地睡了一覺。",
-    "work_complete": "工作完成！賺到 7 枚金幣。",
-    "pet_rewarded": "嘿嘿！再摸一下！",
+    "startup": "莓角守宮來了！右鍵操作・雙擊摸摸",
+    "single_click": ["嘰？", "角角今天也很有精神。", "想摸摸的話可以雙擊。"],
+    "idle": ["尾巴晃呀晃。", "附近有小蟲嗎？", "今天也要照顧我。"],
+    "action_busy": "先等我做完這件事～",
+    "feed_complete": "莓果好甜！一下就吃光了！",
+    "water_complete": "舔舔舔，好清爽！",
+    "sleep_recovered": "呼……尾巴捲好就能安心睡。",
+    "sleep_full": "雖然很有精神，還是舒服地瞇了一會。",
+    "work_complete": "狩獵成功！帶回了 7 枚金幣。",
+    "pet_rewarded": "角角也要輕輕摸！",
     "pet_cooldown": "很舒服，不過先讓我休息一下～",
-    "action_unlocked": "解鎖了新的動作：{action}！"
+    "action_unlocked": "學會了新的動作：{action}！"
   },
   "actions": {
-    "idle": {"file": "pet.svg", "columns": 1, "sequence": [0], "idle_interval": 2.6},
-    "pet": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 4, "frame_time": 0.16},
-    "eat": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 5, "frame_time": 0.2},
-    "drink": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 5, "frame_time": 0.2},
-    "sleep": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 6, "frame_time": 0.24, "autonomous_weight": 10},
-    "move": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 5, "frame_time": 0.18, "autonomous_weight": 25},
-    "drag": {"file": "pet.svg", "columns": 1, "sequence": [0], "frame_time": 0.16},
-    "work": {"file": "pet.svg", "columns": 1, "sequence": [0], "behavior": "pulse", "pulses": 5, "frame_time": 0.18}
+    "idle": {
+      "file": "animations/idle.png",
+      "columns": 2,
+      "rows": 2,
+      "sequence": [0, 1, 2, 3, 1],
+      "frame_time": 0.18,
+      "idle_interval": 2.4,
+      "scale": 0.32,
+      "offsets": [[-10.1, 27.5], [-7.5, 28.5], [-9.3, 38.4], [-5.6, 38.1]]
+    },
+    "pet": {
+      "file": "animations/pet.png",
+      "columns": 2,
+      "rows": 2,
+      "sequence": [0, 1, 2, 3],
+      "frame_time": 0.2,
+      "scale": 0.32,
+      "offsets": [[-7.0, 28.8], [-2.4, 28.5], [-5.8, 37.4], [-0.5, 38.7]]
+    },
+    "eat": {
+      "file": "animations/eat.png",
+      "columns": 2,
+      "rows": 2,
+      "sequence": [0, 1, 2, 3],
+      "frame_time": 0.24,
+      "scale": 0.33,
+      "offsets": [[-6.3, 28.2], [0.2, 28.2], [-12.7, 42.4], [-2.1, 41.8]]
+    },
+    "drink": {
+      "file": "animations/drink.png",
+      "columns": 2,
+      "rows": 2,
+      "sequence": [0, 1, 2, 3],
+      "frame_time": 0.24,
+      "scale": 0.31,
+      "offsets": [[-3.3, 36.0], [2.3, 37.8], [-7.8, 58.6], [8.8, 57.7]]
+    },
+    "sleep": {
+      "file": "animations/sleep.png",
+      "columns": 2,
+      "rows": 2,
+      "sequence": [0, 1, 2, 2, 3],
+      "frame_time": 0.3,
+      "scale": 0.48,
+      "offsets": [[-9.1, 21.5], [20.9, 18.6], [-8.4, 91.1], [27.4, 87.3]]
+    },
+    "move": {
+      "file": "animations/move.png",
+      "columns": 2,
+      "rows": 2,
+      "sequence": [0, 1, 2, 3],
+      "frame_time": 0.16,
+      "autonomous_weight": 25,
+      "scale": 0.32,
+      "offsets": [[1.9, 27.2], [8.0, 28.5], [0.2, 59.5], [7.5, 59.8]]
+    },
+    "drag": {
+      "file": "animations/drag.png",
+      "columns": 1,
+      "rows": 1,
+      "sequence": [0],
+      "frame_time": 0.16,
+      "scale": 0.16,
+      "offsets": [[3.0, 16.0]]
+    },
+    "work": {
+      "file": "animations/work.png",
+      "columns": 2,
+      "rows": 2,
+      "sequence": [0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3, 3],
+      "frame_time": 0.18,
+      "scale": 0.34,
+      "offsets": [[-6.8, 32.9], [15.0, 32.5], [-6.1, 60.1], [-1.7, 41.4]]
+    },
+    "belly_trust": {
+      "display_name": "翻肚撒嬌",
+      "file": "animations/belly_trust.png",
+      "columns": 2,
+      "rows": 2,
+      "sequence": [0, 1, 2, 2, 2, 3, 0],
+      "frame_time": 0.24,
+      "autonomous_weight": 8,
+      "scale": 0.48,
+      "offsets": [[-18.7, 18.6], [2.4, 10.0], [-1.7, 71.0], [4.6, 73.4]],
+      "unlock": {
+        "level": 5,
+        "affection": 15
+      }
+    }
   }
 }

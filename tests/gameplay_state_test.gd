@@ -280,11 +280,25 @@ func _test_character_pack_lifecycle() -> void:
 		"test_import_pet",
 		"runtime loader reads the installed character ID"
 	)
+	for action: String in CharacterPackManagerScript.REQUIRED_ACTIONS:
+		_assert_true(
+			FileAccess.file_exists(
+				"res://characters/public/animations/%s.png" % action
+			),
+			"bundled public character includes the %s animation" % action
+		)
+	_assert_true(
+		FileAccess.file_exists(
+			"res://characters/public/animations/belly_trust.png"
+		),
+		"bundled public character includes the unlockable belly-trust animation"
+	)
 	var external_svg_path := "user://test_runs/external_character.svg"
 	var external_svg := FileAccess.open(external_svg_path, FileAccess.WRITE)
-	external_svg.store_buffer(FileAccess.get_file_as_bytes(
-		"res://characters/public/pet.svg"
-	))
+	external_svg.store_string(
+		'<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8">' \
+		+ '<rect width="8" height="8" fill="#b03060"/></svg>'
+	)
 	external_svg.close()
 	_assert_true(
 		installed_visual._load_texture(external_svg_path) != null,
