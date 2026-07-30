@@ -35,6 +35,7 @@ var _current_action := ""
 var _pack_root := ""
 var _active_request_id := 0
 var _active_requested_action := ""
+var _action_tween: Tween
 var _hit_image_cache: Dictionary = {}
 var _hit_polygon_cache: Dictionary = {}
 var _opaque_bounds_cache: Dictionary = {}
@@ -132,7 +133,9 @@ func set_dragging(value: bool) -> void:
 		return
 	if value:
 		_cancel_active_request()
-	_animation_serial += 1
+		_stop_current_animation(false)
+	else:
+		_animation_serial += 1
 	_dragging = value
 	_busy = false
 	_drag_moving = false
@@ -145,6 +148,27 @@ func set_dragging(value: bool) -> void:
 	else:
 		_restore_idle()
 	_emit_interaction_region()
+
+
+func cancel_autonomous_action() -> bool:
+	if _active_request_id > 0 or _dragging:
+		return false
+	if not _busy:
+		return true
+	_stop_current_animation(true)
+	_emit_interaction_region()
+	return true
+
+
+func _stop_current_animation(restore_idle: bool) -> void:
+	_animation_serial += 1
+	if is_instance_valid(_action_tween):
+		_action_tween.kill()
+	_action_tween = null
+	_busy = false
+	_current_action = ""
+	if restore_idle:
+		_restore_idle()
 
 
 func _capture_base_geometry() -> void:
@@ -478,8 +502,11 @@ func _pulse_action(action: String, definition: Dictionary, serial: int) -> void:
 		_show_action_frame(action, int(sequence[pulse % sequence.size()]))
 		var target := Vector2(0.985, 1.018) if pulse % 2 == 0 else Vector2(1.01, 0.99)
 		var tween := create_tween()
+		_action_tween = tween
 		tween.tween_property(self, "scale", target * _visual_size, frame_time)
 		await tween.finished
+		if _action_tween == tween:
+			_action_tween = null
 
 
 func _show_action_frame(action: String, frame: int) -> void:

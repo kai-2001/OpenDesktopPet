@@ -136,13 +136,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_left_press_pending = false
 		_dragging = false
 		pet.set_dragging(false)
-		if _is_stats_window_open():
-			call_deferred("_bring_stats_window_forward")
-		else:
-			_show_context_menu(Vector2i(event.position))
+		_show_context_menu(Vector2i(event.position))
 
 
 func _begin_drag(mouse: Vector2i) -> void:
+	if not _interrupt_autonomous_action():
+		return
 	_left_press_pending = false
 	_dragging = true
 	_last_drag_mouse = mouse
@@ -152,10 +151,16 @@ func _begin_drag(mouse: Vector2i) -> void:
 
 
 func _can_begin_drag() -> bool:
-	# PetVisual.set_dragging() deliberately cancels its current animation.
-	# PetState stays busy only for user-requested care actions whose result must
-	# settle, so those remain protected while autonomous animations can yield.
 	return not state.is_action_busy()
+
+
+func _interrupt_autonomous_action() -> bool:
+	if state.is_action_busy():
+		return false
+	if is_instance_valid(_auto_move_tween):
+		_auto_move_tween.kill()
+		_auto_move_tween = null
+	return pet.cancel_autonomous_action()
 
 
 func _notification(what: int) -> void:
@@ -616,11 +621,6 @@ func _build_stats_window() -> void:
 	content.add_child(action_grid)
 	content.add_child(HSeparator.new())
 
-	var hint := _new_label("詳細面板開啟時，角色右鍵選單暫停。\n關閉面板後會自動恢復。", 14, Color("#b9ced5"))
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.add_child(hint)
-
 	var close_button := Button.new()
 	close_button.text = "關閉詳細狀態"
 	close_button.custom_minimum_size.y = 42
@@ -1062,7 +1062,7 @@ func _open_character_packs_folder() -> void:
 
 
 func _run_care_action(id: int) -> void:
-	if state.is_action_busy() or pet.is_busy():
+	if state.is_action_busy() or not _interrupt_autonomous_action():
 		_say_dialogue("action_busy", "先等目前的動作完成～", 1.5)
 		return
 	match id:

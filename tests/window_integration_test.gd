@@ -55,6 +55,26 @@ func _init() -> void:
 	)
 	_assert_true(main.pet.contains_point(Vector2(140, 190)), "pet center is interactive")
 	_assert_true(not main.pet.contains_point(Vector2(5, 5)), "transparent corner is not interactive")
+	main.pet.play_action("pet")
+	await process_frame
+	_assert_true(
+		main.pet.is_busy() and main.pet._active_request_id == 0,
+		"autonomous action runs without a care request ID"
+	)
+	main._run_care_action(3)
+	await process_frame
+	_assert_true(
+		main.state.is_action_busy() and main.pet._active_request_id > 0,
+		"care action safely replaces an autonomous action with the same animation ID"
+	)
+	var care_interrupt_deadline := Time.get_ticks_msec() + 3000
+	while main.state.is_action_busy() \
+			and Time.get_ticks_msec() < care_interrupt_deadline:
+		await create_timer(0.05).timeout
+	_assert_true(
+		not main.state.is_action_busy(),
+		"care action completes after interrupting autonomous animation"
+	)
 	main.pet.play_action("move")
 	await process_frame
 	_assert_true(main.pet.is_busy(), "autonomous animation starts for drag interruption test")
@@ -176,6 +196,17 @@ func _init() -> void:
 	_assert_true(not main._stats_window.unresizable, "details window can be resized")
 	_assert_true(not main._stats_window.transient, "details window is an independent native window")
 	_assert_true(not main._stats_window.always_on_top, "details window behaves like a normal window")
+	var stats_open_right_click := InputEventMouseButton.new()
+	stats_open_right_click.button_index = MOUSE_BUTTON_RIGHT
+	stats_open_right_click.position = Vector2(140, 190)
+	stats_open_right_click.pressed = true
+	main._unhandled_input(stats_open_right_click)
+	await process_frame
+	_assert_true(
+		main.context_menu.visible,
+		"pet right-click menu remains available while details are open"
+	)
+	main.context_menu.hide()
 	_assert_true(
 		not main._character_tab_loaded,
 		"character packs are not scanned when the details window first opens"
