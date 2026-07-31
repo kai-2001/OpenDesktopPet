@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download Godot 4.6.3 and export templates
         shell: bash
@@ -25,8 +25,9 @@ jobs:
           GODOT_VERSION="4.6.3"
           GODOT_TAG="${GODOT_VERSION}-stable"
           GODOT_NAME="Godot_v${GODOT_VERSION}-stable"
-          RELEASE_BASE="https://github.com/godotengine/godot/releases/download/${GODOT_TAG}"
+          RELEASE_BASE="https://github.com/godotengine/godot-builds/releases/download/${GODOT_TAG}"
 
+          echo "Downloading Godot from ${RELEASE_BASE}"
           curl --fail --location --retry 3 \
             "${RELEASE_BASE}/${GODOT_NAME}_macos.universal.zip" \
             --output "$RUNNER_TEMP/godot.zip"
