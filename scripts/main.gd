@@ -6,6 +6,8 @@ const DEFAULT_STATS_SIZE := Vector2i(400, 720)
 const MIN_STATS_SIZE := Vector2i(360, 480)
 const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
+const DRAG_HOLD_THRESHOLD_MS := 140
+const DRAG_DISTANCE_THRESHOLD_PX := 3.0
 const AUTOSTART_REGISTRY_KEY := "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
 const AUTOSTART_VALUE_NAME := "Open Desktop Pet"
 const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
@@ -94,7 +96,8 @@ func _process(_delta: float) -> void:
 	_update_cursor(mouse)
 	if _left_press_pending and not _dragging:
 		var held_ms := Time.get_ticks_msec() - _left_press_started_ms
-		if (mouse.distance_to(_drag_origin) >= 6.0 or held_ms >= 220) \
+		if (mouse.distance_to(_drag_origin) >= DRAG_DISTANCE_THRESHOLD_PX \
+				or held_ms >= DRAG_HOLD_THRESHOLD_MS) \
 				and _can_begin_drag():
 			_begin_drag(mouse)
 	if not _dragging:
@@ -360,6 +363,7 @@ func _setup_context_menu() -> void:
 	context_menu.add_item("📊  開啟詳細面板", 6)
 	context_menu.add_item("🔎  角色縮小", 20)
 	context_menu.add_item("🔍  角色放大", 21)
+	context_menu.add_item("🏠  找回桌寵", 22)
 	context_menu.add_separator()
 	context_menu.add_item("❌  儲存並離開", 7)
 	context_menu.id_pressed.connect(_on_context_action)
@@ -416,6 +420,8 @@ func _on_context_action(id: int) -> void:
 		21:
 			state.change_visual_size(0.1)
 			_say_dialogue("size_larger", "放大一點點。", 2.0)
+		22:
+			_recover_pet()
 
 
 func _single_click_reaction() -> void:
@@ -1596,6 +1602,26 @@ func _place_bottom_right() -> void:
 	var screen := DisplayServer.window_get_current_screen()
 	if screen < 0:
 		screen = DisplayServer.get_primary_screen()
+	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
+	DisplayServer.window_set_position(Vector2i(
+		usable.end.x - ceili(visual_bounds.end.x) - 24,
+		usable.end.y - ceili(visual_bounds.end.y)
+	))
+
+
+func _recover_pet() -> void:
+	_left_press_pending = false
+	_dragging = false
+	pet.set_dragging(false)
+	if is_instance_valid(_auto_move_tween):
+		_auto_move_tween.kill()
+		_auto_move_tween = null
+		pet.cancel_roll()
+	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, true)
+	var screen := DisplayServer.get_primary_screen()
 	var usable := DisplayServer.screen_get_usable_rect(screen)
 	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
 	DisplayServer.window_set_position(Vector2i(
