@@ -10,6 +10,7 @@ signal action_result_available(request_id: int)
 const DEFAULT_SAVE_PATH := "user://profiles/default/save_v2.json"
 const SAVE_VERSION := 2
 const DECAY_INTERVAL_SECONDS := 600
+const COMPANION_CHECK_INTERVAL_SECONDS := 600
 const PET_REWARD_COOLDOWN_SECONDS := 600
 const WISH_DURATION_SECONDS := 900
 const FIRST_WISH_MIN_SECONDS := 30
@@ -28,6 +29,12 @@ const DEFAULT_DATA := {
 	"xp": 0,
 	"care": 0,
 	"affection": 0,
+	# 陪伴紀錄，每個角色分別保存。
+	"last_companion_date": "",
+	"companion_streak": 0,
+	"total_companion_days": 0,
+	"longest_companion_streak": 0,
+	"bond_progress": 0.0,
 	"last_seen": 0,
 	"last_decay_at": 0,
 	"wish_action": "",
@@ -42,6 +49,7 @@ const DEFAULT_DATA := {
 var data: Dictionary = DEFAULT_DATA.duplicate(true)
 var save_path := DEFAULT_SAVE_PATH
 var _clock_accumulator := 0.0
+var _companion_check_accumulator := 0.0
 var _action_busy := false
 var _next_request_id := 1
 var _action_results: Dictionary = {}
@@ -63,6 +71,7 @@ func configure_profile(character_id: String) -> void:
 	save_path = profile_save_path
 	data = DEFAULT_DATA.duplicate(true)
 	_clock_accumulator = 0.0
+	_companion_check_accumulator = 0.0
 	_action_busy = false
 	_action_results.clear()
 	_initialized = false
@@ -72,9 +81,17 @@ func configure_profile(character_id: String) -> void:
 func _initialize_if_needed() -> void:
 	if _initialized:
 		return
+
 	_initialized = true
 	load_state()
-	_apply_elapsed_decay(_now(), 48)
+
+	# Offline time is frozen by design: needs and bond progress resume from the
+	# saved values instead of simulating intervals while the app was closed.
+	data.last_decay_at = _now()
+
+	# 啟動程式或切換角色時，記錄今天的陪伴。
+	_update_companion_record()
+
 	_ensure_wish_schedule()
 	save_state()
 	emit_changed()
@@ -82,12 +99,28 @@ func _initialize_if_needed() -> void:
 
 func _process(delta: float) -> void:
 	_clock_accumulator += delta
+	_companion_check_accumulator += delta
+
 	if _clock_accumulator < 1.0:
 		return
+
 	_clock_accumulator = fmod(_clock_accumulator, 1.0)
+
+	var changed_by_companion := false
+
+	if _companion_check_accumulator >= COMPANION_CHECK_INTERVAL_SECONDS:
+		_companion_check_accumulator = fmod(
+			_companion_check_accumulator,
+			COMPANION_CHECK_INTERVAL_SECONDS
+		)
+		changed_by_companion = _update_companion_record()
+
 	var changed_by_decay := _apply_elapsed_decay(_now(), 48)
+
 	_update_wish()
-	if changed_by_decay:
+
+	# 只有數值衰減或陪伴日期真的改變時才存檔。
+	if changed_by_decay or changed_by_companion:
 		_commit()
 
 
@@ -118,52 +151,89 @@ func feed() -> void:
 	if _action_busy:
 		_request_message("action_busy", "先等目前的動作完成～")
 		return
-	if data.hunger >= 92.0:
+
+	if data.hunger >= 100.0:
 		_request_message("feed_full", "肚子已經很飽了，晚點再吃吧。")
 		return
+
 	if data.coins < 2:
 		_request_message("feed_no_coins", "需要 2 枚金幣，先去工作吧。")
 		return
+
 	var request_id := _begin_action("eat")
+
 	if request_id <= 0:
 		return
+
 	var played: bool = await _wait_for_action_result(request_id)
+
 	if not played:
 		_abort_action("feed_failed", "餵食動畫無法播放，沒有扣除金幣。")
 		return
+
+	var hunger_before := float(data.hunger)
+	var affection_reward := _care_affection_reward(hunger_before)
+
 	data.coins -= 2
-	data.hunger = _limit(data.hunger + 28.0)
-	data.mood = _limit(data.mood + 4.0)
+	data.hunger = _limit(hunger_before + 20.0)
+	data.mood = _limit(float(data.mood) + 4.0)
 	data.care += 1
-	_add_affection(1)
+
+	if affection_reward > 0:
+		_add_affection(affection_reward)
+
 	_add_xp(2)
-	_finish_action("feed_complete", "好吃！一下就吃光了！" + _complete_wish("feed"))
+
+	_finish_action(
+		"feed_complete",
+		"好吃！一下就吃光了！"
+		+ _complete_wish("feed")
+	)
 
 
 func water() -> void:
 	if _action_busy:
 		_request_message("action_busy", "先等目前的動作完成～")
 		return
-	if data.thirst >= 92.0:
+
+	if data.thirst >= 100.0:
 		_request_message("water_full", "現在不渴，晚點再喝吧。")
 		return
+
 	if data.coins < 1:
 		_request_message("water_no_coins", "需要 1 枚金幣，先去工作吧。")
 		return
+
 	var request_id := _begin_action("drink")
+
 	if request_id <= 0:
 		return
+
 	var played: bool = await _wait_for_action_result(request_id)
+
 	if not played:
 		_abort_action("water_failed", "喝水動畫無法播放，沒有扣除金幣。")
 		return
+
+	# 記錄喝水前的口渴度。
+	var thirst_before := float(data.thirst)
+	var affection_reward := _care_affection_reward(thirst_before)
+
 	data.coins -= 1
-	data.thirst = _limit(data.thirst + 30.0)
-	data.mood = _limit(data.mood + 2.0)
+	data.thirst = _limit(thirst_before + 25.0)
+	data.mood = _limit(float(data.mood) + 2.0)
 	data.care += 1
-	_add_affection(1)
+
+	if affection_reward > 0:
+		_add_affection(affection_reward)
+
 	_add_xp(1)
-	_finish_action("water_complete", "咕嚕咕嚕，好清爽！" + _complete_wish("water"))
+
+	_finish_action(
+		"water_complete",
+		"咕嚕咕嚕，好清爽！"
+		+ _complete_wish("water")
+	)
 
 
 func sleep() -> void:
@@ -183,39 +253,65 @@ func work() -> void:
 	if _action_busy:
 		_request_message("action_busy", "先等目前的動作完成～")
 		return
+
 	if data.energy < 18.0:
 		_request_message("work_tired", "太累了，先睡一下吧。")
 		return
+
 	if data.hunger < 8.0:
 		_request_message("work_hungry", "肚子太餓了，吃飽再工作吧。")
 		return
+
 	if data.thirst < 10.0:
 		_request_message("work_thirsty", "太渴了，喝水後再工作吧。")
 		return
+
 	var request_id := _begin_action("work")
+
 	if request_id <= 0:
 		return
+
 	var played: bool = await _wait_for_action_result(request_id)
+
 	if not played:
 		_abort_action("work_failed", "工作動畫無法播放，沒有結算獎勵。")
 		return
-	_apply_work_result()
-	_finish_action("work_complete", "工作完成！賺到 7 枚金幣。" + _complete_wish("work"))
+
+	var earned_coins := _apply_work_result()
+
+	_finish_action(
+		"work_complete",
+		"工作完成！\n賺取 %d 枚金幣。" % earned_coins
+		+ _complete_wish("work")
+	)
 
 
 func _apply_sleep_result() -> bool:
-	var recovered: bool = float(data.energy) < 100.0
-	data.energy = _limit(data.energy + 35.0)
-	data.mood = _limit(data.mood + 4.0)
+	var energy_before := float(data.energy)
+	var recovered := energy_before < 100.0
+	var affection_reward := _care_affection_reward(energy_before)
+
+	data.energy = _limit(energy_before + 35.0)
+	data.mood = _limit(float(data.mood) + 4.0)
+
+	if affection_reward > 0:
+		_add_affection(affection_reward)
+		_add_xp(1)
+
 	return recovered
 
 
-func _apply_work_result() -> void:
-	data.energy = _limit(data.energy - 18.0)
-	data.hunger = _limit(data.hunger - 8.0)
-	data.thirst = _limit(data.thirst - 10.0)
-	data.coins += 7
+func _apply_work_result() -> int:
+	var coin_reward := _work_coin_reward()
+
+	data.energy = _limit(float(data.energy) - 18.0)
+	data.hunger = _limit(float(data.hunger) - 8.0)
+	data.thirst = _limit(float(data.thirst) - 10.0)
+	data.coins += coin_reward
+
 	_add_xp(5)
+
+	return coin_reward
 
 
 func is_action_busy() -> bool:
@@ -433,8 +529,14 @@ func emit_changed() -> void:
 
 func get_snapshot() -> Dictionary:
 	var snapshot := data.duplicate(true)
+
 	snapshot.wish_text = wish_text()
 	snapshot.has_active_wish = has_active_wish()
+
+	# 提供給詳細面板與未來自主動畫使用。
+	snapshot.lowest_need = _lowest_need()
+	snapshot.condition_tier = _condition_tier()
+
 	return snapshot
 
 
@@ -442,6 +544,143 @@ func _commit() -> void:
 	save_state()
 	emit_changed()
 
+func _update_companion_record(date_override := "") -> bool:
+	# 使用電腦目前的本地日期，只比較年月日。
+	var today := (
+		date_override
+		if not date_override.is_empty()
+		else Time.get_date_string_from_system(false)
+	)
+	var last_date := String(
+		data.get("last_companion_date", "")
+	)
+
+	# 同一天已經記錄過，不重複增加。
+	if last_date == today:
+		return false
+
+	var today_number := _date_to_day_number(today)
+	var last_number := _date_to_day_number(last_date)
+
+	# 正常情況下今天一定有效；此判斷用來防止異常資料。
+	if today_number < 0:
+		return false
+
+	# 第一次陪伴，或舊日期資料無效。
+	if last_date.is_empty() or last_number < 0:
+		data.companion_streak = 1
+
+	# 上一次陪伴日期正好是昨天，延續連續紀錄。
+	elif today_number == last_number + 1:
+		data.companion_streak = (
+			maxi(int(data.companion_streak), 0) + 1
+		)
+
+	# 中間漏了一天以上，連續陪伴重新從 1 開始。
+	elif today_number > last_number + 1:
+		data.companion_streak = 1
+
+	# 系統日期被調回過去時，不覆蓋原本紀錄。
+	else:
+		return false
+
+	data.total_companion_days = (
+		maxi(int(data.total_companion_days), 0) + 1
+	)
+
+	data.longest_companion_streak = maxi(
+		int(data.longest_companion_streak),
+		int(data.companion_streak)
+	)
+
+	data.last_companion_date = today
+
+	return true
+
+
+func _date_to_day_number(date_string: String) -> int:
+	if date_string.is_empty():
+		return -1
+
+	var parts := date_string.split("-")
+
+	if parts.size() != 3:
+		return -1
+
+	# 將 YYYY-MM-DD 換算成日序號，正確處理跨月、跨年及閏年。
+	var unix_time := Time.get_unix_time_from_datetime_string(
+		date_string
+	)
+
+	return int(unix_time / 86400.0)
+
+func _lowest_need() -> float:
+	return minf(
+		float(data.hunger),
+		minf(
+			float(data.thirst),
+			float(data.energy)
+		)
+	)
+
+
+func _condition_tier() -> int:
+	var lowest := _lowest_need()
+
+	if lowest < 20.0:
+		return 0 # 危急
+
+	if lowest < 50.0:
+		return 1 # 不佳
+
+	if lowest < 80.0:
+		return 2 # 正常
+
+	return 3 # 良好
+
+
+func _care_affection_reward(value_before: float) -> int:
+	if value_before < 25.0:
+		return 2
+
+	if value_before < 70.0:
+		return 1
+
+	return 0
+
+
+func _apply_bond_progress() -> void:
+	match _condition_tier():
+		3:
+			# 三項需求都至少 80，每 10 分鐘累積 1 點。
+			data.bond_progress = float(data.bond_progress) + 1.0
+
+		2:
+			# 最低需求介於 50～79，每 10 分鐘累積 0.5 點。
+			data.bond_progress = float(data.bond_progress) + 0.5
+
+		_:
+			# 狀態不佳或危急時，不會自動增加親密度。
+			pass
+
+	while float(data.bond_progress) >= 12.0:
+		data.bond_progress = float(data.bond_progress) - 12.0
+		_add_affection(1)
+
+
+func _work_coin_reward() -> int:
+	# 體力占工作效率 60%，心情占 40%。
+	var efficiency := (
+		float(data.energy) * 0.6
+		+ float(data.mood) * 0.4
+	) / 100.0
+
+	# 工作收入最低 5 枚、最高 9 枚。
+	return clampi(
+		roundi(5.0 + efficiency * 4.0),
+		5,
+		9
+	)
 
 func _add_affection(amount: int) -> void:
 	data.affection = clampi(int(data.affection) + amount, 0, 100)
@@ -463,39 +702,126 @@ func change_visual_size(delta: float) -> void:
 
 func _apply_elapsed_decay(now: int, maximum_intervals: int) -> bool:
 	var last_decay := int(data.get("last_decay_at", 0))
-	if last_decay <= 0:
-		last_decay = int(data.get("last_seen", 0))
+
 	if last_decay <= 0 or last_decay > now:
 		data.last_decay_at = now
 		return false
-	var available_intervals := int((now - last_decay) / float(DECAY_INTERVAL_SECONDS))
-	var intervals: int = mini(available_intervals, maximum_intervals)
+
+	var available_intervals := int(
+		(now - last_decay) / float(DECAY_INTERVAL_SECONDS)
+	)
+
+	var intervals: int = mini(
+		available_intervals,
+		maximum_intervals
+	)
+
 	if intervals <= 0:
 		return false
+
 	for _interval in intervals:
+		# 每 10 分鐘的自然衰減。
 		data.hunger = _limit(float(data.hunger) - 2.0)
 		data.thirst = _limit(float(data.thirst) - 3.0)
-		if float(data.hunger) < 25.0 or float(data.thirst) < 25.0:
+		data.energy = _limit(float(data.energy) - 0.5)
+
+		var lowest := _lowest_need()
+
+		# 至少一項需求嚴重不足。
+		if lowest < 20.0:
 			data.mood = _limit(float(data.mood) - 2.0)
-	data.last_decay_at = now if available_intervals > maximum_intervals \
+
+		# 至少一項需求不佳。
+		elif lowest < 50.0:
+			data.mood = _limit(float(data.mood) - 1.0)
+
+		# 根據整體照顧狀態累積親密成長。
+		_apply_bond_progress()
+
+	data.last_decay_at = (
+		now
+		if available_intervals > maximum_intervals
 		else last_decay + intervals * DECAY_INTERVAL_SECONDS
+	)
+
 	return true
 
 
 func _normalize_loaded_data() -> void:
-	for key: String in ["hunger", "thirst", "energy", "mood", "affection"]:
+	for key: String in [
+		"hunger",
+		"thirst",
+		"energy",
+		"mood",
+		"affection"
+	]:
 		data[key] = _limit(float(data.get(key, 0.0)))
+
+	data.bond_progress = clampf(
+		float(data.get("bond_progress", 0.0)),
+		0.0,
+		11.999
+	)
+
+	# 陪伴紀錄相容舊存檔。
+	data.last_companion_date = String(
+		data.get("last_companion_date", "")
+	)
+
+	data.companion_streak = maxi(
+		int(data.get("companion_streak", 0)),
+		0
+	)
+
+	data.total_companion_days = maxi(
+		int(data.get("total_companion_days", 0)),
+		data.companion_streak
+	)
+
+	data.longest_companion_streak = maxi(
+		int(data.get("longest_companion_streak", 0)),
+		data.companion_streak
+	)
+
+	# 日期內容損壞時，清除日期，下一次載入會重新開始記錄。
+	if (
+		not data.last_companion_date.is_empty()
+		and _date_to_day_number(data.last_companion_date) < 0
+	):
+		data.last_companion_date = ""
+		data.companion_streak = 0
+
 	data.coins = maxi(int(data.coins), 0)
 	data.level = maxi(int(data.level), 1)
 	data.xp = maxi(int(data.xp), 0)
 	data.care = maxi(int(data.care), 0)
-	data.visual_scale = clampf(float(data.visual_scale), 0.7, 1.15)
+
+	data.visual_scale = clampf(
+		float(data.visual_scale),
+		0.7,
+		1.15
+	)
+
 	for key: String in [
-		"last_seen", "last_decay_at", "wish_expires_at", "next_wish_at",
+		"last_seen",
+		"last_decay_at",
+		"wish_expires_at",
+		"next_wish_at",
 		"last_pet_reward_at"
 	]:
-		data[key] = maxi(int(data.get(key, 0)), 0)
-	if String(data.wish_action) not in ["", "feed", "water", "pet", "sleep", "work"]:
+		data[key] = maxi(
+			int(data.get(key, 0)),
+			0
+		)
+
+	if String(data.wish_action) not in [
+		"",
+		"feed",
+		"water",
+		"pet",
+		"sleep",
+		"work"
+	]:
 		data.wish_action = ""
 		data.wish_expires_at = 0
 

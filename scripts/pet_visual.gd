@@ -433,6 +433,20 @@ func get_character_version() -> String:
 	return String(_manifest.get("version", "1.0.0"))
 
 
+func get_drag_anchor() -> Variant:
+	var anchor: Variant = _manifest.get("drag_anchor", null)
+	if anchor is not Array or anchor.size() < 2:
+		return null
+	if anchor[0] is not float and anchor[0] is not int:
+		return null
+	if anchor[1] is not float and anchor[1] is not int:
+		return null
+	var result := Vector2(float(anchor[0]), float(anchor[1]))
+	if not is_finite(result.x) or not is_finite(result.y):
+		return null
+	return result
+
+
 func get_pack_root() -> String:
 	return _pack_root
 

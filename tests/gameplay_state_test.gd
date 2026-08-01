@@ -82,8 +82,29 @@ func _init() -> void:
 		PetVisualScript.PUBLIC_PACK_ROOT,
 		"public default character root"
 	)
+	_assert_equal(
+		default_visual.get_drag_anchor(),
+		Vector2(140.0, 128.0),
+		"public gecko defines a stable drag anchor"
+	)
+	var anchorless_visual := PetVisualScript.new()
+	anchorless_visual._manifest = {}
+	_assert_equal(
+		anchorless_visual.get_drag_anchor(),
+		null,
+		"character packs without a drag anchor preserve the pressed point"
+	)
+	anchorless_visual._manifest.drag_anchor = ["invalid", 20]
+	_assert_equal(
+		anchorless_visual.get_drag_anchor(),
+		null,
+		"invalid optional drag anchors safely fall back to the pressed point"
+	)
+	anchorless_visual.free()
 	default_visual.free()
 	_test_character_pack_lifecycle()
+	_test_companion_and_progression_rules(state)
+	await _test_offline_freeze()
 
 	state.data.hunger = 80.0
 	state.data.thirst = 80.0
@@ -112,7 +133,7 @@ func _init() -> void:
 	var feed_elapsed := Time.get_ticks_msec() - feed_started
 	_assert_true(feed_elapsed >= 1150, "feed must wait for the real visual animation")
 	_assert_equal(state.data.coins, 18, "successful feed coin cost")
-	_assert_equal(state.data.hunger, 78.0, "successful feed result")
+	_assert_equal(state.data.hunger, 70.0, "successful feed result")
 	_assert_true(not state.is_action_busy(), "state must unlock after visual completion")
 	_assert_true(not visual.is_busy(), "visual must be idle after completion")
 
@@ -193,6 +214,135 @@ func _init() -> void:
 	else:
 		print("GAMEPLAY_STATE_TEST_OK")
 		quit(0)
+
+
+func _test_companion_and_progression_rules(state: Node) -> void:
+	state.data.last_companion_date = ""
+	state.data.companion_streak = 0
+	state.data.total_companion_days = 0
+	state.data.longest_companion_streak = 0
+	_assert_true(
+		state._update_companion_record("2028-02-28"),
+		"first companion date creates a record"
+	)
+	_assert_equal(state.data.companion_streak, 1, "first companion streak day")
+	_assert_true(
+		not state._update_companion_record("2028-02-28"),
+		"the same date is never counted twice"
+	)
+	_assert_equal(state.data.total_companion_days, 1, "same-day companion total remains stable")
+	_assert_true(
+		state._update_companion_record("2028-02-29"),
+		"leap day continues the companion streak"
+	)
+	_assert_true(
+		state._update_companion_record("2028-03-01"),
+		"month boundary continues the companion streak"
+	)
+	_assert_equal(state.data.companion_streak, 3, "leap-day streak reaches three days")
+	_assert_equal(state.data.longest_companion_streak, 3, "longest streak is retained")
+	_assert_true(
+		state._update_companion_record("2028-03-03"),
+		"a missed day starts a new companion streak"
+	)
+	_assert_equal(state.data.companion_streak, 1, "missed day resets current streak")
+	_assert_equal(state.data.total_companion_days, 4, "distinct companion dates increment total")
+	_assert_true(
+		not state._update_companion_record("2028-03-02"),
+		"moving the system date backwards does not overwrite the record"
+	)
+	_assert_equal(state.data.last_companion_date, "2028-03-03", "backdated record is ignored")
+
+	_assert_equal(state._care_affection_reward(24.9), 2, "critical care grants two affection")
+	_assert_equal(state._care_affection_reward(25.0), 1, "medium care grants one affection")
+	_assert_equal(state._care_affection_reward(69.9), 1, "care reward upper middle boundary")
+	_assert_equal(state._care_affection_reward(70.0), 0, "healthy care grants no affection")
+
+	state.data.energy = 0.0
+	state.data.mood = 0.0
+	_assert_equal(state._work_coin_reward(), 5, "work reward has a five-coin floor")
+	state.data.energy = 100.0
+	state.data.mood = 100.0
+	_assert_equal(state._work_coin_reward(), 9, "work reward has a nine-coin ceiling")
+	state.data.energy = 50.0
+	state.data.mood = 50.0
+	_assert_equal(state._work_coin_reward(), 7, "average condition earns seven coins")
+
+	state.data.hunger = 80.0
+	state.data.thirst = 80.0
+	state.data.energy = 80.0
+	state.data.bond_progress = 11.0
+	state.data.affection = 0
+	state._apply_bond_progress()
+	_assert_equal(state.data.bond_progress, 0.0, "good condition converts twelve bond points")
+	_assert_equal(state.data.affection, 1, "bond conversion grants affection")
+	state.data.hunger = 50.0
+	state.data.thirst = 80.0
+	state.data.energy = 80.0
+	state.data.bond_progress = 11.5
+	state._apply_bond_progress()
+	_assert_equal(state.data.bond_progress, 0.0, "normal condition adds half a bond point")
+	_assert_equal(state.data.affection, 2, "half-point bond conversion grants affection")
+	state.data.affection = 100
+	state._add_affection(2)
+	_assert_equal(state.data.affection, 100, "affection remains capped at one hundred")
+
+	state.data.erase("last_companion_date")
+	state.data.erase("companion_streak")
+	state.data.erase("total_companion_days")
+	state.data.erase("longest_companion_streak")
+	state.data.erase("bond_progress")
+	state._normalize_loaded_data()
+	_assert_equal(state.data.last_companion_date, "", "old saves receive an empty companion date")
+	_assert_equal(state.data.companion_streak, 0, "old saves receive a zero companion streak")
+	_assert_equal(state.data.total_companion_days, 0, "old saves receive a zero companion total")
+	_assert_equal(state.data.longest_companion_streak, 0, "old saves receive a zero longest streak")
+	_assert_equal(state.data.bond_progress, 0.0, "old saves receive zero bond progress")
+
+
+func _test_offline_freeze() -> void:
+	const OFFLINE_SAVE_PATH := "user://test_runs/offline_freeze.json"
+	for suffix: String in ["", ".tmp", ".backup"]:
+		var cleanup_path := OFFLINE_SAVE_PATH + suffix
+		if FileAccess.file_exists(cleanup_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(cleanup_path))
+	var frozen_data: Dictionary = PetStateScript.DEFAULT_DATA.duplicate(true)
+	var old_timestamp := int(Time.get_unix_time_from_system()) - 86400
+	frozen_data.hunger = 42.0
+	frozen_data.thirst = 43.0
+	frozen_data.energy = 44.0
+	frozen_data.mood = 45.0
+	frozen_data.affection = 12
+	frozen_data.bond_progress = 7.5
+	frozen_data.last_decay_at = old_timestamp
+	frozen_data.last_companion_date = Time.get_date_string_from_system(false)
+	var file := FileAccess.open(OFFLINE_SAVE_PATH, FileAccess.WRITE)
+	_assert_true(file != null, "offline freeze fixture can be written")
+	if file == null:
+		return
+	file.store_string(JSON.stringify(frozen_data))
+	file.close()
+	var frozen_state := PetStateScript.new()
+	frozen_state.save_path = OFFLINE_SAVE_PATH
+	root.add_child(frozen_state)
+	await process_frame
+	await process_frame
+	_assert_equal(frozen_state.data.hunger, 42.0, "offline time does not decay hunger")
+	_assert_equal(frozen_state.data.thirst, 43.0, "offline time does not decay thirst")
+	_assert_equal(frozen_state.data.energy, 44.0, "offline time does not decay energy")
+	_assert_equal(frozen_state.data.mood, 45.0, "offline time does not decay mood")
+	_assert_equal(frozen_state.data.affection, 12, "offline time does not grant affection")
+	_assert_equal(frozen_state.data.bond_progress, 7.5, "offline time freezes bond progress")
+	_assert_true(
+		int(frozen_state.data.last_decay_at) > old_timestamp,
+		"resuming resets the live decay clock"
+	)
+	frozen_state.queue_free()
+	await process_frame
+	for suffix: String in ["", ".tmp", ".backup"]:
+		var cleanup_path := OFFLINE_SAVE_PATH + suffix
+		if FileAccess.file_exists(cleanup_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(cleanup_path))
 
 
 func _test_frame_viewport_containment(visual: Node2D) -> void:

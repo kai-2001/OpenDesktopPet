@@ -53,6 +53,7 @@ PinkGirl.petpack
 - `version`：顯示用角色包版本，建議採`主版.次版.修正版`。
 - `preview`：選填的小型預覽圖，建議不超過256×256。
 - `scale`：角色顯示比例。
+- `drag_anchor`：選填的拖曳抓取點 `[x, y]`，使用角色視窗座標；未設定或格式錯誤時，保留使用者實際按下的位置。
 - `source_facing`：原圖面向，可使用`left`或`right`。
 - `fallback_action`：缺少選填動作時使用的替代動作。
 

@@ -4,6 +4,7 @@
   "name": "莓角守宮",
   "version": "2.0.0",
   "scale": 0.31,
+  "drag_anchor": [140.0, 128.0],
   "source_facing": "left",
   "fallback_action": "idle",
   "interactions": {
@@ -22,7 +23,7 @@
     "water_complete": "舔舔舔，好清爽！",
     "sleep_recovered": "呼……尾巴捲好就能安心睡。",
     "sleep_full": "雖然很有精神，還是舒服地瞇了一會。",
-    "work_complete": "狩獵成功！帶回了 7 枚金幣。",
+    "work_complete": "狩獵成功！",
     "pet_rewarded": "角角也要輕輕摸！",
     "pet_cooldown": "很舒服，不過先讓我休息一下～",
     "action_unlocked": "學會了新的動作：{action}！"
@@ -90,8 +91,8 @@
       "rows": 1,
       "sequence": [0],
       "frame_time": 0.16,
-      "scale": 0.16,
-      "offsets": [[3.0, 16.0]]
+      "scale": 0.18,
+      "offsets": [[0.0, 0.0]]
     },
     "work": {
       "file": "animations/work.png",
