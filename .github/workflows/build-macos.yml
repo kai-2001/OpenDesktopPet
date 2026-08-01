@@ -65,7 +65,7 @@ jobs:
           export_filter="all_resources"
           include_filter="characters/public/pet.json,characters/public/animations/*.png"
           exclude_filter="characters/custom/*,private_pets/*,素材/*,tests/*,examples/*,docs/*,build/*,scripts/rig_validation.gd"
-          export_path="build/public/OpenDesktopPet-v0.1.0-macOS.zip"
+          export_path="build/public/OpenDesktopPet-v0.2.0-macOS.zip"
           patches=PackedStringArray()
           encryption_include_filters=""
           encryption_exclude_filters=""
@@ -83,8 +83,8 @@ jobs:
           application/bundle_identifier="io.github.kai2001.opendesktoppet"
           application/signature=""
           application/app_category="Games"
-          application/short_version="0.1.0"
-          application/version="0.1.0"
+          application/short_version="0.2.0"
+          application/version="0.2.0"
           application/icon="res://assets/branding/birthmark_app_icon.png"
           display/high_res=true
           codesign/codesign=1
@@ -129,8 +129,8 @@ jobs:
           mkdir -p build/public
           "$GODOT_BIN" --headless --path "$GITHUB_WORKSPACE" \
             --export-release "macOS Public" \
-            "build/public/OpenDesktopPet-v0.1.0-macOS.zip"
-          test -s "build/public/OpenDesktopPet-v0.1.0-macOS.zip"
+            "build/public/OpenDesktopPet-v0.2.0-macOS.zip"
+          test -s "build/public/OpenDesktopPet-v0.2.0-macOS.zip"
 
       - name: Verify app bundle
         shell: bash
@@ -138,7 +138,7 @@ jobs:
           set -euo pipefail
           VERIFY_DIR="$RUNNER_TEMP/verify-macos"
           mkdir -p "$VERIFY_DIR"
-          ditto -x -k "build/public/OpenDesktopPet-v0.1.0-macOS.zip" "$VERIFY_DIR"
+          ditto -x -k "build/public/OpenDesktopPet-v0.2.0-macOS.zip" "$VERIFY_DIR"
           APP_PATH="$(find "$VERIFY_DIR" -maxdepth 2 -name '*.app' -type d | head -n 1)"
           test -n "$APP_PATH"
           EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PATH/Contents/Info.plist")"
@@ -153,7 +153,7 @@ jobs:
       - name: Upload macOS build
         uses: actions/upload-artifact@v4
         with:
-          name: OpenDesktopPet-v0.1.0-macOS
-          path: build/public/OpenDesktopPet-v0.1.0-macOS.zip
+          name: OpenDesktopPet-v0.2.0-macOS
+          path: build/public/OpenDesktopPet-v0.2.0-macOS.zip
           if-no-files-found: error
           retention-days: 14
