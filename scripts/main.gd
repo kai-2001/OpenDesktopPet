@@ -6,8 +6,7 @@ const DEFAULT_STATS_SIZE := Vector2i(500, 620)
 const MIN_STATS_SIZE := Vector2i(360, 480)
 const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
-const DRAG_HOLD_THRESHOLD_MS := 140
-const DRAG_DISTANCE_THRESHOLD_PX := 3.0
+const DRAG_DISTANCE_THRESHOLD_PX := 1.0
 const AUTOSTART_REGISTRY_KEY := "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
 const AUTOSTART_VALUE_NAME := "Open Desktop Pet"
 const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
@@ -19,12 +18,15 @@ const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 @onready var bubble_tail: Polygon2D = $SpeechTail
 @onready var context_menu: PopupMenu = $ContextMenu
 var _stats_window: Window
+var _stats_tabs: TabContainer
+var _stats_tab_buttons: Array[Button] = []
 var _stats_status: Label
 var _companion_status: Label
 var _wish_status: Label
 var _unlock_status: Label
 var _last_message_status: Label
 var _fps_option_button: OptionButton
+var _details_theme_option_button: OptionButton
 var _autostart_check_box: CheckBox
 var _settings_feedback: Label
 var _character_list: ItemList
@@ -45,7 +47,6 @@ var _autostart_operation_serial := 0
 var _latest_autostart_operation_id := 0
 var _dragging := false
 var _left_press_pending := false
-var _left_press_started_ms := 0
 var _drag_offset := Vector2i.ZERO
 var _drag_origin := Vector2i.ZERO
 var _bubble_token := 0
@@ -62,6 +63,7 @@ var _pet_interaction_polygon := PackedVector2Array()
 var _cursor_shape := Input.CURSOR_ARROW
 var _status_indicator: StatusIndicator
 var _tray_exit_menu: PopupMenu
+var _details_theme_mode := "light"
 
 
 func _ready() -> void:
@@ -86,6 +88,12 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_restore_from_system_minimize()
+	# A drag pose can replace the native window's shaped hit region. If Windows
+	# drops the release event during that transition, reconcile against the
+	# physical button state so the pet can never remain attached to the cursor.
+	if (_dragging or _left_press_pending) \
+			and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_finish_left_press()
 	var mouse := DisplayServer.mouse_get_position()
 	if mouse.distance_to(_last_global_mouse) > 1.0:
 		_last_user_activity_ms = Time.get_ticks_msec()
@@ -95,24 +103,31 @@ func _process(_delta: float) -> void:
 			pet.cancel_roll()
 	_last_global_mouse = mouse
 	_update_cursor(mouse)
-	if _left_press_pending and not _dragging:
-		var held_ms := Time.get_ticks_msec() - _left_press_started_ms
-		if (mouse.distance_to(_drag_origin) >= DRAG_DISTANCE_THRESHOLD_PX \
-				or held_ms >= DRAG_HOLD_THRESHOLD_MS) \
-				and _can_begin_drag():
-			_begin_drag(mouse)
-	if not _dragging:
-		return
+	# Mouse events are routed to whichever native Godot window is under the
+	# cursor. Keep an active drag following the global cursor when it crosses
+	# over the separate details window (or another application window).
+	if _dragging and mouse != _last_drag_mouse:
+		_update_drag_position(mouse)
+
+
+func _update_drag_position(mouse: Vector2i) -> void:
 	if mouse.distance_to(_last_drag_mouse) > 1.0:
 		pet.set_facing_direction(1 if mouse.x > _last_drag_mouse.x else -1)
 		pet.set_drag_motion(true)
 	else:
 		pet.set_drag_motion(false)
 	_last_drag_mouse = mouse
-	DisplayServer.window_set_position(_clamp_window_position(mouse - _drag_offset))
+	# Keep the pickup point under the cursor for the entire drag. Clamping here
+	# can separate the cursor from the shaped transparent window at a screen
+	# edge, causing Windows to deliver the eventual release somewhere else.
+	# The restored idle pose is clamped once the button is released instead.
+	DisplayServer.window_set_position(mouse - _drag_offset)
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_handle_drag_mouse_motion(DisplayServer.mouse_get_position())
+		return
 	if event is not InputEventMouseButton:
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
@@ -124,24 +139,35 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.pressed:
 			_left_press_pending = true
-			_left_press_started_ms = Time.get_ticks_msec()
 			_drag_origin = DisplayServer.mouse_get_position()
 			_last_drag_mouse = _drag_origin
 			_drag_offset = _drag_origin - DisplayServer.window_get_position()
 		else:
-			var was_dragging := _dragging
-			_left_press_pending = false
-			if was_dragging:
-				_dragging = false
-				pet.set_dragging(false)
-				_set_cursor_shape(Input.CURSOR_POINTING_HAND)
-			else:
-				_single_click_reaction()
+			_finish_left_press()
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		_left_press_pending = false
 		_dragging = false
 		pet.set_dragging(false)
 		_show_context_menu(Vector2i(event.position))
+
+
+func _handle_drag_mouse_motion(mouse: Vector2i) -> void:
+	if _left_press_pending \
+			and not _dragging \
+			and mouse.distance_to(_drag_origin) >= DRAG_DISTANCE_THRESHOLD_PX \
+			and _can_begin_drag():
+		_begin_drag(mouse)
+	if _dragging:
+		_update_drag_position(mouse)
+
+
+func _on_stats_window_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_handle_drag_mouse_motion(DisplayServer.mouse_get_position())
+	elif event is InputEventMouseButton \
+			and event.button_index == MOUSE_BUTTON_LEFT \
+			and not event.pressed:
+		_finish_left_press()
 
 
 func _begin_drag(mouse: Vector2i) -> void:
@@ -162,11 +188,52 @@ func _begin_drag(mouse: Vector2i) -> void:
 		)
 		# A character-defined anchor gives its drag pose a consistent pickup
 		# point. Packs without one retain the exact point the user pressed.
-		DisplayServer.window_set_position(
-			_clamp_window_position(mouse - _drag_offset)
-		)
+		DisplayServer.window_set_position(mouse - _drag_offset)
 
 	_set_cursor_shape(Input.CURSOR_DRAG)
+	_refresh_interaction_polygon()
+
+
+func _finish_left_press() -> void:
+	if not _left_press_pending and not _dragging:
+		return
+	var was_dragging := _dragging
+	_left_press_pending = false
+	_dragging = false
+	if was_dragging:
+		var window_position := DisplayServer.window_get_position()
+		var window_size := DisplayServer.window_get_size()
+		var screen := DisplayServer.get_screen_from_rect(
+			Rect2i(window_position, window_size)
+		)
+		if screen < 0:
+			screen = DisplayServer.get_primary_screen()
+		var usable := DisplayServer.screen_get_usable_rect(screen)
+		var drag_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
+		var was_at_bottom := absf(
+			float(window_position.y) + drag_bounds.end.y - float(usable.end.y)
+		) <= 2.0
+		pet.set_dragging(false)
+		# Native transparent-window geometry settles after the drag frame is
+		# replaced. Preserve contact with the taskbar when drag and idle poses
+		# have different visible heights.
+		call_deferred("_settle_drag_release", screen, was_at_bottom)
+		_set_cursor_shape(Input.CURSOR_POINTING_HAND)
+	else:
+		_single_click_reaction()
+	_refresh_interaction_polygon()
+
+
+func _settle_drag_release(screen: int, preserve_bottom_contact: bool) -> void:
+	await get_tree().process_frame
+	if _dragging or _left_press_pending:
+		return
+	var requested := DisplayServer.window_get_position()
+	if preserve_bottom_contact:
+		var usable := DisplayServer.screen_get_usable_rect(screen)
+		var idle_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
+		requested.y = usable.end.y - ceili(idle_bounds.end.y)
+	DisplayServer.window_set_position(_clamp_window_position(requested))
 
 
 func _can_begin_drag() -> bool:
@@ -530,40 +597,54 @@ func _build_stats_window() -> void:
 	_stats_window.always_on_top = false
 	_stats_window.visible = false
 	_stats_window.close_requested.connect(_destroy_stats_window)
+	_stats_window.window_input.connect(_on_stats_window_input)
 	add_child(_stats_window)
 
 	var panel := PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.theme = _create_details_theme()
 	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color("#14242d")
-	panel_style.border_color = Color("#55b6cc")
-	panel_style.set_border_width_all(2)
-	panel_style.set_corner_radius_all(14)
+	panel_style.bg_color = _details_color("#f7f8f9", "#181818")
+	panel_style.border_color = _details_color("#dce3e6", "#333333")
+	panel_style.set_border_width_all(1)
+	panel_style.set_corner_radius_all(12)
 	panel.add_theme_stylebox_override("panel", panel_style)
 	_stats_window.add_child(panel)
 
+	var root_layout := VBoxContainer.new()
+	root_layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root_layout.add_theme_constant_override("separation", 0)
+	panel.add_child(root_layout)
+
+	var navigation_margin := MarginContainer.new()
+	navigation_margin.add_theme_constant_override("margin_left", 14)
+	navigation_margin.add_theme_constant_override("margin_top", 10)
+	navigation_margin.add_theme_constant_override("margin_right", 14)
+	navigation_margin.add_theme_constant_override("margin_bottom", 8)
+	root_layout.add_child(navigation_margin)
+	var navigation := HBoxContainer.new()
+	navigation.add_theme_constant_override("separation", 8)
+	navigation_margin.add_child(navigation)
+	_stats_tab_buttons.clear()
+	for tab_index: int in 3:
+		var navigation_button := Button.new()
+		navigation_button.text = ["狀態", "設定", "角色"][tab_index]
+		navigation_button.custom_minimum_size.y = 40
+		navigation_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		navigation_button.focus_mode = Control.FOCUS_NONE
+		navigation_button.pressed.connect(
+			Callable(self, "_select_stats_tab").bind(tab_index)
+		)
+		navigation.add_child(navigation_button)
+		_stats_tab_buttons.append(navigation_button)
+
 	var tabs := TabContainer.new()
-	tabs.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var tab_bar := tabs.get_tab_bar()
-	tab_bar.add_theme_font_size_override("font_size", 16)
-	tab_bar.add_theme_constant_override("h_separation", 6)
-	var selected_tab_style := StyleBoxFlat.new()
-	selected_tab_style.bg_color = Color("#203c48")
-	selected_tab_style.border_color = Color("#55c8e5")
-	selected_tab_style.border_width_top = 2
-	selected_tab_style.content_margin_left = 18
-	selected_tab_style.content_margin_right = 18
-	selected_tab_style.content_margin_top = 9
-	selected_tab_style.content_margin_bottom = 9
-	var unselected_tab_style := selected_tab_style.duplicate() as StyleBoxFlat
-	unselected_tab_style.bg_color = Color("#101a1f")
-	unselected_tab_style.border_color = Color("#263b44")
-	var hovered_tab_style := selected_tab_style.duplicate() as StyleBoxFlat
-	hovered_tab_style.bg_color = Color("#284b59")
-	tab_bar.add_theme_stylebox_override("tab_selected", selected_tab_style)
-	tab_bar.add_theme_stylebox_override("tab_unselected", unselected_tab_style)
-	tab_bar.add_theme_stylebox_override("tab_hovered", hovered_tab_style)
-	panel.add_child(tabs)
+	_stats_tabs = tabs
+	tabs.theme = panel.theme
+	tabs.tabs_visible = false
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root_layout.add_child(tabs)
 
 	var scroll := ScrollContainer.new()
 	scroll.name = "狀態"
@@ -574,27 +655,27 @@ func _build_stats_window() -> void:
 	var margin := MarginContainer.new()
 	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	margin.add_theme_constant_override("margin_left", 24)
-	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_top", 14)
 	margin.add_theme_constant_override("margin_right", 24)
-	margin.add_theme_constant_override("margin_bottom", 20)
+	margin.add_theme_constant_override("margin_bottom", 14)
 	scroll.add_child(margin)
 
 	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 12)
+	content.add_theme_constant_override("separation", 10)
 	margin.add_child(content)
 
-	var title := _new_label("養成狀態", 24, Color("#e9fbff"))
+	var title := _new_label("養成狀態", 24, _details_color("#20272b", "#f0f0f0"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(title)
 
-	_stats_status = _new_label("", 15, Color("#8ed9e8"))
+	_stats_status = _new_label("", 15, _details_color("#238b9d", "#4fc1ff"))
 	_stats_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(_stats_status)
 
 	_companion_status = _new_label(
 		"",
 		14,
-		Color("#c5a3ff")
+		_details_color("#6f65a8", "#c8a7ff")
 	)
 	_companion_status.horizontal_alignment = (
 		HORIZONTAL_ALIGNMENT_CENTER
@@ -604,30 +685,30 @@ func _build_stats_window() -> void:
 	)
 	content.add_child(_companion_status)
 
-	_wish_status = _new_label("", 15, Color("#ffd98e"))
+	_wish_status = _new_label("", 15, _details_color("#a66b16", "#dcdcaa"))
 	_wish_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_wish_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(_wish_status)
 
 	content.add_child(HSeparator.new())
-	_add_stat_row(content, "飽食", "hunger", Color("#ffbd69"))
-	_add_stat_row(content, "水分", "thirst", Color("#65c9ff"))
-	_add_stat_row(content, "體力", "energy", Color("#8de28d"))
-	_add_stat_row(content, "心情", "mood", Color("#ff91bd"))
-	_add_stat_row(content, "親密", "affection", Color("#c5a3ff"))
+	_add_stat_row(content, "飽食", "hunger", Color("#efa64a"))
+	_add_stat_row(content, "水分", "thirst", Color("#55b7df"))
+	_add_stat_row(content, "體力", "energy", Color("#69c986"))
+	_add_stat_row(content, "心情", "mood", Color("#e97ca6"))
+	_add_stat_row(content, "親密", "affection", Color("#9a83d2"))
 
-	_unlock_status = _new_label("", 14, Color("#c5a3ff"))
+	_unlock_status = _new_label("", 14, _details_color("#6f65a8", "#c8a7ff"))
 	_unlock_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_unlock_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(_unlock_status)
 
-	_last_message_status = _new_label("最近訊息：%s" % _last_state_message, 13, Color("#b9ced5"))
+	_last_message_status = _new_label("最近訊息：%s" % _last_state_message, 13, _details_color("#68747a", "#9da1a6"))
 	_last_message_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_last_message_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(_last_message_status)
 	content.add_child(HSeparator.new())
 
-	var action_title := _new_label("照顧操作", 16, Color("#e9fbff"))
+	var action_title := _new_label("照顧操作", 16, _details_color("#30383c", "#d4d4d4"))
 	action_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(action_title)
 
@@ -658,7 +739,7 @@ func _build_stats_window() -> void:
 
 	var close_button := Button.new()
 	close_button.text = "關閉詳細狀態"
-	close_button.custom_minimum_size.y = 42
+	close_button.custom_minimum_size.y = 40
 	close_button.pressed.connect(_destroy_stats_window)
 	content.add_child(close_button)
 
@@ -679,13 +760,13 @@ func _build_stats_window() -> void:
 	settings_content.add_theme_constant_override("separation", 16)
 	settings_margin.add_child(settings_content)
 
-	var settings_title := _new_label("桌寵設定", 24, Color("#e9fbff"))
+	var settings_title := _new_label("桌寵設定", 24, _details_color("#20272b", "#f0f0f0"))
 	settings_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settings_content.add_child(settings_title)
 
 	var fps_row := HBoxContainer.new()
 	fps_row.add_theme_constant_override("separation", 12)
-	var fps_label := _new_label("桌寵幀率（FPS）", 16, Color("#e9fbff"))
+	var fps_label := _new_label("桌寵幀率（FPS）", 16, _details_color("#30383c", "#d4d4d4"))
 	fps_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fps_row.add_child(fps_label)
 	_fps_option_button = OptionButton.new()
@@ -702,10 +783,33 @@ func _build_stats_window() -> void:
 	var fps_hint := _new_label(
 		"控制整個桌寵的更新率（15–60）；30 FPS 適合日常使用，降低可省電。",
 		13,
-		Color("#b9ced5")
+		_details_color("#68747a", "#9da1a6")
 	)
 	fps_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_content.add_child(fps_hint)
+	settings_content.add_child(HSeparator.new())
+
+	var theme_row := HBoxContainer.new()
+	theme_row.add_theme_constant_override("separation", 12)
+	var theme_label := _new_label(
+		"詳細面板主題", 16, _details_color("#30383c", "#d4d4d4")
+	)
+	theme_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	theme_row.add_child(theme_label)
+	_details_theme_option_button = OptionButton.new()
+	_details_theme_option_button.add_item("淺色", 0)
+	_details_theme_option_button.add_item("深色", 1)
+	_details_theme_option_button.select(1 if _details_theme_mode == "dark" else 0)
+	_details_theme_option_button.custom_minimum_size = Vector2(120, 40)
+	_details_theme_option_button.item_selected.connect(_on_details_theme_selected)
+	theme_row.add_child(_details_theme_option_button)
+	settings_content.add_child(theme_row)
+	var theme_hint := _new_label(
+		"切換詳細面板的完整配色；設定會自動保存。",
+		13,
+		_details_color("#68747a", "#9da1a6")
+	)
+	settings_content.add_child(theme_hint)
 	settings_content.add_child(HSeparator.new())
 
 	_autostart_check_box = CheckBox.new()
@@ -721,7 +825,7 @@ func _build_stats_window() -> void:
 		if OS.has_feature("editor")
 		else "正在讀取 Windows 開機啟動設定…",
 		13,
-		Color("#b9ced5")
+		_details_color("#68747a", "#9da1a6")
 	)
 	_settings_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_content.add_child(_settings_feedback)
@@ -738,6 +842,7 @@ func _build_stats_window() -> void:
 
 	_build_character_tab(tabs)
 	tabs.tab_changed.connect(_on_stats_tab_changed)
+	_select_stats_tab(0)
 
 
 func _build_character_tab(tabs: TabContainer) -> void:
@@ -759,13 +864,13 @@ func _build_character_tab(tabs: TabContainer) -> void:
 	content.add_theme_constant_override("separation", 12)
 	margin.add_child(content)
 
-	var title := _new_label("角色管理", 24, Color("#e9fbff"))
+	var title := _new_label("角色管理", 24, _details_color("#20272b", "#f0f0f0"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(title)
 	var hint := _new_label(
 		"角色清單只會在開啟這個頁面時讀取，不會增加平常常駐耗能。",
 		13,
-		Color("#b9ced5")
+		_details_color("#68747a", "#9da1a6")
 	)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -784,12 +889,14 @@ func _build_character_tab(tabs: TabContainer) -> void:
 	_character_use_button.text = "使用選取角色"
 	_character_use_button.custom_minimum_size = Vector2(145, 40)
 	_character_use_button.disabled = true
+	_apply_primary_button_style(_character_use_button)
 	_character_use_button.pressed.connect(_use_selected_character)
 	action_row.add_child(_character_use_button)
 	_character_delete_button = Button.new()
 	_character_delete_button.text = "刪除角色包"
 	_character_delete_button.custom_minimum_size = Vector2(125, 40)
 	_character_delete_button.disabled = true
+	_apply_danger_button_style(_character_delete_button)
 	_character_delete_button.pressed.connect(_confirm_delete_selected_character)
 	action_row.add_child(_character_delete_button)
 	content.add_child(action_row)
@@ -812,7 +919,7 @@ func _build_character_tab(tabs: TabContainer) -> void:
 	_character_feedback = _new_label(
 		"切換角色會儲存目前進度，並直接在目前視窗載入。",
 		13,
-		Color("#8ed9e8")
+		_details_color("#238b9d", "#4fc1ff")
 	)
 	_character_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_character_feedback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -839,9 +946,60 @@ func _build_character_tab(tabs: TabContainer) -> void:
 
 
 func _on_stats_tab_changed(tab_index: int) -> void:
+	_refresh_stats_tab_buttons(tab_index)
 	if tab_index != _character_tab_index or _character_tab_loaded:
 		return
 	_refresh_character_list()
+
+
+func _select_stats_tab(tab_index: int) -> void:
+	if not is_instance_valid(_stats_tabs):
+		return
+	_stats_tabs.current_tab = clampi(tab_index, 0, _stats_tabs.get_tab_count() - 1)
+	_refresh_stats_tab_buttons(_stats_tabs.current_tab)
+
+
+func _refresh_stats_tab_buttons(selected_index: int) -> void:
+	for index: int in _stats_tab_buttons.size():
+		_apply_stats_tab_button_style(
+			_stats_tab_buttons[index], index == selected_index
+		)
+
+
+func _apply_stats_tab_button_style(button: Button, selected: bool) -> void:
+	var normal_bg := _details_color("#0f0f0f", "#37373d") \
+			if selected else _details_color("#e6e6e6", "#252526")
+	var normal_border := _details_color("#0f0f0f", "#3794ff") \
+			if selected else _details_color("#f2f2f2", "#333333")
+	var hover_bg := normal_bg if selected \
+			else _details_color("#e5e5e5", "#2a2d2e")
+	var pressed_bg := _details_color("#272727", "#094771") \
+			if selected else _details_color("#d9d9d9", "#333337")
+	var normal_style := _details_style(normal_bg, normal_border, 8)
+	var hover_style := _details_style(
+		hover_bg,
+		normal_border if selected else _details_color("#e5e5e5", "#4e4e4e"),
+		8
+	)
+	var pressed_style := _details_style(pressed_bg, normal_border, 8)
+	if _details_theme_mode == "dark" and selected:
+		normal_style.border_width_bottom = 2
+		hover_style.border_width_bottom = 2
+		pressed_style.border_width_bottom = 2
+	button.add_theme_stylebox_override("normal", normal_style)
+	button.add_theme_stylebox_override("hover", hover_style)
+	button.add_theme_stylebox_override("pressed", pressed_style)
+	button.add_theme_stylebox_override("focus", normal_style)
+	button.add_theme_color_override(
+		"font_color", Color("#ffffff") if selected \
+		else _details_color("#0f0f0f", "#cccccc")
+	)
+	button.add_theme_color_override(
+		"font_hover_color", Color("#ffffff") if selected \
+		else _details_color("#0f0f0f", "#ffffff")
+	)
+	button.add_theme_color_override("font_pressed_color", Color("#ffffff"))
+	button.add_theme_font_size_override("font_size", 15)
 
 
 func _refresh_character_list(message := "") -> void:
@@ -1003,12 +1161,23 @@ func _apply_character_without_restart(character_id: String, is_reload: bool) -> 
 	_refresh_json_driven_ui()
 	_refresh_ui(state.get_snapshot())
 	_refresh_interaction_polygon()
+	call_deferred("_reposition_after_character_switch", character_id)
 	_refresh_character_list(
 		"已重新載入「%s」。" % pet.get_character_name()
 		if is_reload
 		else "已切換為「%s」。" % pet.get_character_name()
 	)
 	return true
+
+
+func _reposition_after_character_switch(expected_character_id: String) -> void:
+	# Character frames can resize the native transparent window. Wait until that
+	# geometry is committed, then place the newly loaded character independently
+	# of the previous character's sprite bounds and offsets.
+	await get_tree().process_frame
+	if pet.get_character_id() != expected_character_id:
+		return
+	_place_bottom_right()
 
 
 func _refresh_json_driven_ui() -> void:
@@ -1116,7 +1285,7 @@ func _run_care_action(id: int) -> void:
 func _add_stat_row(parent: VBoxContainer, label_text: String, key: String, color: Color) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	var label := _new_label(label_text, 15, Color("#e9fbff"))
+	var label := _new_label(label_text, 15, _details_color("#445057", "#cccccc"))
 	label.custom_minimum_size.x = 48
 	row.add_child(label)
 	var bar := ProgressBar.new()
@@ -1124,19 +1293,176 @@ func _add_stat_row(parent: VBoxContainer, label_text: String, key: String, color
 	bar.custom_minimum_size.y = 22
 	bar.show_percentage = true
 	var background := StyleBoxFlat.new()
-	background.bg_color = Color("#263b45")
+	background.bg_color = _details_color("#e8edef", "#333333")
 	background.set_corner_radius_all(8)
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = color
 	fill.set_corner_radius_all(8)
 	bar.add_theme_stylebox_override("background", background)
 	bar.add_theme_stylebox_override("fill", fill)
-	bar.add_theme_color_override("font_color", Color("#ffffff"))
-	bar.add_theme_color_override("font_outline_color", Color("#102028"))
-	bar.add_theme_constant_override("outline_size", 3)
+	bar.add_theme_color_override("font_color", _details_color("#263238", "#f0f0f0"))
+	bar.add_theme_color_override("font_outline_color", _details_color("#ffffff", "#1e1e1e"))
+	bar.add_theme_constant_override("outline_size", 1)
 	row.add_child(bar)
 	_stats_bars[key] = bar
 	parent.add_child(row)
+
+
+func _create_details_theme() -> Theme:
+	var theme := Theme.new()
+	var empty_panel := StyleBoxEmpty.new()
+	theme.set_stylebox("panel", "TabContainer", empty_panel)
+	theme.set_stylebox("panel", "ScrollContainer", empty_panel)
+	var normal := _details_style(
+		_details_color("#ffffff", "#252526"),
+		_details_color("#d6dee2", "#3c3c3c"), 8
+	)
+	var hover := _details_style(
+		_details_color("#edf8fa", "#2a2d2e"),
+		_details_color("#78c8d5", "#4e94ce"), 8
+	)
+	var pressed := _details_style(
+		_details_color("#d9f0f4", "#094771"),
+		_details_color("#35a9bd", "#3794ff"), 8
+	)
+	var disabled := _details_style(
+		_details_color("#eef1f2", "#232323"),
+		_details_color("#e1e6e8", "#333333"), 8
+	)
+	for type_name: String in ["Button", "OptionButton"]:
+		theme.set_stylebox("normal", type_name, normal)
+		theme.set_stylebox("hover", type_name, hover)
+		theme.set_stylebox("pressed", type_name, pressed)
+		theme.set_stylebox("focus", type_name, pressed)
+		theme.set_stylebox("disabled", type_name, disabled)
+		theme.set_color("font_color", type_name, _details_color("#30383c", "#cccccc"))
+		theme.set_color("font_hover_color", type_name, _details_color("#176f7e", "#ffffff"))
+		theme.set_color("font_pressed_color", type_name, _details_color("#145f6c", "#ffffff"))
+		theme.set_color("font_focus_color", type_name, _details_color("#145f6c", "#ffffff"))
+		theme.set_color("font_disabled_color", type_name, _details_color("#99a3a8", "#6d6d6d"))
+		theme.set_font_size("font_size", type_name, 14)
+
+	var list_panel := _details_style(
+		_details_color("#ffffff", "#1e1e1e"),
+		_details_color("#dce3e6", "#3c3c3c"), 9
+	)
+	var list_selected := _details_style(
+		_details_color("#cfeef3", "#094771"),
+		_details_color("#59b9c8", "#3794ff"), 7
+	)
+	var list_hover := _details_style(
+		_details_color("#e7f5f7", "#2a2d2e"),
+		_details_color("#a8d9e0", "#3c3c3c"), 7
+	)
+	var list_focus := _details_style(
+		Color(0, 0, 0, 0), _details_color("#8bcbd5", "#4e94ce"), 9
+	)
+	theme.set_stylebox("panel", "ItemList", list_panel)
+	theme.set_stylebox("selected", "ItemList", list_selected)
+	theme.set_stylebox("selected_focus", "ItemList", list_selected)
+	theme.set_stylebox("hovered", "ItemList", list_hover)
+	theme.set_stylebox("hovered_selected", "ItemList", list_selected)
+	theme.set_stylebox("focus", "ItemList", list_focus)
+	theme.set_color("font_color", "ItemList", _details_color("#30383c", "#cccccc"))
+	theme.set_color("font_hovered_color", "ItemList", _details_color("#164f59", "#ffffff"))
+	theme.set_color("font_selected_color", "ItemList", _details_color("#103f47", "#ffffff"))
+	theme.set_font_size("font_size", "ItemList", 14)
+	var popup_panel := _details_style(
+		_details_color("#ffffff", "#252526"),
+		_details_color("#d6dee2", "#454545"), 8
+	)
+	var popup_hover := _details_style(
+		_details_color("#dff2f5", "#094771"),
+		_details_color("#91cfd8", "#3794ff"), 6
+	)
+	theme.set_stylebox("panel", "PopupMenu", popup_panel)
+	theme.set_stylebox("hover", "PopupMenu", popup_hover)
+	theme.set_color("font_color", "PopupMenu", _details_color("#30383c", "#cccccc"))
+	theme.set_color("font_hover_color", "PopupMenu", _details_color("#103f47", "#ffffff"))
+	var tooltip_panel := _details_style(
+		_details_color("#243136", "#252526"),
+		_details_color("#40545b", "#555555"), 6
+	)
+	theme.set_stylebox("panel", "TooltipPanel", tooltip_panel)
+	theme.set_color("font_color", "TooltipLabel", Color("#f5f5f5"))
+	theme.set_font_size("font_size", "TooltipLabel", 13)
+
+	var separator := StyleBoxLine.new()
+	separator.color = _details_color("#dde4e7", "#3c3c3c")
+	separator.thickness = 1
+	theme.set_stylebox("separator", "HSeparator", separator)
+	theme.set_color("font_color", "CheckBox", _details_color("#30383c", "#cccccc"))
+	theme.set_color("font_hover_color", "CheckBox", _details_color("#176f7e", "#ffffff"))
+	theme.set_color("font_disabled_color", "CheckBox", _details_color("#99a3a8", "#6d6d6d"))
+	theme.set_color("font_selected_color", "TabBar", Color("#ffffff"))
+	theme.set_color("font_unselected_color", "TabBar", _details_color("#0f0f0f", "#9da1a6"))
+	theme.set_color("font_hovered_color", "TabBar", _details_color("#0f0f0f", "#ffffff"))
+	return theme
+
+
+func _details_color(light: String, dark: String) -> Color:
+	return Color(dark if _details_theme_mode == "dark" else light)
+
+
+func _apply_primary_button_style(button: Button) -> void:
+	button.add_theme_stylebox_override(
+		"normal", _details_style(
+			_details_color("#35a9bd", "#0e639c"),
+			_details_color("#35a9bd", "#1177bb"), 8
+		)
+	)
+	button.add_theme_stylebox_override(
+		"hover", _details_style(
+			_details_color("#278fa1", "#1177bb"),
+			_details_color("#278fa1", "#3794ff"), 8
+		)
+	)
+	button.add_theme_stylebox_override(
+		"pressed", _details_style(
+			_details_color("#1d7888", "#094771"),
+			_details_color("#1d7888", "#3794ff"), 8
+		)
+	)
+	button.add_theme_color_override("font_color", Color("#ffffff"))
+	button.add_theme_color_override("font_hover_color", Color("#ffffff"))
+	button.add_theme_color_override("font_pressed_color", Color("#ffffff"))
+
+
+func _apply_danger_button_style(button: Button) -> void:
+	button.add_theme_stylebox_override(
+		"normal", _details_style(
+			_details_color("#fffafa", "#2b2020"),
+			_details_color("#e7b4b4", "#8b4545"), 8
+		)
+	)
+	button.add_theme_stylebox_override(
+		"hover", _details_style(
+			_details_color("#fff0f0", "#3b2424"),
+			_details_color("#d97b7b", "#d16969"), 8
+		)
+	)
+	button.add_theme_stylebox_override(
+		"pressed", _details_style(
+			_details_color("#f8dddd", "#512b2b"),
+			_details_color("#c85f5f", "#f48771"), 8
+		)
+	)
+	button.add_theme_color_override("font_color", _details_color("#b34747", "#f48771"))
+	button.add_theme_color_override("font_hover_color", _details_color("#a53636", "#ff9b8a"))
+	button.add_theme_color_override("font_pressed_color", _details_color("#8f2d2d", "#ffffff"))
+
+
+func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	return style
 
 
 func _new_label(text: String, font_size: int, color: Color) -> Label:
@@ -1194,12 +1520,15 @@ func _destroy_stats_window() -> void:
 	if is_instance_valid(_stats_window):
 		_stats_window.queue_free()
 	_stats_window = null
+	_stats_tabs = null
+	_stats_tab_buttons.clear()
 	_stats_status = null
 	_companion_status = null
 	_wish_status = null
 	_unlock_status = null
 	_last_message_status = null
 	_fps_option_button = null
+	_details_theme_option_button = null
 	_autostart_check_box = null
 	_settings_feedback = null
 	_character_list = null
@@ -1240,6 +1569,11 @@ func _load_runtime_settings() -> void:
 		target_fps = int(config.get_value(
 			"performance", "target_fps", DEFAULT_TARGET_FPS
 		))
+		_details_theme_mode = String(config.get_value(
+			"appearance", "details_theme", "light"
+		))
+	if _details_theme_mode not in ["light", "dark"]:
+		_details_theme_mode = "light"
 	Engine.max_fps = _normalize_target_fps(target_fps)
 
 
@@ -1266,6 +1600,40 @@ func _set_target_fps(value: int) -> void:
 	config.load(UI_SETTINGS_PATH)
 	config.set_value("performance", "target_fps", target_fps)
 	config.save(UI_SETTINGS_PATH)
+
+
+func _on_details_theme_selected(index: int) -> void:
+	var requested := "dark" if index == 1 else "light"
+	if requested == _details_theme_mode:
+		return
+	_details_theme_mode = requested
+	var config := ConfigFile.new()
+	config.load(UI_SETTINGS_PATH)
+	config.set_value("appearance", "details_theme", _details_theme_mode)
+	config.save(UI_SETTINGS_PATH)
+	if not is_instance_valid(_stats_window):
+		return
+	var previous_position := _stats_window.position
+	var previous_size := _stats_window.size
+	_destroy_stats_window()
+	call_deferred(
+		"_rebuild_stats_window_after_theme_change",
+		previous_position,
+		previous_size
+	)
+
+
+func _rebuild_stats_window_after_theme_change(
+	previous_position: Vector2i,
+	previous_size: Vector2i
+) -> void:
+	_build_stats_window()
+	_stats_window.position = previous_position
+	_stats_window.size = previous_size
+	_select_stats_tab(1)
+	_stats_window.show()
+	_refresh_ui(state.get_snapshot())
+	call_deferred("_bring_stats_window_forward")
 
 
 func _is_autostart_supported() -> bool:

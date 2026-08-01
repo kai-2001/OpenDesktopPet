@@ -180,7 +180,7 @@ func _capture_base_geometry() -> void:
 		_base_root_position = root_canvas.position
 
 
-func _restore_base_geometry() -> void:
+func _restore_base_geometry(resize_window := true) -> void:
 	var window := get_window()
 	var root_canvas := get_parent() as Node2D
 	if root_canvas:
@@ -194,7 +194,8 @@ func _restore_base_geometry() -> void:
 				roundi(canvas_delta.x),
 				roundi(canvas_delta.y)
 			)
-	if window and _base_window_size.x > 0 and _base_window_size.y > 0:
+	if resize_window and window \
+			and _base_window_size.x > 0 and _base_window_size.y > 0:
 		window.size = _base_window_size
 
 
@@ -545,7 +546,10 @@ func _show_action_frame(action: String, frame: int) -> void:
 	)
 	_sprite.position = _frame_offset(definition, safe_frame)
 	_apply_sprite_scale(definition)
-	_restore_base_geometry()
+	# Reset the canvas coordinate system without first shrinking the native
+	# transparent window. Shrinking and immediately growing an oversized frame
+	# makes the Windows compositor briefly expose opaque black strips.
+	_restore_base_geometry(false)
 	_grow_window_to_fit_frame()
 	_keep_frame_inside_viewport()
 	_emit_interaction_region()
@@ -873,14 +877,16 @@ func _grow_window_to_fit_frame() -> void:
 	var window := get_window()
 	if window == null:
 		return
-	var current_size := Vector2(window.size)
+	var base_size := Vector2(_base_window_size) \
+			if _base_window_size.x > 0 and _base_window_size.y > 0 \
+			else Vector2(window.size)
 	var required_start := Vector2(
 		minf(visible_bounds.position.x - FRAME_VIEWPORT_PADDING, 0.0),
 		minf(visible_bounds.position.y - FRAME_VIEWPORT_PADDING, 0.0)
 	)
 	var required_end := Vector2(
-		maxf(visible_bounds.end.x + FRAME_VIEWPORT_PADDING, current_size.x),
-		maxf(visible_bounds.end.y + FRAME_VIEWPORT_PADDING, current_size.y)
+		maxf(visible_bounds.end.x + FRAME_VIEWPORT_PADDING, base_size.x),
+		maxf(visible_bounds.end.y + FRAME_VIEWPORT_PADDING, base_size.y)
 	)
 	var required_size := Vector2i(
 		ceili(required_end.x - required_start.x),
