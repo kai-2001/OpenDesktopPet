@@ -20,6 +20,9 @@
     "feed_complete": "好吃！",
     "water_complete": "喝完水了！",
     "work_complete": "工作完成！",
+    "sleep_recovered": "睡飽了，精神完全恢復！",
+    "sleep_woken": "嗯……醒來了，精神恢復了一些。",
+    "sleep_full": "現在還不睏。",
     "action_unlocked": "學會新動作：{action}！"
   },
   "aliases": {

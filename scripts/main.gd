@@ -135,6 +135,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_left_press_pending = false
 			_dragging = false
 			pet.set_dragging(false)
+			if state.wake_sleep("double_click"):
+				_last_user_activity_ms = Time.get_ticks_msec()
+				return
 			_run_care_action(3)
 			return
 		if event.pressed:
@@ -154,9 +157,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func _handle_drag_mouse_motion(mouse: Vector2i) -> void:
 	if _left_press_pending \
 			and not _dragging \
-			and mouse.distance_to(_drag_origin) >= DRAG_DISTANCE_THRESHOLD_PX \
-			and _can_begin_drag():
-		_begin_drag(mouse)
+			and mouse.distance_to(_drag_origin) >= DRAG_DISTANCE_THRESHOLD_PX:
+		if state.is_sleeping():
+			state.wake_sleep("drag")
+		if _can_begin_drag():
+			_begin_drag(mouse)
 	if _dragging:
 		_update_drag_position(mouse)
 
@@ -390,6 +395,8 @@ func _connect_signals() -> void:
 	state.message_requested.connect(_show_state_message)
 	state.action_requested.connect(pet.play_action)
 	pet.action_completed.connect(state.receive_action_completed)
+	state.sleep_started.connect(pet.start_sleep_loop)
+	state.sleep_ended.connect(pet.stop_sleep_loop)
 	pet.interaction_region_changed.connect(_apply_interaction_polygon)
 	state.wish_started.connect(_show_wish_notice)
 	# PetState becomes ready before its parent, so its first `changed` signal is
@@ -507,6 +514,9 @@ func _on_context_action(id: int) -> void:
 
 
 func _single_click_reaction() -> void:
+	if state.wake_sleep("click"):
+		_last_user_activity_ms = Time.get_ticks_msec()
+		return
 	var lines := [
 		"有事嗎？",
 		"我有在聽。",
@@ -544,11 +554,14 @@ func _can_act_autonomously(require_mouse_idle := false) -> bool:
 		and not context_menu.visible \
 		and not _is_stats_window_open() \
 		and not _dragging \
+		and not state.is_sleeping() \
 		and not pet.is_busy() \
 		and not state.is_action_busy()
 
 
 func _run_autonomous_action() -> void:
+	if state.is_sleeping():
+		return
 	var mouse_is_idle := Time.get_ticks_msec() - _last_user_activity_ms >= 4500
 	var action: String = pet.pick_autonomous_action(mouse_is_idle)
 	if action == "move":
@@ -1266,6 +1279,10 @@ func _open_character_packs_folder() -> void:
 
 
 func _run_care_action(id: int) -> void:
+	if state.is_sleeping():
+		state.wake_sleep("care_action")
+		_last_user_activity_ms = Time.get_ticks_msec()
+		return
 	if state.is_action_busy() or not _interrupt_autonomous_action():
 		_say_dialogue("action_busy", "先等目前的動作完成～", 1.5)
 		return

@@ -23,6 +23,7 @@ var _dragging := false
 var _drag_moving := false
 var _drag_frame_clock := 0.0
 var _drag_frame_step := 0
+var _sleep_loop_active := false
 var _facing_direction := -1
 var _visual_size := 1.0
 var _pack_scale := 0.31
@@ -101,6 +102,7 @@ func reload_character() -> bool:
 	_drag_moving = false
 	_drag_frame_clock = 0.0
 	_drag_frame_step = 0
+	_sleep_loop_active = false
 	_current_action = ""
 	_active_request_id = 0
 	_active_requested_action = ""
@@ -160,8 +162,59 @@ func cancel_autonomous_action() -> bool:
 	return true
 
 
+func start_sleep_loop() -> void:
+	if _sleep_loop_active or _dragging or not _actions.has("sleep"):
+		return
+	_stop_current_animation(false)
+	_sleep_loop_active = true
+	_busy = true
+	_current_action = "sleep"
+	_animation_serial += 1
+	var serial := _animation_serial
+	_run_sleep_loop(serial)
+
+
+func stop_sleep_loop(reason := "user") -> void:
+	if not _sleep_loop_active:
+		return
+	_sleep_loop_active = false
+	_animation_serial += 1
+	var definition := _action_definition("sleep")
+	var wake_sequence := _optional_sequence(definition, "wake_sequence")
+	if reason == "drag" or wake_sequence.is_empty():
+		_busy = false
+		_current_action = ""
+		_restore_idle()
+		_emit_interaction_region()
+		return
+	_busy = true
+	_current_action = "sleep"
+	var serial := _animation_serial
+	await _play_frames("sleep", wake_sequence, definition, serial)
+	if serial == _animation_serial and not _dragging:
+		_busy = false
+		_current_action = ""
+		_restore_idle()
+		_emit_interaction_region()
+
+
+func _run_sleep_loop(serial: int) -> void:
+	var definition := _action_definition("sleep")
+	var sequence := _optional_sequence(definition, "loop_sequence")
+	if sequence.is_empty():
+		sequence = _sequence_for(definition)
+	var frame_time := float(definition.get("frame_time", 0.3))
+	while _sleep_loop_active and serial == _animation_serial:
+		for frame: Variant in sequence:
+			if not _sleep_loop_active or serial != _animation_serial:
+				return
+			_show_action_frame("sleep", int(frame))
+			await get_tree().create_timer(frame_time).timeout
+
+
 func _stop_current_animation(restore_idle: bool) -> void:
 	_animation_serial += 1
+	_sleep_loop_active = false
 	if is_instance_valid(_action_tween):
 		_action_tween.kill()
 	_action_tween = null
@@ -345,8 +398,12 @@ func play_action(requested_action: String, request_id := 0) -> void:
 	_active_requested_action = requested_action
 	_animation_serial += 1
 	var serial := _animation_serial
+	var enter_sequence := _optional_sequence(definition, "enter_sequence") \
+			if action == "sleep" and request_id > 0 else []
 	var behavior := String(definition.get("behavior", "sequence"))
-	if behavior == "pulse":
+	if not enter_sequence.is_empty():
+		await _play_frames(action, enter_sequence, definition, serial)
+	elif behavior == "pulse":
 		await _pulse_action(action, definition, serial)
 	else:
 		await _play_sequence(action, definition, serial)
@@ -499,8 +556,17 @@ func get_action_duration(requested_action: String) -> float:
 
 
 func _play_sequence(action: String, definition: Dictionary, serial: int) -> void:
+	await _play_frames(action, _sequence_for(definition), definition, serial)
+
+
+func _play_frames(
+	action: String,
+	sequence: Array,
+	definition: Dictionary,
+	serial: int
+) -> void:
 	var frame_time := float(definition.get("frame_time", 0.16))
-	for frame: Variant in _sequence_for(definition):
+	for frame: Variant in sequence:
 		if serial != _animation_serial:
 			return
 		_show_action_frame(action, int(frame))
@@ -589,6 +655,11 @@ func _is_action_flipped(definition: Dictionary) -> bool:
 func _sequence_for(definition: Dictionary) -> Array:
 	var sequence: Array = definition.get("sequence", [0])
 	return sequence if not sequence.is_empty() else [0]
+
+
+func _optional_sequence(definition: Dictionary, key: String) -> Array:
+	var value: Variant = definition.get(key, [])
+	return value if value is Array else []
 
 
 func _first_frame(action: String) -> int:
@@ -718,6 +789,19 @@ func _validate_action(action_id: String, raw_definition: Variant, root: String) 
 		if frame_index < 0 or frame_index >= columns * rows:
 			push_warning("Action '%s' contains an out-of-range frame." % action_id)
 			return false
+	if action_id == "sleep":
+		for phase_key: String in ["enter_sequence", "loop_sequence", "wake_sequence"]:
+			if not definition.has(phase_key):
+				continue
+			var phase: Variant = definition[phase_key]
+			if phase is not Array or phase.is_empty() or phase.size() > 120:
+				push_warning("Sleep action '%s' must be a non-empty array." % phase_key)
+				return false
+			for frame: Variant in phase:
+				var frame_index := int(frame)
+				if frame_index < 0 or frame_index >= columns * rows:
+					push_warning("Sleep action '%s' contains an out-of-range frame." % phase_key)
+					return false
 	if float(definition.get("frame_time", 0.16)) <= 0.0:
 		push_warning("Action '%s' frame_time must be positive." % action_id)
 		return false

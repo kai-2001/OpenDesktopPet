@@ -87,6 +87,22 @@ func _init() -> void:
 		Vector2(140.0, 128.0),
 		"public gecko defines a stable drag anchor"
 	)
+	var public_sleep: Dictionary = default_visual._actions.sleep
+	_assert_equal(
+		default_visual._optional_sequence(public_sleep, "enter_sequence"),
+		[0.0],
+		"public sleep uses its first frame to enter sleep"
+	)
+	_assert_equal(
+		default_visual._optional_sequence(public_sleep, "loop_sequence"),
+		[1.0, 2.0],
+		"public sleep loops its second and third frames"
+	)
+	_assert_equal(
+		default_visual._optional_sequence(public_sleep, "wake_sequence"),
+		[3.0],
+		"public sleep uses its fourth frame to wake"
+	)
 	var anchorless_visual := PetVisualScript.new()
 	anchorless_visual._manifest = {}
 	_assert_equal(

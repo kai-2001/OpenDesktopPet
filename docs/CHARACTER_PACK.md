@@ -102,6 +102,29 @@ ID相同 → 顯示確認後更新／重新安裝
 - `behavior: "pulse"`可搭配`pulses`使用。
 - `autonomous_weight`大於0時，該動作可由桌寵自主觸發。
 
+`sleep`可選擇把動畫分成入睡、睡眠循環與醒來三段：
+
+```json
+{
+  "file": "animations/sleep.png",
+  "columns": 2,
+  "rows": 2,
+  "sequence": [0, 1, 2, 3],
+  "enter_sequence": [0],
+  "loop_sequence": [1, 2],
+  "wake_sequence": [3],
+  "frame_time": 0.3
+}
+```
+
+- `enter_sequence`選填，開始睡覺時播放一次；省略時使用原本的`sequence`或`pulse`。
+- `loop_sequence`選填，正式睡眠期間持續循環；省略時循環原本的`sequence`。
+- `wake_sequence`選填，自然醒或點擊喚醒時播放一次；省略時直接回到`idle`。
+- 拖曳喚醒會跳過`wake_sequence`，立即切換到拖曳姿勢。
+
+睡眠每3秒恢復2點體力，自主動作不會中斷睡眠。三個新欄位皆為選填，因此舊角色包
+不需要修改，既有`sleep`Sprite Sheet仍可直接作為睡眠循環動畫。
+
 動作可單獨覆寫原圖面向：
 
 ```json
@@ -134,6 +157,8 @@ ID相同 → 顯示確認後更新／重新安裝
 角色包可透過`interactions`自訂五種互動的名稱、圖示與願望文字，也能透過
 `dialogue`自訂啟動、單擊、待機及動作完成訊息。完整欄位可參考
 `examples/character-pack/pet.json`。
+
+睡眠可使用`sleep_recovered`自訂自然睡醒訊息，並以`sleep_woken`自訂中途喚醒訊息。
 
 ## 安全限制
 

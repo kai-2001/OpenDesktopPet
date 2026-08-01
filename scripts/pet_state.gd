@@ -6,6 +6,8 @@ signal message_requested(key: String, fallback: String)
 signal action_requested(action: String, request_id: int)
 signal wish_started(action: String)
 signal action_result_available(request_id: int)
+signal sleep_started
+signal sleep_ended(reason: String)
 
 const DEFAULT_SAVE_PATH := "user://profiles/default/save_v2.json"
 const SAVE_VERSION := 2
@@ -17,6 +19,8 @@ const FIRST_WISH_MIN_SECONDS := 30
 const FIRST_WISH_MAX_SECONDS := 60
 const WISH_MIN_SECONDS := 1200
 const WISH_MAX_SECONDS := 2400
+const SLEEP_RECOVERY_INTERVAL_SECONDS := 3.0
+const SLEEP_ENERGY_PER_TICK := 2.0
 
 const DEFAULT_DATA := {
 	"save_version": SAVE_VERSION,
@@ -54,6 +58,10 @@ var _action_busy := false
 var _next_request_id := 1
 var _action_results: Dictionary = {}
 var _initialized := false
+var _sleeping := false
+var _sleep_accumulator := 0.0
+var _sleep_energy_before := 0.0
+var _sleep_recovered := 0.0
 
 
 func _ready() -> void:
@@ -73,6 +81,9 @@ func configure_profile(character_id: String) -> void:
 	_clock_accumulator = 0.0
 	_companion_check_accumulator = 0.0
 	_action_busy = false
+	_sleeping = false
+	_sleep_accumulator = 0.0
+	_sleep_recovered = 0.0
 	_action_results.clear()
 	_initialized = false
 	_initialize_if_needed()
@@ -98,6 +109,8 @@ func _initialize_if_needed() -> void:
 
 
 func _process(delta: float) -> void:
+	if _sleeping:
+		_process_sleep(delta)
 	_clock_accumulator += delta
 	_companion_check_accumulator += delta
 
@@ -244,9 +257,19 @@ func sleep() -> void:
 	if not played:
 		_abort_action("sleep_failed", "睡覺動畫無法播放。")
 		return
-	var recovered: bool = _apply_sleep_result()
-	var message := "呼嚕……睡成一顆麻糬。" if recovered else "雖然很有精神，還是舒服地睡了一覺。"
-	_finish_action("sleep_recovered" if recovered else "sleep_full", message + _complete_wish("sleep"))
+	if float(data.energy) >= 100.0:
+		data.mood = _limit(float(data.mood) + 4.0)
+		_finish_action(
+			"sleep_full",
+			"雖然很有精神，還是舒服地瞇了一會。" + _complete_wish("sleep")
+		)
+		return
+	_sleeping = true
+	_sleep_accumulator = 0.0
+	_sleep_energy_before = float(data.energy)
+	_sleep_recovered = 0.0
+	sleep_started.emit()
+	emit_changed()
 
 
 func work() -> void:
@@ -286,19 +309,53 @@ func work() -> void:
 	)
 
 
-func _apply_sleep_result() -> bool:
-	var energy_before := float(data.energy)
-	var recovered := energy_before < 100.0
-	var affection_reward := _care_affection_reward(energy_before)
+func _process_sleep(delta: float) -> void:
+	_sleep_accumulator += delta
+	if _sleep_accumulator < SLEEP_RECOVERY_INTERVAL_SECONDS:
+		return
+	_sleep_accumulator = fmod(
+		_sleep_accumulator, SLEEP_RECOVERY_INTERVAL_SECONDS
+	)
+	var before := float(data.energy)
+	data.energy = _limit(before + SLEEP_ENERGY_PER_TICK)
+	_sleep_recovered += float(data.energy) - before
+	emit_changed()
+	if float(data.energy) >= 100.0:
+		_end_sleep("natural")
 
-	data.energy = _limit(energy_before + 35.0)
-	data.mood = _limit(float(data.mood) + 4.0)
 
-	if affection_reward > 0:
-		_add_affection(affection_reward)
-		_add_xp(1)
+func wake_sleep(reason := "user") -> bool:
+	if not _sleeping:
+		return false
+	_end_sleep(reason)
+	return true
 
-	return recovered
+
+func _end_sleep(reason: String) -> void:
+	if not _sleeping:
+		return
+	var natural := reason == "natural"
+	_sleeping = false
+	_sleep_accumulator = 0.0
+	_action_busy = false
+	sleep_ended.emit(reason)
+	if natural:
+		data.mood = _limit(float(data.mood) + 4.0)
+		var affection_reward := _care_affection_reward(_sleep_energy_before)
+		if affection_reward > 0:
+			_add_affection(affection_reward)
+			_add_xp(1)
+		_request_message(
+			"sleep_recovered",
+			"睡飽了，精神完全恢復！" + _complete_wish("sleep")
+		)
+	else:
+		_request_message(
+			"sleep_woken",
+			"醒來了，這次恢復了 %.0f 點體力。" % _sleep_recovered
+		)
+	_sleep_recovered = 0.0
+	_commit()
 
 
 func _apply_work_result() -> int:
@@ -316,6 +373,10 @@ func _apply_work_result() -> int:
 
 func is_action_busy() -> bool:
 	return _action_busy
+
+
+func is_sleeping() -> bool:
+	return _sleeping
 
 
 func wish_text() -> String:
