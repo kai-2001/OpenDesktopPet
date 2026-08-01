@@ -12,13 +12,13 @@ config_version=5
 
 config/name="Open Desktop Pet"
 run/main_scene="res://scenes/main.tscn"
-config/icon="res://assets/branding/birthmark_app_icon.png"
 config/features=PackedStringArray("4.6")
-boot_splash/show_image=false
-boot_splash/bg_color=Color(0, 0, 0, 0)
 run/max_fps=30
 run/low_processor_mode=true
 run/low_processor_mode_sleep_usec=10000
+boot_splash/bg_color=Color(0, 0, 0, 0)
+boot_splash/show_image=false
+config/icon="res://assets/branding/birthmark_app_icon.png"
 
 [display]
 
@@ -26,7 +26,6 @@ window/size/viewport_width=280
 window/size/viewport_height=320
 window/size/borderless=true
 window/size/always_on_top=true
-window/size/no_focus=true
 window/size/transparent=true
 window/size/window_width_override=280
 window/size/window_height_override=320

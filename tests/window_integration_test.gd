@@ -12,8 +12,8 @@ func _init() -> void:
 	await process_frame
 
 	_assert_true(
-		bool(ProjectSettings.get_setting("display/window/size/no_focus", false)),
-		"desktop pet overlay stays out of the taskbar and task switcher"
+		not bool(ProjectSettings.get_setting("display/window/size/no_focus", true)),
+		"desktop pet window accepts focus so native popup menus dismiss on outside clicks"
 	)
 	_assert_true(main.pet.visible, "pet is revealed after native window setup")
 	_assert_equal(

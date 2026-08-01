@@ -6,9 +6,9 @@ Windows release exports use:
 
 The binary is intentionally ignored by Git. It is Godot 4.6.3-stable's
 `template_release` with `engine-patches/godot-4.6.3-no-focus-overlay.patch`
-applied. The patch prevents a `no_focus` main window from receiving
-`WS_EX_APPWINDOW` when its native window is created, keeping the desktop pet
-out of the taskbar without a runtime helper or startup flash.
+applied. The patch gives the focusable main desktop-overlay window
+`WS_EX_TOOLWINDOW` instead of `WS_EX_APPWINDOW`, keeping the pet out of the
+taskbar and Alt-Tab while allowing native popup menus to dismiss on focus loss.
 
 From the Open Desktop Pet project root, set the location of a Godot
 4.6.3-stable source checkout, then build the template:
@@ -40,7 +40,7 @@ Copy-Item (
 
 Expected SHA-256 for the current template:
 
-`6088b821a63166d155c7f7cc176fdae5d8ba0a314ceb3290cb6ef8e8fbacda84`
+`72eb7afe441a63c3f1cfaab045a0dcc9eae1c328ff42b19999d11dbe2899e4f3`
 
 The Windows Public export preset references this custom template and should
 fail rather than silently switching back to the official template if it is

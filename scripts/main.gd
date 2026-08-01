@@ -2,10 +2,12 @@ extends Node2D
 
 const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
-const DEFAULT_STATS_SIZE := Vector2i(400, 720)
+const DEFAULT_STATS_SIZE := Vector2i(500, 620)
 const MIN_STATS_SIZE := Vector2i(360, 480)
 const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
+const DRAG_HOLD_THRESHOLD_MS := 140
+const DRAG_DISTANCE_THRESHOLD_PX := 3.0
 const AUTOSTART_REGISTRY_KEY := "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
 const AUTOSTART_VALUE_NAME := "Open Desktop Pet"
 const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
@@ -18,6 +20,7 @@ const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 @onready var context_menu: PopupMenu = $ContextMenu
 var _stats_window: Window
 var _stats_status: Label
+var _companion_status: Label
 var _wish_status: Label
 var _unlock_status: Label
 var _last_message_status: Label
@@ -94,7 +97,8 @@ func _process(_delta: float) -> void:
 	_update_cursor(mouse)
 	if _left_press_pending and not _dragging:
 		var held_ms := Time.get_ticks_msec() - _left_press_started_ms
-		if (mouse.distance_to(_drag_origin) >= 6.0 or held_ms >= 220) \
+		if (mouse.distance_to(_drag_origin) >= DRAG_DISTANCE_THRESHOLD_PX \
+				or held_ms >= DRAG_HOLD_THRESHOLD_MS) \
 				and _can_begin_drag():
 			_begin_drag(mouse)
 	if not _dragging:
@@ -143,11 +147,25 @@ func _unhandled_input(event: InputEvent) -> void:
 func _begin_drag(mouse: Vector2i) -> void:
 	if not _interrupt_autonomous_action():
 		return
+
 	_left_press_pending = false
 	_dragging = true
 	_last_drag_mouse = mouse
+
 	pet.set_dragging(true)
 	pet.set_drag_motion(true)
+	var configured_anchor: Variant = pet.get_drag_anchor()
+	if configured_anchor is Vector2:
+		_drag_offset = Vector2i(
+			roundi(configured_anchor.x),
+			roundi(configured_anchor.y)
+		)
+		# A character-defined anchor gives its drag pose a consistent pickup
+		# point. Packs without one retain the exact point the user pressed.
+		DisplayServer.window_set_position(
+			_clamp_window_position(mouse - _drag_offset)
+		)
+
 	_set_cursor_shape(Input.CURSOR_DRAG)
 
 
@@ -350,7 +368,7 @@ func _setup_context_menu() -> void:
 	context_menu.add_item("%s  %s" % [
 		_interaction_icon("pet"), _interaction_label("pet")
 	], 3)
-	context_menu.add_item("%s  %s（賺 7 金幣）" % [
+	context_menu.add_item("%s  %s（賺取金幣）" % [
 		_interaction_icon("work"), _interaction_label("work")
 	], 4)
 	context_menu.add_item("%s  %s" % [
@@ -360,6 +378,7 @@ func _setup_context_menu() -> void:
 	context_menu.add_item("📊  開啟詳細面板", 6)
 	context_menu.add_item("🔎  角色縮小", 20)
 	context_menu.add_item("🔍  角色放大", 21)
+	context_menu.add_item("🏠  找回桌寵", 22)
 	context_menu.add_separator()
 	context_menu.add_item("❌  儲存並離開", 7)
 	context_menu.id_pressed.connect(_on_context_action)
@@ -416,6 +435,8 @@ func _on_context_action(id: int) -> void:
 		21:
 			state.change_visual_size(0.1)
 			_say_dialogue("size_larger", "放大一點點。", 2.0)
+		22:
+			_recover_pet()
 
 
 func _single_click_reaction() -> void:
@@ -569,6 +590,19 @@ func _build_stats_window() -> void:
 	_stats_status = _new_label("", 15, Color("#8ed9e8"))
 	_stats_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(_stats_status)
+
+	_companion_status = _new_label(
+		"",
+		14,
+		Color("#c5a3ff")
+	)
+	_companion_status.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	_companion_status.autowrap_mode = (
+		TextServer.AUTOWRAP_WORD_SMART
+	)
+	content.add_child(_companion_status)
 
 	_wish_status = _new_label("", 15, Color("#ffd98e"))
 	_wish_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -988,7 +1022,7 @@ func _refresh_json_driven_ui() -> void:
 		3: "%s  %s" % [
 			_interaction_icon("pet"), _interaction_label("pet")
 		],
-		4: "%s  %s（賺 7 金幣）" % [
+		4: "%s  %s（賺取金幣）" % [
 			_interaction_icon("work"), _interaction_label("work")
 		],
 		5: "%s  %s" % [
@@ -1161,6 +1195,7 @@ func _destroy_stats_window() -> void:
 		_stats_window.queue_free()
 	_stats_window = null
 	_stats_status = null
+	_companion_status = null
 	_wish_status = null
 	_unlock_status = null
 	_last_message_status = null
@@ -1500,6 +1535,14 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 	if is_instance_valid(_stats_status):
 		_stats_status.text = level_text
 		_wish_status.text = "願望：%s" % _formatted_wish_text(snapshot)
+
+	if is_instance_valid(_companion_status):
+		_companion_status.text = (
+			"陪伴紀錄 : "
+			+ "連續陪伴 %d 天"
+		) % [
+			int(snapshot.get("companion_streak", 0)),
+		]
 		var next_unlock: Dictionary = pet.get_next_unlock()
 		if next_unlock.is_empty():
 			_unlock_status.text = "目前已解鎖所有角色動作"
@@ -1596,6 +1639,26 @@ func _place_bottom_right() -> void:
 	var screen := DisplayServer.window_get_current_screen()
 	if screen < 0:
 		screen = DisplayServer.get_primary_screen()
+	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
+	DisplayServer.window_set_position(Vector2i(
+		usable.end.x - ceili(visual_bounds.end.x) - 24,
+		usable.end.y - ceili(visual_bounds.end.y)
+	))
+
+
+func _recover_pet() -> void:
+	_left_press_pending = false
+	_dragging = false
+	pet.set_dragging(false)
+	if is_instance_valid(_auto_move_tween):
+		_auto_move_tween.kill()
+		_auto_move_tween = null
+		pet.cancel_roll()
+	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, true)
+	var screen := DisplayServer.get_primary_screen()
 	var usable := DisplayServer.screen_get_usable_rect(screen)
 	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
 	DisplayServer.window_set_position(Vector2i(
