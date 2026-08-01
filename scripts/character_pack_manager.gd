@@ -175,6 +175,19 @@ static func validate_pack(root: String) -> Dictionary:
 		var sequence: Variant = definition.get("sequence", [0])
 		if sequence is not Array or sequence.is_empty() or sequence.size() > 120:
 			return _failure("動作 %s 的 sequence 無效。" % action_id)
+		for frame: Variant in sequence:
+			if int(frame) < 0 or int(frame) >= columns * rows:
+				return _failure("動作 %s 的 sequence 含有超出格線的影格。" % action_id)
+		if action_id == "sleep":
+			for phase_key: String in ["enter_sequence", "loop_sequence", "wake_sequence"]:
+				if not definition.has(phase_key):
+					continue
+				var phase: Variant = definition[phase_key]
+				if phase is not Array or phase.is_empty() or phase.size() > 120:
+					return _failure("睡眠動作的 %s 無效。" % phase_key)
+				for frame: Variant in phase:
+					if int(frame) < 0 or int(frame) >= columns * rows:
+						return _failure("睡眠動作的 %s 含有超出格線的影格。" % phase_key)
 	var preview := String(manifest.get("preview", ""))
 	if not preview.is_empty():
 		if not _is_safe_relative_path(preview):

@@ -484,22 +484,34 @@ func _init() -> void:
 	main._show_context_menu(Vector2i(140, 190))
 	main.context_menu.id_pressed.emit(5)
 	main.context_menu.hide()
-	await create_timer(0.1).timeout
+	var sleep_start_deadline := Time.get_ticks_msec() + 4000
+	while not main.state.is_sleeping() \
+			and Time.get_ticks_msec() < sleep_start_deadline:
+		await process_frame
+	_assert_true(main.state.is_sleeping(), "sleep enters its persistent recovery state")
+	_assert_true(main.pet.is_busy(), "sleep animation keeps looping while asleep")
+	_assert_true(
+		not main._can_act_autonomously(),
+		"autonomous actions cannot interrupt active sleep"
+	)
+	var sleeping_energy := float(main.state.data.energy)
+	main.state._process_sleep(main.state.SLEEP_RECOVERY_INTERVAL_SECONDS)
+	_assert_true(
+		float(main.state.data.energy) > sleeping_energy,
+		"sleep restores energy progressively"
+	)
 	var right_click := InputEventMouseButton.new()
 	right_click.button_index = MOUSE_BUTTON_RIGHT
 	right_click.pressed = true
 	main._unhandled_input(right_click)
 	main.context_menu.hide()
-	main._show_context_menu(Vector2i(140, 190))
-	main.context_menu.id_pressed.emit(3)
-	main.context_menu.hide()
-	while main.state.is_action_busy():
-		await process_frame
+	_assert_true(main.state.wake_sleep("test"), "sleep supports an explicit wake-up")
+	await process_frame
 	_assert_true(
-		not main.pet.is_busy(),
-		"busy-menu rejection does not leave the visual action locked"
+		not main.state.is_action_busy() and not main.pet.is_busy(),
+		"waking releases both gameplay and visual action locks"
 	)
-	_assert_true(float(main.state.data.energy) >= energy_before, "sleep settles after animation")
+	_assert_true(float(main.state.data.energy) >= energy_before, "waking keeps recovered energy")
 	# Allow startup/action speech SceneTreeTimers to finish before teardown so
 	# the integration run also verifies clean resource ownership.
 	await create_timer(6.3).timeout

@@ -22,6 +22,7 @@
     "feed_complete": "莓果好甜！一下就吃光了！",
     "water_complete": "舔舔舔，好清爽！",
     "sleep_recovered": "呼……尾巴捲好就能安心睡。",
+    "sleep_woken": "唔……醒來了，尾巴還有一點睏。",
     "sleep_full": "雖然很有精神，還是舒服地瞇了一會。",
     "work_complete": "狩獵成功！",
     "pet_rewarded": "角角也要輕輕摸！",
@@ -71,6 +72,9 @@
       "columns": 2,
       "rows": 2,
       "sequence": [0, 1, 2, 2, 3],
+      "enter_sequence": [0],
+      "loop_sequence": [1, 2],
+      "wake_sequence": [3],
       "frame_time": 0.3,
       "scale": 0.48,
       "offsets": [[-9.1, 21.5], [20.9, 18.6], [-8.4, 91.1], [27.4, 87.3]]
