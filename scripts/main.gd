@@ -7,6 +7,8 @@ const MIN_STATS_SIZE := Vector2i(360, 480)
 const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
+const AUTONOMOUS_MOVE_MIN_PX := 96
+const AUTONOMOUS_MOVE_MAX_PX := 120
 const AUTOSTART_REGISTRY_KEY := "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
 const AUTOSTART_VALUE_NAME := "Open Desktop Pet"
 const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
@@ -577,25 +579,39 @@ func _autonomous_small_roll() -> void:
 	if screen < 0:
 		screen = DisplayServer.get_primary_screen()
 	var usable := DisplayServer.screen_get_usable_rect(screen)
-	var window_size := DisplayServer.window_get_size()
+	var distance := randi_range(
+		AUTONOMOUS_MOVE_MIN_PX,
+		AUTONOMOUS_MOVE_MAX_PX
+	) * (-1 if randf() < 0.5 else 1)
+	if not pet.begin_progressive_move():
+		return
+	# The first move frame can change the transparent window geometry. Read the
+	# actual position and size after it is shown so the tween starts from the
+	# same native window that the user sees.
 	var start := DisplayServer.window_get_position()
-	var distance := randi_range(72, 128) * (-1 if randf() < 0.5 else 1)
+	var window_size := DisplayServer.window_get_size()
 	var target_x := clampi(start.x + distance, usable.position.x, usable.end.x - window_size.x)
 	if target_x == start.x:
 		target_x = clampi(start.x - distance, usable.position.x, usable.end.x - window_size.x)
 	var target := Vector2i(target_x, start.y)
 	var move_duration: float = pet.get_action_duration("move")
 	pet.set_facing_direction(1 if target_x > start.x else -1)
-	pet.play_action("move")
-	_auto_move_tween = create_tween()
-	_auto_move_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_auto_move_tween.tween_method(
+	pet.update_progressive_move(0.0)
+	var tween := create_tween()
+	_auto_move_tween = tween
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_method(
 		func(weight: float) -> void:
+			pet.update_progressive_move(weight)
 			DisplayServer.window_set_position(Vector2i(Vector2(start).lerp(Vector2(target), weight))),
 		0.0, 1.0, move_duration
 	)
-	await _auto_move_tween.finished
-	_auto_move_tween = null
+	tween.finished.connect(func() -> void:
+		if _auto_move_tween != tween:
+			return
+		_auto_move_tween = null
+		pet.finish_progressive_move()
+	)
 
 
 func _build_stats_window() -> void:

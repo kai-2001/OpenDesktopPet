@@ -33,6 +33,7 @@ var _idle_step := 0
 var _home_position := Vector2.ZERO
 var _animation_serial := 0
 var _current_action := ""
+var _progressive_move_sequence_index := -1
 var _pack_root := ""
 var _active_request_id := 0
 var _active_requested_action := ""
@@ -288,6 +289,50 @@ func cancel_roll() -> void:
 	_animation_serial += 1
 	_busy = false
 	_current_action = ""
+	_restore_idle()
+
+
+func begin_progressive_move() -> bool:
+	if _busy or _dragging or not _actions.has("idle"):
+		return false
+	var action := _resolve_action("move")
+	if not _actions.has(action) or not is_action_unlocked(action):
+		return false
+	_animation_serial += 1
+	_busy = true
+	_current_action = action
+	_active_request_id = 0
+	_active_requested_action = ""
+	_progressive_move_sequence_index = -1
+	_show_action_frame(action, _first_frame(action))
+	return true
+
+
+func update_progressive_move(progress: float) -> void:
+	if not _busy or _current_action != _resolve_action("move"):
+		return
+	var definition := _action_definition(_current_action)
+	var sequence := _sequence_for(definition)
+	if sequence.is_empty():
+		return
+	var normalized := clampf(progress, 0.0, 1.0)
+	var sequence_index := mini(
+		floori(normalized * sequence.size()),
+		sequence.size() - 1
+	)
+	if sequence_index == _progressive_move_sequence_index:
+		return
+	_progressive_move_sequence_index = sequence_index
+	_show_action_frame(_current_action, int(sequence[sequence_index]))
+
+
+func finish_progressive_move() -> void:
+	if not _busy or _current_action != _resolve_action("move"):
+		return
+	_animation_serial += 1
+	_busy = false
+	_current_action = ""
+	_progressive_move_sequence_index = -1
 	_restore_idle()
 
 
