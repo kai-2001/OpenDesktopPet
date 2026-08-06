@@ -1,11 +1,14 @@
 extends Node2D
 
 const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
+const CodexIntegrationControllerScript = preload("res://scripts/codex_integration_controller.gd")
+const DetailsWindowControllerScript = preload("res://scripts/details_window_controller.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_STATS_SIZE := Vector2i(500, 620)
 const MIN_STATS_SIZE := Vector2i(360, 480)
 const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
+const CODEX_NOTIFICATION_QUEUE_LIMIT := 16
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
 const AUTONOMOUS_MOVE_MIN_PX := 96
 const AUTONOMOUS_MOVE_MAX_PX := 120
@@ -31,6 +34,12 @@ var _fps_option_button: OptionButton
 var _details_theme_option_button: OptionButton
 var _autostart_check_box: CheckBox
 var _settings_feedback: Label
+var _codex_state_option_button: OptionButton
+var _codex_port_spin_box: SpinBox
+var _codex_status_label: Label
+var _codex_feedback: Label
+var _codex_configure_button: Button
+var _codex_reconnect_button: Button
 var _character_list: ItemList
 var _character_feedback: Label
 var _character_use_button: Button
@@ -66,6 +75,11 @@ var _cursor_shape := Input.CURSOR_ARROW
 var _status_indicator: StatusIndicator
 var _tray_exit_menu: PopupMenu
 var _details_theme_mode := "light"
+var _codex_controller: CodexIntegrationController
+var _details_window_controller: DetailsWindowController
+var _codex_notification_queue: Array[Dictionary] = []
+var _codex_notification_active := false
+var _codex_bubble_press := false
 
 
 func _ready() -> void:
@@ -82,6 +96,7 @@ func _ready() -> void:
 	_refresh_ui(state.get_snapshot())
 	_setup_context_menu()
 	_setup_status_indicator()
+	_setup_codex_integration()
 	_setup_idle_behavior()
 	_last_global_mouse = DisplayServer.mouse_get_position()
 	_last_user_activity_ms = Time.get_ticks_msec()
@@ -89,6 +104,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if _codex_controller != null:
+		_codex_controller.poll()
 	_restore_from_system_minimize()
 	# A drag pose can replace the native window's shaped hit region. If Windows
 	# drops the release event during that transition, reconcile against the
@@ -134,6 +151,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		if event.double_click and event.pressed:
+			var double_click_local := Vector2(
+				DisplayServer.mouse_get_position() - DisplayServer.window_get_position()
+			)
+			if _codex_notification_active and _is_speech_overlay_at(double_click_local):
+				_focus_codex_interface()
+				_codex_bubble_press = false
+				return
 			_left_press_pending = false
 			_dragging = false
 			pet.set_dragging(false)
@@ -147,6 +171,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_drag_origin = DisplayServer.mouse_get_position()
 			_last_drag_mouse = _drag_origin
 			_drag_offset = _drag_origin - DisplayServer.window_get_position()
+			_codex_bubble_press = _codex_notification_active and _is_speech_overlay_at(
+				Vector2(_drag_origin - DisplayServer.window_get_position())
+			)
 		else:
 			_finish_left_press()
 	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
@@ -226,8 +253,13 @@ func _finish_left_press() -> void:
 		# have different visible heights.
 		call_deferred("_settle_drag_release", screen, was_at_bottom)
 		_set_cursor_shape(Input.CURSOR_POINTING_HAND)
+		_codex_bubble_press = false
 	else:
-		_single_click_reaction()
+		if _codex_bubble_press:
+			_codex_bubble_press = false
+			_focus_codex_interface()
+		else:
+			_single_click_reaction()
 	_refresh_interaction_polygon()
 
 
@@ -261,7 +293,15 @@ func _notification(what: int) -> void:
 		call_deferred("_request_shutdown")
 
 
-func say(text: String, seconds := 6.0) -> void:
+func _exit_tree() -> void:
+	if _codex_controller != null:
+		_codex_controller.shutdown()
+
+
+func say(text: String, seconds := 6.0, codex_priority := false) -> void:
+	if not codex_priority \
+			and (_codex_notification_active or not _codex_notification_queue.is_empty()):
+		return
 	_bubble_token += 1
 	var token := _bubble_token
 	# Container layout and the native Windows hit-test region are both applied
@@ -287,6 +327,10 @@ func say(text: String, seconds := 6.0) -> void:
 		bubble.visible = false
 		bubble_tail.visible = false
 		_refresh_interaction_polygon()
+		if codex_priority:
+			_codex_notification_active = false
+			_codex_bubble_press = false
+			call_deferred("_show_next_codex_notification")
 
 
 func _restore_from_system_minimize() -> void:
@@ -410,6 +454,111 @@ func _connect_signals() -> void:
 	if not active_wish.is_empty() \
 			and int(snapshot.get("wish_expires_at", 0)) > int(Time.get_unix_time_from_system()):
 		call_deferred("_show_wish_notice", active_wish)
+
+
+func _setup_codex_integration() -> void:
+	_codex_controller = CodexIntegrationControllerScript.new()
+	_codex_controller.notification_received.connect(_handle_codex_notification)
+	_codex_controller.state_changed.connect(_refresh_codex_settings_ui)
+	_codex_controller.load_settings()
+
+
+func _refresh_codex_settings_ui() -> void:
+	_apply_codex_control_state()
+	if not is_instance_valid(_codex_status_label):
+		return
+	if _codex_controller == null or not _codex_controller.enabled:
+		_codex_status_label.text = "狀態：已關閉"
+		_codex_status_label.add_theme_color_override(
+			"font_color", _details_color("#68747a", "#9da1a6")
+		)
+		if is_instance_valid(_codex_feedback):
+			_codex_feedback.text = "通知已關閉；選擇通訊埠後按「設定通訊埠」。"
+		return
+	if _codex_controller.is_running():
+		_codex_status_label.text = "狀態：監聽中　127.0.0.1:%d" % _codex_controller.port
+		_codex_status_label.add_theme_color_override(
+			"font_color", _details_color("#238b9d", "#4fc1ff")
+		)
+		if is_instance_valid(_codex_feedback):
+			_codex_feedback.text = "通知已開啟；通訊埠目前已鎖定。"
+	else:
+		_codex_status_label.text = "狀態：無法監聽，連接埠可能被占用"
+		_codex_status_label.add_theme_color_override(
+			"font_color", _details_color("#b44949", "#ff8c8c")
+		)
+		if is_instance_valid(_codex_feedback):
+			_codex_feedback.text = "通知已開啟，但目前無法監聽這個通訊埠。"
+
+
+func _apply_codex_control_state() -> void:
+	var enabled := _codex_controller != null and _codex_controller.enabled
+	_update_codex_state_option()
+	if is_instance_valid(_codex_port_spin_box):
+		_codex_port_spin_box.editable = not enabled
+		_codex_port_spin_box.mouse_filter = (
+			Control.MOUSE_FILTER_IGNORE
+			if enabled
+			else Control.MOUSE_FILTER_STOP
+		)
+		var port_line_edit := _codex_port_spin_box.get_line_edit()
+		port_line_edit.editable = not enabled
+		port_line_edit.mouse_filter = (
+			Control.MOUSE_FILTER_IGNORE
+			if enabled
+			else Control.MOUSE_FILTER_STOP
+		)
+		_codex_port_spin_box.modulate = (
+			Color("#8c979b") if enabled else Color.WHITE
+		)
+	if enabled:
+		if is_instance_valid(_codex_configure_button):
+			_set_codex_action_button_disabled(_codex_configure_button, true)
+		if is_instance_valid(_codex_reconnect_button):
+			_set_codex_action_button_disabled(_codex_reconnect_button, false)
+	else:
+		if is_instance_valid(_codex_configure_button):
+			_set_codex_action_button_disabled(_codex_configure_button, false)
+		if is_instance_valid(_codex_reconnect_button):
+			_set_codex_action_button_disabled(_codex_reconnect_button, true)
+
+
+func _handle_codex_notification(
+	message: String, reaction_action: String
+) -> void:
+	_enqueue_codex_status(message, reaction_action)
+
+
+func _enqueue_codex_status(message: String, reaction_action: String) -> void:
+	if _codex_notification_queue.size() >= CODEX_NOTIFICATION_QUEUE_LIMIT:
+		_codex_notification_queue.pop_front()
+	_codex_notification_queue.append({
+		"message": message,
+		"reaction_action": reaction_action,
+	})
+	if not _codex_notification_active:
+		_show_next_codex_notification()
+
+
+func _show_next_codex_notification() -> void:
+	if _codex_notification_queue.is_empty():
+		_codex_notification_active = false
+		return
+	var notification: Dictionary = _codex_notification_queue.pop_front()
+	_codex_notification_active = true
+	var message := String(notification.get("message", "Codex 有新的通知。"))
+	var reaction_action := String(notification.get("reaction_action", "idle"))
+	_last_state_message = message
+	if is_instance_valid(_last_message_status):
+		_last_message_status.text = "最近訊息：%s" % message
+	say(message, 8.0, true)
+	if not state.is_sleeping() and not state.is_action_busy():
+		pet.play_action(reaction_action)
+
+
+func _focus_codex_interface() -> void:
+	if _codex_controller != null:
+		_codex_controller.focus_codex_interface()
 
 
 func _show_state_message(key: String, fallback: String) -> void:
@@ -618,6 +767,7 @@ func _build_stats_window() -> void:
 	_stats_bars.clear()
 	_care_action_buttons.clear()
 	_stats_window = Window.new()
+	_stats_window.name = "StatsWindow"
 	_stats_window.title = "桌寵詳細狀態"
 	_stats_window.size = DEFAULT_STATS_SIZE
 	_stats_window.min_size = MIN_STATS_SIZE
@@ -668,6 +818,7 @@ func _build_stats_window() -> void:
 		_stats_tab_buttons.append(navigation_button)
 
 	var tabs := TabContainer.new()
+	tabs.name = "DetailsTabs"
 	_stats_tabs = tabs
 	tabs.theme = panel.theme
 	tabs.tabs_visible = false
@@ -675,303 +826,46 @@ func _build_stats_window() -> void:
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_layout.add_child(tabs)
 
-	var scroll := ScrollContainer.new()
-	scroll.name = "狀態"
-	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	tabs.add_child(scroll)
-
-	var margin := MarginContainer.new()
-	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.add_theme_constant_override("margin_left", 24)
-	margin.add_theme_constant_override("margin_top", 14)
-	margin.add_theme_constant_override("margin_right", 24)
-	margin.add_theme_constant_override("margin_bottom", 14)
-	scroll.add_child(margin)
-
-	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 10)
-	margin.add_child(content)
-
-	var title := _new_label("養成狀態", 24, _details_color("#20272b", "#f0f0f0"))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(title)
-
-	_stats_status = _new_label("", 15, _details_color("#238b9d", "#4fc1ff"))
-	_stats_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(_stats_status)
-
-	_companion_status = _new_label(
-		"",
-		14,
-		_details_color("#6f65a8", "#c8a7ff")
+	if _details_window_controller == null:
+		_details_window_controller = DetailsWindowControllerScript.new()
+	var status_refs: Dictionary = _details_window_controller.build_status_tab(
+		tabs, self
 	)
-	_companion_status.horizontal_alignment = (
-		HORIZONTAL_ALIGNMENT_CENTER
+	_stats_status = status_refs["stats_status"] as Label
+	_companion_status = status_refs["companion_status"] as Label
+	_wish_status = status_refs["wish_status"] as Label
+	_unlock_status = status_refs["unlock_status"] as Label
+	_last_message_status = status_refs["last_message_status"] as Label
+	_care_action_buttons = status_refs["care_action_buttons"] as Dictionary
+
+	var settings_refs: Dictionary = _details_window_controller.build_settings_tab(
+		tabs, self
 	)
-	_companion_status.autowrap_mode = (
-		TextServer.AUTOWRAP_WORD_SMART
+	_fps_option_button = settings_refs["fps_option_button"] as OptionButton
+	_details_theme_option_button = settings_refs["details_theme_option_button"] as OptionButton
+	_codex_state_option_button = settings_refs["codex_state_option_button"] as OptionButton
+	_codex_port_spin_box = settings_refs["codex_port_spin_box"] as SpinBox
+	_codex_status_label = settings_refs["codex_status_label"] as Label
+	_codex_configure_button = settings_refs["codex_configure_button"] as Button
+	_codex_reconnect_button = settings_refs["codex_reconnect_button"] as Button
+	_codex_feedback = settings_refs["codex_feedback"] as Label
+	_autostart_check_box = settings_refs["autostart_check_box"] as CheckBox
+	_settings_feedback = settings_refs["settings_feedback"] as Label
+	_refresh_codex_settings_ui()
+
+	var character_refs: Dictionary = _details_window_controller.build_character_tab(
+		tabs, self
 	)
-	content.add_child(_companion_status)
-
-	_wish_status = _new_label("", 15, _details_color("#a66b16", "#dcdcaa"))
-	_wish_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_wish_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.add_child(_wish_status)
-
-	content.add_child(HSeparator.new())
-	_add_stat_row(content, "飽食", "hunger", Color("#efa64a"))
-	_add_stat_row(content, "水分", "thirst", Color("#55b7df"))
-	_add_stat_row(content, "體力", "energy", Color("#69c986"))
-	_add_stat_row(content, "心情", "mood", Color("#e97ca6"))
-	_add_stat_row(content, "親密", "affection", Color("#9a83d2"))
-
-	_unlock_status = _new_label("", 14, _details_color("#6f65a8", "#c8a7ff"))
-	_unlock_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_unlock_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.add_child(_unlock_status)
-
-	_last_message_status = _new_label("最近訊息：%s" % _last_state_message, 13, _details_color("#68747a", "#9da1a6"))
-	_last_message_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_last_message_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.add_child(_last_message_status)
-	content.add_child(HSeparator.new())
-
-	var action_title := _new_label("照顧操作", 16, _details_color("#30383c", "#d4d4d4"))
-	action_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(action_title)
-
-	var action_grid := HFlowContainer.new()
-	action_grid.alignment = FlowContainer.ALIGNMENT_CENTER
-	action_grid.add_theme_constant_override("h_separation", 7)
-	action_grid.add_theme_constant_override("v_separation", 7)
-	var panel_actions: Array[Dictionary] = [
-		{"action": "feed", "id": 1},
-		{"action": "water", "id": 2},
-		{"action": "pet", "id": 3},
-		{"action": "work", "id": 4},
-		{"action": "sleep", "id": 5},
-	]
-	for definition: Dictionary in panel_actions:
-		var action := String(definition.action)
-		var action_button := Button.new()
-		action_button.text = "%s %s" % [
-			_interaction_icon(action), _interaction_label(action)
-		]
-		action_button.custom_minimum_size = Vector2(100, 38)
-		var action_id := int(definition.id)
-		action_button.pressed.connect(func() -> void: _run_care_action(action_id))
-		action_grid.add_child(action_button)
-		_care_action_buttons[action] = action_button
-	content.add_child(action_grid)
-	content.add_child(HSeparator.new())
-
-	var close_button := Button.new()
-	close_button.text = "關閉詳細狀態"
-	close_button.custom_minimum_size.y = 40
-	close_button.pressed.connect(_destroy_stats_window)
-	content.add_child(close_button)
-
-	var settings_scroll := ScrollContainer.new()
-	settings_scroll.name = "設定"
-	settings_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	tabs.add_child(settings_scroll)
-
-	var settings_margin := MarginContainer.new()
-	settings_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	settings_margin.add_theme_constant_override("margin_left", 24)
-	settings_margin.add_theme_constant_override("margin_top", 20)
-	settings_margin.add_theme_constant_override("margin_right", 24)
-	settings_margin.add_theme_constant_override("margin_bottom", 20)
-	settings_scroll.add_child(settings_margin)
-
-	var settings_content := VBoxContainer.new()
-	settings_content.add_theme_constant_override("separation", 16)
-	settings_margin.add_child(settings_content)
-
-	var settings_title := _new_label("桌寵設定", 24, _details_color("#20272b", "#f0f0f0"))
-	settings_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	settings_content.add_child(settings_title)
-
-	var fps_row := HBoxContainer.new()
-	fps_row.add_theme_constant_override("separation", 12)
-	var fps_label := _new_label("桌寵幀率（FPS）", 16, _details_color("#30383c", "#d4d4d4"))
-	fps_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fps_row.add_child(fps_label)
-	_fps_option_button = OptionButton.new()
-	for fps: int in TARGET_FPS_OPTIONS:
-		_fps_option_button.add_item("%d FPS" % fps, fps)
-	_fps_option_button.select(
-		_fps_option_button.get_item_index(Engine.max_fps)
-	)
-	_fps_option_button.custom_minimum_size = Vector2(120, 40)
-	_fps_option_button.item_selected.connect(_on_target_fps_selected)
-	fps_row.add_child(_fps_option_button)
-	settings_content.add_child(fps_row)
-
-	var fps_hint := _new_label(
-		"控制整個桌寵的更新率（15–60）；30 FPS 適合日常使用，降低可省電。",
-		13,
-		_details_color("#68747a", "#9da1a6")
-	)
-	fps_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	settings_content.add_child(fps_hint)
-	settings_content.add_child(HSeparator.new())
-
-	var theme_row := HBoxContainer.new()
-	theme_row.add_theme_constant_override("separation", 12)
-	var theme_label := _new_label(
-		"詳細面板主題", 16, _details_color("#30383c", "#d4d4d4")
-	)
-	theme_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	theme_row.add_child(theme_label)
-	_details_theme_option_button = OptionButton.new()
-	_details_theme_option_button.add_item("淺色", 0)
-	_details_theme_option_button.add_item("深色", 1)
-	_details_theme_option_button.select(1 if _details_theme_mode == "dark" else 0)
-	_details_theme_option_button.custom_minimum_size = Vector2(120, 40)
-	_details_theme_option_button.item_selected.connect(_on_details_theme_selected)
-	theme_row.add_child(_details_theme_option_button)
-	settings_content.add_child(theme_row)
-	var theme_hint := _new_label(
-		"切換詳細面板的完整配色；設定會自動保存。",
-		13,
-		_details_color("#68747a", "#9da1a6")
-	)
-	settings_content.add_child(theme_hint)
-	settings_content.add_child(HSeparator.new())
-
-	_autostart_check_box = CheckBox.new()
-	_autostart_check_box.text = "登入 Windows 時自動開啟桌寵"
-	_autostart_check_box.add_theme_font_size_override("font_size", 16)
-	_autostart_check_box.button_pressed = false
-	_autostart_check_box.disabled = true
-	_autostart_check_box.toggled.connect(_on_autostart_toggled)
-	settings_content.add_child(_autostart_check_box)
-
-	_settings_feedback = _new_label(
-		"請使用打包版設定開機啟動。"
-		if OS.has_feature("editor")
-		else "正在讀取 Windows 開機啟動設定…",
-		13,
-		_details_color("#68747a", "#9da1a6")
-	)
-	_settings_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	settings_content.add_child(_settings_feedback)
-	if _is_autostart_supported():
-		call_deferred("_start_autostart_operation", "query", false)
-	elif not OS.has_feature("editor"):
-		_settings_feedback.text = "目前平台不支援 Windows 開機啟動設定。"
-
-	var settings_close_button := Button.new()
-	settings_close_button.text = "關閉詳細面板"
-	settings_close_button.custom_minimum_size.y = 42
-	settings_close_button.pressed.connect(_destroy_stats_window)
-	settings_content.add_child(settings_close_button)
-
-	_build_character_tab(tabs)
+	_character_tab_index = int(character_refs["character_tab_index"])
+	_character_list = character_refs["character_list"] as ItemList
+	_character_use_button = character_refs["character_use_button"] as Button
+	_character_delete_button = character_refs["character_delete_button"] as Button
+	_character_feedback = character_refs["character_feedback"] as Label
+	_character_import_dialog = character_refs["character_import_dialog"] as FileDialog
+	_character_update_dialog = character_refs["character_update_dialog"] as ConfirmationDialog
+	_character_delete_dialog = character_refs["character_delete_dialog"] as ConfirmationDialog
 	tabs.tab_changed.connect(_on_stats_tab_changed)
 	_select_stats_tab(0)
-
-
-func _build_character_tab(tabs: TabContainer) -> void:
-	var character_scroll := ScrollContainer.new()
-	character_scroll.name = "角色"
-	character_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_character_tab_index = tabs.get_tab_count()
-	tabs.add_child(character_scroll)
-
-	var margin := MarginContainer.new()
-	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.add_theme_constant_override("margin_left", 24)
-	margin.add_theme_constant_override("margin_top", 20)
-	margin.add_theme_constant_override("margin_right", 24)
-	margin.add_theme_constant_override("margin_bottom", 20)
-	character_scroll.add_child(margin)
-
-	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 12)
-	margin.add_child(content)
-
-	var title := _new_label("角色管理", 24, _details_color("#20272b", "#f0f0f0"))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(title)
-	var hint := _new_label(
-		"角色清單只會在開啟這個頁面時讀取，不會增加平常常駐耗能。",
-		13,
-		_details_color("#68747a", "#9da1a6")
-	)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(hint)
-
-	_character_list = ItemList.new()
-	_character_list.custom_minimum_size = Vector2(0, 260)
-	_character_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_character_list.item_selected.connect(_on_character_selected)
-	content.add_child(_character_list)
-
-	var action_row := HFlowContainer.new()
-	action_row.alignment = FlowContainer.ALIGNMENT_CENTER
-	action_row.add_theme_constant_override("h_separation", 8)
-	_character_use_button = Button.new()
-	_character_use_button.text = "使用選取角色"
-	_character_use_button.custom_minimum_size = Vector2(145, 40)
-	_character_use_button.disabled = true
-	_apply_primary_button_style(_character_use_button)
-	_character_use_button.pressed.connect(_use_selected_character)
-	action_row.add_child(_character_use_button)
-	_character_delete_button = Button.new()
-	_character_delete_button.text = "刪除角色包"
-	_character_delete_button.custom_minimum_size = Vector2(125, 40)
-	_character_delete_button.disabled = true
-	_apply_danger_button_style(_character_delete_button)
-	_character_delete_button.pressed.connect(_confirm_delete_selected_character)
-	action_row.add_child(_character_delete_button)
-	content.add_child(action_row)
-
-	var import_row := HFlowContainer.new()
-	import_row.alignment = FlowContainer.ALIGNMENT_CENTER
-	import_row.add_theme_constant_override("h_separation", 8)
-	var import_button := Button.new()
-	import_button.text = "匯入角色包"
-	import_button.custom_minimum_size = Vector2(135, 40)
-	import_button.pressed.connect(_open_character_import_dialog)
-	import_row.add_child(import_button)
-	var open_folder_button := Button.new()
-	open_folder_button.text = "開啟角色資料夾"
-	open_folder_button.custom_minimum_size = Vector2(145, 40)
-	open_folder_button.pressed.connect(_open_character_packs_folder)
-	import_row.add_child(open_folder_button)
-	content.add_child(import_row)
-
-	_character_feedback = _new_label(
-		"切換角色會儲存目前進度，並直接在目前視窗載入。",
-		13,
-		_details_color("#238b9d", "#4fc1ff")
-	)
-	_character_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_character_feedback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(_character_feedback)
-
-	_character_import_dialog = FileDialog.new()
-	_character_import_dialog.title = "匯入角色包"
-	_character_import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	_character_import_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	_character_import_dialog.use_native_dialog = true
-	_character_import_dialog.add_filter("*.petpack, *.zip", "桌寵角色包")
-	_character_import_dialog.file_selected.connect(_install_character_archive)
-	_stats_window.add_child(_character_import_dialog)
-
-	_character_update_dialog = ConfirmationDialog.new()
-	_character_update_dialog.title = "更新角色包"
-	_character_update_dialog.confirmed.connect(_install_pending_character_archive)
-	_stats_window.add_child(_character_update_dialog)
-
-	_character_delete_dialog = ConfirmationDialog.new()
-	_character_delete_dialog.title = "刪除角色包"
-	_character_delete_dialog.confirmed.connect(_delete_selected_character)
-	_stats_window.add_child(_character_delete_dialog)
 
 
 func _on_stats_tab_changed(tab_index: int) -> void:
@@ -1437,6 +1331,135 @@ func _details_color(light: String, dark: String) -> Color:
 	return Color(dark if _details_theme_mode == "dark" else light)
 
 
+func _style_codex_state_option() -> void:
+	if not is_instance_valid(_codex_state_option_button):
+		return
+	_codex_state_option_button.add_theme_color_override(
+		"font_color", _details_color("#30383c", "#d4d4d4")
+	)
+	_codex_state_option_button.add_theme_color_override(
+		"font_hover_color", _details_color("#145f6c", "#ffffff")
+	)
+	_codex_state_option_button.add_theme_color_override(
+		"font_pressed_color", _details_color("#145f6c", "#ffffff")
+	)
+	_codex_state_option_button.add_theme_color_override(
+		"font_focus_color", _details_color("#145f6c", "#ffffff")
+	)
+
+
+func _update_codex_state_option() -> void:
+	if not is_instance_valid(_codex_state_option_button):
+		return
+	_codex_state_option_button.select(
+		0 if _codex_controller != null and _codex_controller.enabled else 1
+	)
+	_style_codex_state_option()
+
+
+func _style_codex_action_button(button: Button) -> void:
+	var normal := _details_style(
+		_details_color("#ffffff", "#252526"),
+		_details_color("#cbd5d9", "#454545"), 8
+	)
+	var hover := _details_style(
+		_details_color("#edf8fa", "#2a2d2e"),
+		_details_color("#78c8d5", "#4e94ce"), 8
+	)
+	var pressed := _details_style(
+		_details_color("#d9f0f4", "#094771"),
+		_details_color("#35a9bd", "#3794ff"), 8
+	)
+	var disabled := _details_style(
+		_details_color("#dfe6e8", "#292e31"),
+		_details_color("#b9c4c8", "#4a5054"), 8
+	)
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", pressed)
+	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_color_override(
+		"font_color", _details_color("#30383c", "#d4d4d4")
+	)
+	button.add_theme_color_override(
+		"font_hover_color", _details_color("#145f6c", "#ffffff")
+	)
+	button.add_theme_color_override(
+		"font_pressed_color", _details_color("#145f6c", "#ffffff")
+	)
+	button.add_theme_color_override(
+		"font_focus_color", _details_color("#145f6c", "#ffffff")
+	)
+	button.add_theme_color_override(
+		"font_disabled_color", _details_color("#9aa6aa", "#6d6d6d")
+	)
+
+
+func _set_codex_action_button_disabled(button: Button, disabled: bool) -> void:
+	button.disabled = disabled
+	button.modulate = Color("#8c979b") if disabled else Color.WHITE
+	button.mouse_default_cursor_shape = (
+		Control.CURSOR_FORBIDDEN if disabled else Control.CURSOR_POINTING_HAND
+	)
+
+
+func _style_checkbox(check_box: CheckBox) -> void:
+	# Keep the native CheckBox artwork; only control spacing and text states.
+	# This fixes the old hover text collision without replacing the checkbox
+	# with a sharp custom bitmap.
+	check_box.add_theme_constant_override("h_separation", 10)
+	check_box.add_theme_color_override(
+		"font_color", _details_color("#30383c", "#cccccc")
+	)
+	check_box.add_theme_color_override(
+		"font_hover_color", _details_color("#176f7e", "#ffffff")
+	)
+	check_box.add_theme_color_override(
+		"font_pressed_color", _details_color("#145f6c", "#ffffff")
+	)
+	check_box.add_theme_color_override(
+		"font_hover_pressed_color", _details_color("#145f6c", "#ffffff")
+	)
+	check_box.add_theme_color_override(
+		"font_focus_color", _details_color("#145f6c", "#ffffff")
+	)
+	check_box.add_theme_color_override(
+		"font_disabled_color", _details_color("#99a3a8", "#6d6d6d")
+	)
+
+
+func _style_spin_box(spin_box: SpinBox) -> void:
+	var line_edit := spin_box.get_line_edit()
+	var normal := _details_style(
+		_details_color("#ffffff", "#252526"),
+		_details_color("#d6dee2", "#3c3c3c"), 6
+	)
+	var hover := _details_style(
+		_details_color("#f7fcfd", "#2a2d2e"),
+		_details_color("#78c8d5", "#4e94ce"), 6
+	)
+	var focus := _details_style(
+		_details_color("#ffffff", "#252526"),
+		_details_color("#35a9bd", "#3794ff"), 6
+	)
+	line_edit.add_theme_stylebox_override("normal", normal)
+	line_edit.add_theme_stylebox_override("hover", hover)
+	line_edit.add_theme_stylebox_override("focus", focus)
+	line_edit.add_theme_color_override(
+		"font_color", _details_color("#30383c", "#d4d4d4")
+	)
+	line_edit.add_theme_color_override(
+		"font_uneditable_color", _details_color("#68747a", "#9da1a6")
+	)
+	line_edit.add_theme_color_override(
+		"caret_color", _details_color("#176f7e", "#4fc1ff")
+	)
+	spin_box.add_theme_color_override(
+		"font_color", _details_color("#30383c", "#d4d4d4")
+	)
+
+
 func _apply_primary_button_style(button: Button) -> void:
 	button.add_theme_stylebox_override(
 		"normal", _details_style(
@@ -1562,6 +1585,12 @@ func _destroy_stats_window() -> void:
 	_last_message_status = null
 	_fps_option_button = null
 	_details_theme_option_button = null
+	_codex_state_option_button = null
+	_codex_port_spin_box = null
+	_codex_status_label = null
+	_codex_feedback = null
+	_codex_configure_button = null
+	_codex_reconnect_button = null
 	_autostart_check_box = null
 	_settings_feedback = null
 	_character_list = null
@@ -1654,6 +1683,76 @@ func _on_details_theme_selected(index: int) -> void:
 		previous_position,
 		previous_size
 	)
+
+
+func _on_codex_state_selected(index: int) -> void:
+	_on_codex_enabled_toggled(index == 0)
+	call_deferred("_apply_codex_control_state")
+
+
+func _on_codex_enabled_toggled(enabled: bool) -> void:
+	if _codex_controller == null:
+		return
+	if enabled and is_instance_valid(_codex_port_spin_box):
+		_codex_port_spin_box.set_value_no_signal(_codex_controller.port)
+	_codex_controller.set_enabled(enabled)
+	_apply_codex_control_state()
+	call_deferred("_apply_codex_control_state")
+	if is_instance_valid(_codex_feedback):
+		_codex_feedback.text = (
+			"Codex 完成通知已開啟；通訊埠目前已鎖定。"
+			if enabled
+			else "Codex 完成通知已關閉；現在可以修改通訊埠。"
+		)
+
+
+func _on_codex_port_changed(value: float) -> void:
+	if _codex_controller == null:
+		return
+	if _codex_controller.enabled:
+		if is_instance_valid(_codex_port_spin_box):
+			_codex_port_spin_box.set_value_no_signal(_codex_controller.port)
+		return
+	var pending_port := _codex_controller.normalize_port(roundi(value))
+	_codex_controller.set_pending_port(pending_port)
+	if is_instance_valid(_codex_feedback):
+		_codex_feedback.text = (
+			"待設定通訊埠：%d；按「設定通訊埠」後才會套用。"
+			% pending_port
+		)
+
+
+func _configure_codex_port() -> void:
+	if _codex_controller == null or _codex_controller.enabled:
+		if is_instance_valid(_codex_feedback):
+			_codex_feedback.text = "請先關閉通知開關，才能修改或設定通訊埠。"
+		return
+	var selected_port := _codex_controller.port
+	if is_instance_valid(_codex_port_spin_box):
+		selected_port = _codex_controller.normalize_port(
+			roundi(_codex_port_spin_box.value)
+		)
+	var configured := _codex_controller.configure_port(selected_port)
+	if is_instance_valid(_codex_feedback):
+		_codex_feedback.text = (
+			"已設定本機通訊埠 127.0.0.1:%d；請重新啟動 VS Code/Codex。"
+			% selected_port
+			if configured
+			else "找不到 Codex 通知設定工具，請確認 tools 資料夾存在。"
+		)
+
+
+func _reconnect_codex_receiver() -> void:
+	if _codex_controller == null or not _codex_controller.enabled:
+		return
+	var connected := _codex_controller.reconnect()
+	_refresh_codex_settings_ui()
+	if is_instance_valid(_codex_feedback):
+		_codex_feedback.text = (
+			"已重新連線接收器。"
+			if connected
+			else "重新連線失敗，請確認通訊埠沒有被其他程式占用。"
+		)
 
 
 func _rebuild_stats_window_after_theme_change(
@@ -1910,6 +2009,8 @@ func _prepare_shutdown() -> void:
 	_save_stats_window_size()
 	state.save_state()
 	_finish_all_autostart_threads()
+	if _codex_controller != null:
+		_codex_controller.shutdown()
 	_remove_status_indicator()
 	_destroy_stats_window()
 

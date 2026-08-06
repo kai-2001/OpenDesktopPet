@@ -30,6 +30,23 @@ try {
     }
 
     $ErrorActionPreference = 'Continue'
+    $codexNotificationOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_notification_receiver_test.gd' 2>&1
+    $codexNotificationExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+    $codexNotificationOutput | Write-Output
+    if ($codexNotificationExitCode -ne 0 -or -not ($codexNotificationOutput -match 'CODEX_NOTIFICATION_RECEIVER_TEST_OK')) {
+        throw 'Codex notification receiver validation failed.'
+    }
+
+    $ErrorActionPreference = 'Continue'
+    $codexSettingsUiOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_settings_ui_test.gd' 2>&1
+    $codexSettingsUiExitCode = $LASTEXITCODE
+    $codexSettingsUiOutput | Write-Output
+    if ($codexSettingsUiExitCode -ne 0 -or -not ($codexSettingsUiOutput -match 'CODEX_SETTINGS_UI_TEST_OK')) {
+        throw 'Codex settings UI validation failed.'
+    }
+
+    $ErrorActionPreference = 'Continue'
     $windowOutput = & $GodotExe --path $projectRoot --script 'res://tests/window_integration_test.gd' 2>&1
     $windowExitCode = $LASTEXITCODE
     $ErrorActionPreference = $previousErrorActionPreference
