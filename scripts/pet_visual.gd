@@ -9,9 +9,12 @@ const PUBLIC_PACK_ROOT := "res://characters/public/"
 const INSTALLED_PACKS_ROOT := "user://character_packs/"
 const CHARACTER_SETTINGS_PATH := "user://ui_settings.cfg"
 const PUBLIC_CHARACTER_ID := "open_desktop_pet_default"
-const REQUIRED_ACTIONS := ["idle", "pet", "eat", "drink", "sleep", "move", "drag", "work"]
+const PetHitboxCalculatorScript = preload("res://scripts/pet_hitbox_calculator.gd")
+const CharacterPackRuntimeScript = preload("res://scripts/character_pack_runtime.gd")
 const FRAME_VIEWPORT_PADDING := 2.0
 
+var _pack_runtime = CharacterPackRuntimeScript.new()
+var _hitbox_calculator = PetHitboxCalculatorScript.new()
 var _sprite: Sprite2D
 var _manifest: Dictionary = {}
 var _actions: Dictionary = {}
@@ -767,103 +770,14 @@ func _selected_character_id() -> String:
 
 
 func _load_pack_from(candidate_root: String) -> bool:
-	var manifest_path := candidate_root.path_join("pet.json")
-	if not FileAccess.file_exists(manifest_path):
+	var loaded: Dictionary = _pack_runtime.load_pack(candidate_root)
+	if not bool(loaded.get("ok", false)):
 		return false
-	var file := FileAccess.open(manifest_path, FileAccess.READ)
-	if file == null:
-		return false
-	var parsed: Variant = JSON.parse_string(file.get_as_text())
-	if parsed is not Dictionary:
-		push_error("pet.json is not valid JSON.")
-		return false
-	var candidate_manifest: Dictionary = parsed
-	if int(candidate_manifest.get("format_version", 0)) != 1:
-		push_warning("Unsupported character-pack format version: %s" % manifest_path)
-		return false
-	var candidate_actions: Variant = candidate_manifest.get("actions", {})
-	if candidate_actions is not Dictionary:
-		push_warning("Character pack actions must be an object: %s" % manifest_path)
-		return false
-	for required_action: String in REQUIRED_ACTIONS:
-		if not candidate_actions.has(required_action):
-			push_warning("Character pack is missing required action '%s': %s" % [
-				required_action, manifest_path
-			])
-			return false
-	for action_id: String in candidate_actions:
-		if not _validate_action(action_id, candidate_actions[action_id], candidate_root):
-			return false
-	var fallback := String(candidate_manifest.get("fallback_action", "idle"))
-	if not candidate_actions.has(fallback):
-		push_warning("Character-pack fallback action does not exist: %s" % fallback)
-		return false
-	_manifest = candidate_manifest
-	_actions = candidate_actions
-	_aliases = candidate_manifest.get("aliases", {}) \
-		if candidate_manifest.get("aliases", {}) is Dictionary else {}
-	_pack_scale = clampf(float(candidate_manifest.get("scale", 0.31)), 0.01, 4.0)
-	_pack_root = candidate_root
-	return true
-
-
-func _validate_action(action_id: String, raw_definition: Variant, root: String) -> bool:
-	if raw_definition is not Dictionary:
-		push_warning("Action '%s' must be an object." % action_id)
-		return false
-	var definition: Dictionary = raw_definition
-	var relative_path := String(definition.get("file", ""))
-	if relative_path.is_empty() or relative_path.is_absolute_path() or relative_path.contains(".."):
-		push_warning("Action '%s' has an unsafe or empty file path." % action_id)
-		return false
-	var full_path := root.path_join(relative_path)
-	if not FileAccess.file_exists(full_path) and not ResourceLoader.exists(full_path):
-		push_warning("Action '%s' image does not exist: %s" % [action_id, full_path])
-		return false
-	var columns := int(definition.get("columns", 1))
-	var rows := int(definition.get("rows", 1))
-	if columns <= 0 or rows <= 0:
-		push_warning("Action '%s' columns and rows must be positive." % action_id)
-		return false
-	var sequence: Variant = definition.get("sequence", [0])
-	if sequence is not Array or sequence.is_empty():
-		push_warning("Action '%s' sequence must be a non-empty array." % action_id)
-		return false
-	for frame: Variant in sequence:
-		var frame_index := int(frame)
-		if frame_index < 0 or frame_index >= columns * rows:
-			push_warning("Action '%s' contains an out-of-range frame." % action_id)
-			return false
-	if action_id == "sleep":
-		for phase_key: String in ["enter_sequence", "loop_sequence", "wake_sequence"]:
-			if not definition.has(phase_key):
-				continue
-			var phase: Variant = definition[phase_key]
-			if phase is not Array or phase.is_empty() or phase.size() > 120:
-				push_warning("Sleep action '%s' must be a non-empty array." % phase_key)
-				return false
-			for frame: Variant in phase:
-				var frame_index := int(frame)
-				if frame_index < 0 or frame_index >= columns * rows:
-					push_warning("Sleep action '%s' contains an out-of-range frame." % phase_key)
-					return false
-	if float(definition.get("frame_time", 0.16)) <= 0.0:
-		push_warning("Action '%s' frame_time must be positive." % action_id)
-		return false
-	if float(definition.get("frame_time", 0.16)) > 5.0 or sequence.size() > 120:
-		push_warning("Action '%s' animation duration settings are excessive." % action_id)
-		return false
-	if int(definition.get("pulses", 4)) < 1 or int(definition.get("pulses", 4)) > 120:
-		push_warning("Action '%s' pulses must be between 1 and 120." % action_id)
-		return false
-	var offsets: Variant = definition.get("offsets", [])
-	if offsets is not Array:
-		push_warning("Action '%s' offsets must be an array." % action_id)
-		return false
-	for offset: Variant in offsets:
-		if offset is not Array or offset.size() < 2:
-			push_warning("Action '%s' has an invalid offset." % action_id)
-			return false
+	_manifest = loaded.manifest
+	_actions = loaded.actions
+	_aliases = loaded.aliases
+	_pack_scale = float(loaded.scale)
+	_pack_root = String(loaded.root)
 	return true
 
 
@@ -941,25 +855,10 @@ func _source_hit_polygon() -> PackedVector2Array:
 		pixel_polygon = _hit_polygon_cache[cache_key]
 	else:
 		var frame_image := image.get_region(pixel_rect)
-		var bitmap := BitMap.new()
-		bitmap.create_from_image_alpha(frame_image, 0.08)
-		var polygons := bitmap.opaque_to_polygons(
-			Rect2i(Vector2i.ZERO, frame_image.get_size()),
-			2.0
+		pixel_polygon = _hitbox_calculator.content_polygon(
+			frame_image,
+			Rect2i(Vector2i.ZERO, frame_image.get_size())
 		)
-		var all_points := PackedVector2Array()
-		for candidate: PackedVector2Array in polygons:
-			all_points.append_array(candidate)
-		if not all_points.is_empty():
-			var content_bounds := Rect2(all_points[0], Vector2.ZERO)
-			for point: Vector2 in all_points:
-				content_bounds = content_bounds.expand(point)
-			pixel_polygon = PackedVector2Array([
-				content_bounds.position,
-				Vector2(content_bounds.end.x, content_bounds.position.y),
-				content_bounds.end,
-				Vector2(content_bounds.position.x, content_bounds.end.y),
-			])
 		_hit_polygon_cache[cache_key] = pixel_polygon
 	var sprite_rect := _sprite.get_rect()
 	var result := PackedVector2Array()
@@ -1068,21 +967,7 @@ func _opaque_frame_bounds_in_canvas() -> Rect2:
 		var image := _hit_image_for(_sprite.texture)
 		if image == null or image.is_empty():
 			return Rect2()
-		var frame_image := image.get_region(pixel_rect)
-		var bitmap := BitMap.new()
-		bitmap.create_from_image_alpha(frame_image, 0.08)
-		var polygons := bitmap.opaque_to_polygons(
-			Rect2i(Vector2i.ZERO, frame_image.get_size()),
-			2.0
-		)
-		var has_point := false
-		for polygon: PackedVector2Array in polygons:
-			for point: Vector2 in polygon:
-				if has_point:
-					opaque_bounds = opaque_bounds.expand(point)
-				else:
-					opaque_bounds = Rect2(point, Vector2.ZERO)
-					has_point = true
+		opaque_bounds = _hitbox_calculator.content_bounds(image, pixel_rect)
 		_opaque_bounds_cache[cache_key] = opaque_bounds
 	if opaque_bounds.size == Vector2.ZERO:
 		return Rect2()
@@ -1108,15 +993,6 @@ func _opaque_frame_bounds_in_canvas() -> Rect2:
 	for corner: Vector2 in corners:
 		canvas_bounds = canvas_bounds.expand(corner)
 	return canvas_bounds
-
-
-func _polygon_area(polygon: PackedVector2Array) -> float:
-	var area := 0.0
-	for index in polygon.size():
-		var next := (index + 1) % polygon.size()
-		area += polygon[index].x * polygon[next].y
-		area -= polygon[next].x * polygon[index].y
-	return area * 0.5
 
 
 func _emit_interaction_region() -> void:

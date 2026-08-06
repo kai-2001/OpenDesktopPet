@@ -1,6 +1,9 @@
 class_name PetState
 extends Node
 
+const PetClockScript = preload("res://scripts/pet_clock.gd")
+const PetStateRepositoryScript = preload("res://scripts/pet_state_repository.gd")
+
 signal changed(snapshot: Dictionary)
 signal message_requested(key: String, fallback: String)
 signal action_requested(action: String, request_id: int)
@@ -52,6 +55,8 @@ const DEFAULT_DATA := {
 
 var data: Dictionary = DEFAULT_DATA.duplicate(true)
 var save_path := DEFAULT_SAVE_PATH
+var clock = PetClockScript.new()
+var repository = PetStateRepositoryScript.new()
 var _clock_accumulator := 0.0
 var _companion_check_accumulator := 0.0
 var _action_busy := false
@@ -536,47 +541,12 @@ func _ensure_wish_schedule() -> void:
 
 func save_state() -> void:
 	data.last_seen = _now()
-	DirAccess.make_dir_recursive_absolute(
-		ProjectSettings.globalize_path(save_path.get_base_dir())
-	)
-	var temporary_path := save_path + ".tmp"
-	var backup_path := save_path + ".backup"
-	var file := FileAccess.open(temporary_path, FileAccess.WRITE)
-	if file == null:
-		push_warning("Unable to open save file: %s" % FileAccess.get_open_error())
-		return
-	file.store_string(JSON.stringify(data, "\t"))
-	file.flush()
-	file.close()
-	var verification := FileAccess.open(temporary_path, FileAccess.READ)
-	if verification == null or JSON.parse_string(verification.get_as_text()) is not Dictionary:
-		push_warning("Temporary save verification failed.")
-		return
-	verification.close()
-	var absolute_save := ProjectSettings.globalize_path(save_path)
-	var absolute_temporary := ProjectSettings.globalize_path(temporary_path)
-	var absolute_backup := ProjectSettings.globalize_path(backup_path)
-	if FileAccess.file_exists(backup_path):
-		DirAccess.remove_absolute(absolute_backup)
-	if FileAccess.file_exists(save_path):
-		if DirAccess.rename_absolute(absolute_save, absolute_backup) != OK:
-			push_warning("Unable to rotate the previous save file.")
-			return
-	if DirAccess.rename_absolute(absolute_temporary, absolute_save) != OK:
-		push_warning("Unable to install the verified save file.")
-		if FileAccess.file_exists(backup_path):
-			DirAccess.rename_absolute(absolute_backup, absolute_save)
+	repository.save(data, save_path)
 
 
 func load_state() -> void:
-	if not FileAccess.file_exists(save_path):
-		return
-	var file := FileAccess.open(save_path, FileAccess.READ)
-	if file == null:
-		return
-	var parsed: Variant = JSON.parse_string(file.get_as_text())
-	if parsed is not Dictionary:
-		push_warning("Save data is invalid; defaults are used.")
+	var parsed: Variant = repository.load(save_path)
+	if not parsed is Dictionary:
 		return
 	for key: String in data.keys():
 		if parsed.has(key):
@@ -607,10 +577,10 @@ func _commit() -> void:
 
 func _update_companion_record(date_override := "") -> bool:
 	# 使用電腦目前的本地日期，只比較年月日。
-	var today := (
+	var today: String = (
 		date_override
 		if not date_override.is_empty()
-		else Time.get_date_string_from_system(false)
+		else clock.local_date()
 	)
 	var last_date := String(
 		data.get("last_companion_date", "")
@@ -888,7 +858,7 @@ func _normalize_loaded_data() -> void:
 
 
 func _now() -> int:
-	return int(Time.get_unix_time_from_system())
+	return clock.now()
 
 
 func _limit(value: float) -> float:

@@ -4,8 +4,37 @@ extends RefCounted
 const CodexIntegrationControllerScript = preload("res://scripts/codex_integration_controller.gd")
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 
+signal care_action_requested(action: String)
+signal close_requested
+signal target_fps_selected(index: int)
+signal details_theme_selected(index: int)
+signal codex_state_selected(index: int)
+signal codex_port_changed(value: float)
+signal codex_configure_requested
+signal codex_reconnect_requested
+signal autostart_toggled(enabled: bool)
+signal autostart_query_requested
+signal character_selected(index: int)
+signal character_use_requested
+signal character_delete_requested
+signal character_import_requested
+signal open_character_packs_folder_requested
+signal character_archive_selected(path: String)
+signal character_update_confirmed
+signal character_delete_confirmed
 
-func build_status_tab(tabs: TabContainer, host: Node) -> Dictionary:
+var theme_mode := "light"
+var last_state_message := "尚無紀錄"
+var codex_enabled := false
+var codex_port := CodexIntegrationControllerScript.DEFAULT_PORT
+var autostart_supported := false
+var interaction_label: Callable
+var interaction_icon: Callable
+var stats_bars: Dictionary = {}
+
+
+func build_status_tab(tabs: TabContainer) -> Dictionary:
+	stats_bars.clear()
 	var scroll := ScrollContainer.new()
 	scroll.name = "狀態"
 	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -24,58 +53,58 @@ func build_status_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	content.add_theme_constant_override("separation", 10)
 	margin.add_child(content)
 
-	var title: Label = host._new_label(
-		"養成狀態", 24, host._details_color("#20272b", "#f0f0f0")
+	var title: Label = _new_label(
+		"養成狀態", 24, _details_color("#20272b", "#f0f0f0")
 	)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(title)
 
-	var stats_status: Label = host._new_label(
-		"", 15, host._details_color("#238b9d", "#4fc1ff")
+	var stats_status: Label = _new_label(
+		"", 15, _details_color("#238b9d", "#4fc1ff")
 	)
 	stats_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(stats_status)
 
-	var companion_status: Label = host._new_label(
-		"", 14, host._details_color("#6f65a8", "#c8a7ff")
+	var companion_status: Label = _new_label(
+		"", 14, _details_color("#6f65a8", "#c8a7ff")
 	)
 	companion_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	companion_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(companion_status)
 
-	var wish_status: Label = host._new_label(
-		"", 15, host._details_color("#a66b16", "#dcdcaa")
+	var wish_status: Label = _new_label(
+		"", 15, _details_color("#a66b16", "#dcdcaa")
 	)
 	wish_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	wish_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(wish_status)
 
 	content.add_child(HSeparator.new())
-	host._add_stat_row(content, "飽食", "hunger", Color("#efa64a"))
-	host._add_stat_row(content, "水分", "thirst", Color("#55b7df"))
-	host._add_stat_row(content, "體力", "energy", Color("#69c986"))
-	host._add_stat_row(content, "心情", "mood", Color("#e97ca6"))
-	host._add_stat_row(content, "親密", "affection", Color("#9a83d2"))
+	_add_stat_row(content, "飽食", "hunger", Color("#efa64a"))
+	_add_stat_row(content, "水分", "thirst", Color("#55b7df"))
+	_add_stat_row(content, "體力", "energy", Color("#69c986"))
+	_add_stat_row(content, "心情", "mood", Color("#e97ca6"))
+	_add_stat_row(content, "親密", "affection", Color("#9a83d2"))
 
-	var unlock_status: Label = host._new_label(
-		"", 14, host._details_color("#6f65a8", "#c8a7ff")
+	var unlock_status: Label = _new_label(
+		"", 14, _details_color("#6f65a8", "#c8a7ff")
 	)
 	unlock_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	unlock_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(unlock_status)
 
-	var last_message_status: Label = host._new_label(
-		"最近訊息：%s" % host._last_state_message,
+	var last_message_status: Label = _new_label(
+		"最近訊息：%s" % last_state_message,
 		13,
-		host._details_color("#68747a", "#9da1a6")
+		_details_color("#68747a", "#9da1a6")
 	)
 	last_message_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	last_message_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(last_message_status)
 	content.add_child(HSeparator.new())
 
-	var action_title: Label = host._new_label(
-		"照顧操作", 16, host._details_color("#30383c", "#d4d4d4")
+	var action_title: Label = _new_label(
+		"照顧操作", 16, _details_color("#30383c", "#d4d4d4")
 	)
 	action_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(action_title)
@@ -96,12 +125,11 @@ func build_status_tab(tabs: TabContainer, host: Node) -> Dictionary:
 		var action := String(definition.action)
 		var action_button := Button.new()
 		action_button.text = "%s %s" % [
-			host._interaction_icon(action), host._interaction_label(action)
+			_interaction_icon(action), _interaction_label(action)
 		]
 		action_button.custom_minimum_size = Vector2(100, 38)
-		var action_id := int(definition.id)
 		action_button.pressed.connect(
-			func() -> void: host._run_care_action(action_id)
+			func() -> void: care_action_requested.emit(action)
 		)
 		action_grid.add_child(action_button)
 		care_action_buttons[action] = action_button
@@ -111,7 +139,7 @@ func build_status_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	var close_button := Button.new()
 	close_button.text = "關閉詳細狀態"
 	close_button.custom_minimum_size.y = 40
-	close_button.pressed.connect(host._destroy_stats_window)
+	close_button.pressed.connect(func() -> void: close_requested.emit())
 	content.add_child(close_button)
 
 	return {
@@ -121,10 +149,11 @@ func build_status_tab(tabs: TabContainer, host: Node) -> Dictionary:
 		"unlock_status": unlock_status,
 		"last_message_status": last_message_status,
 		"care_action_buttons": care_action_buttons,
+		"stats_bars": stats_bars,
 	}
 
 
-func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
+func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	var settings_scroll := ScrollContainer.new()
 	settings_scroll.name = "設定"
 	settings_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -142,16 +171,16 @@ func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	settings_content.add_theme_constant_override("separation", 16)
 	settings_margin.add_child(settings_content)
 
-	var settings_title: Label = host._new_label(
-		"桌寵設定", 24, host._details_color("#20272b", "#f0f0f0")
+	var settings_title: Label = _new_label(
+		"桌寵設定", 24, _details_color("#20272b", "#f0f0f0")
 	)
 	settings_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settings_content.add_child(settings_title)
 
 	var fps_row := HBoxContainer.new()
 	fps_row.add_theme_constant_override("separation", 12)
-	var fps_label: Label = host._new_label(
-		"桌寵幀率（FPS）", 16, host._details_color("#30383c", "#d4d4d4")
+	var fps_label: Label = _new_label(
+		"桌寵幀率（FPS）", 16, _details_color("#30383c", "#d4d4d4")
 	)
 	fps_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fps_row.add_child(fps_label)
@@ -160,14 +189,16 @@ func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
 		fps_option_button.add_item("%d FPS" % fps, fps)
 	fps_option_button.select(fps_option_button.get_item_index(Engine.max_fps))
 	fps_option_button.custom_minimum_size = Vector2(120, 40)
-	fps_option_button.item_selected.connect(host._on_target_fps_selected)
+	fps_option_button.item_selected.connect(
+		func(index: int) -> void: target_fps_selected.emit(index)
+	)
 	fps_row.add_child(fps_option_button)
 	settings_content.add_child(fps_row)
 
-	var fps_hint: Label = host._new_label(
+	var fps_hint: Label = _new_label(
 		"控制整個桌寵的更新率（15–60）；30 FPS 適合日常使用，降低可省電。",
 		13,
-		host._details_color("#68747a", "#9da1a6")
+		_details_color("#68747a", "#9da1a6")
 	)
 	fps_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_content.add_child(fps_hint)
@@ -175,8 +206,8 @@ func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
 
 	var theme_row := HBoxContainer.new()
 	theme_row.add_theme_constant_override("separation", 12)
-	var theme_label: Label = host._new_label(
-		"詳細面板主題", 16, host._details_color("#30383c", "#d4d4d4")
+	var theme_label: Label = _new_label(
+		"詳細面板主題", 16, _details_color("#30383c", "#d4d4d4")
 	)
 	theme_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	theme_row.add_child(theme_label)
@@ -184,31 +215,33 @@ func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	details_theme_option_button.add_item("淺色", 0)
 	details_theme_option_button.add_item("深色", 1)
 	details_theme_option_button.select(
-		1 if host._details_theme_mode == "dark" else 0
+		1 if theme_mode == "dark" else 0
 	)
 	details_theme_option_button.custom_minimum_size = Vector2(120, 40)
-	details_theme_option_button.item_selected.connect(host._on_details_theme_selected)
+	details_theme_option_button.item_selected.connect(
+		func(index: int) -> void: details_theme_selected.emit(index)
+	)
 	theme_row.add_child(details_theme_option_button)
 	settings_content.add_child(theme_row)
 
-	var theme_hint: Label = host._new_label(
+	var theme_hint: Label = _new_label(
 		"切換詳細面板的完整配色；設定會自動保存。",
 		13,
-		host._details_color("#68747a", "#9da1a6")
+		_details_color("#68747a", "#9da1a6")
 	)
 	settings_content.add_child(theme_hint)
 	settings_content.add_child(HSeparator.new())
 
-	var codex_title: Label = host._new_label(
-		"Codex 完成通知", 18, host._details_color("#30383c", "#d4d4d4")
+	var codex_title: Label = _new_label(
+		"Codex 完成通知", 18, _details_color("#30383c", "#d4d4d4")
 	)
 	codex_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settings_content.add_child(codex_title)
 
 	var codex_switch_row := HBoxContainer.new()
 	codex_switch_row.add_theme_constant_override("separation", 12)
-	var codex_switch_label: Label = host._new_label(
-		"通知狀態", 16, host._details_color("#30383c", "#d4d4d4")
+	var codex_switch_label: Label = _new_label(
+		"通知狀態", 16, _details_color("#30383c", "#d4d4d4")
 	)
 	codex_switch_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	codex_switch_row.add_child(codex_switch_label)
@@ -216,19 +249,18 @@ func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	codex_state_option_button.name = "CodexStateOptionButton"
 	codex_state_option_button.add_item("開啟", 0)
 	codex_state_option_button.add_item("關閉", 1)
-	var codex_enabled: bool = (
-		host._codex_controller != null and host._codex_controller.enabled
-	)
 	codex_state_option_button.select(0 if codex_enabled else 1)
 	codex_state_option_button.custom_minimum_size = Vector2(112, 40)
-	codex_state_option_button.item_selected.connect(host._on_codex_state_selected)
+	codex_state_option_button.item_selected.connect(
+		func(index: int) -> void: codex_state_selected.emit(index)
+	)
 	codex_switch_row.add_child(codex_state_option_button)
 	settings_content.add_child(codex_switch_row)
 
 	var codex_port_row := HBoxContainer.new()
 	codex_port_row.add_theme_constant_override("separation", 12)
-	var codex_port_label: Label = host._new_label(
-		"本機通訊埠", 16, host._details_color("#30383c", "#d4d4d4")
+	var codex_port_label: Label = _new_label(
+		"本機通訊埠", 16, _details_color("#30383c", "#d4d4d4")
 	)
 	codex_port_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	codex_port_row.add_child(codex_port_label)
@@ -237,27 +269,25 @@ func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	codex_port_spin_box.min_value = CodexIntegrationControllerScript.MIN_PORT
 	codex_port_spin_box.max_value = CodexIntegrationControllerScript.MAX_PORT
 	codex_port_spin_box.step = 1
-	codex_port_spin_box.value = (
-		host._codex_controller.port
-		if host._codex_controller != null
-		else CodexIntegrationControllerScript.DEFAULT_PORT
-	)
+	codex_port_spin_box.value = codex_port
 	codex_port_spin_box.custom_minimum_size = Vector2(140, 40)
-	host._style_spin_box(codex_port_spin_box)
-	codex_port_spin_box.value_changed.connect(host._on_codex_port_changed)
+	_style_spin_box(codex_port_spin_box)
+	codex_port_spin_box.value_changed.connect(
+		func(value: float) -> void: codex_port_changed.emit(value)
+	)
 	codex_port_row.add_child(codex_port_spin_box)
 	settings_content.add_child(codex_port_row)
 
-	var codex_status_label: Label = host._new_label(
-		"", 14, host._details_color("#238b9d", "#4fc1ff")
+	var codex_status_label: Label = _new_label(
+		"", 14, _details_color("#238b9d", "#4fc1ff")
 	)
 	codex_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settings_content.add_child(codex_status_label)
 
-	var codex_hint: Label = host._new_label(
+	var codex_hint: Label = _new_label(
 		"通知開啟時通訊埠會鎖定；關閉後才可以修改。",
 		13,
-		host._details_color("#68747a", "#9da1a6")
+		_details_color("#68747a", "#9da1a6")
 	)
 	codex_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_content.add_child(codex_hint)
@@ -269,25 +299,29 @@ func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	codex_configure_button.text = "設定通訊埠"
 	codex_configure_button.custom_minimum_size = Vector2(0, 40)
 	codex_configure_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	host._style_codex_action_button(codex_configure_button)
+	_style_codex_action_button(codex_configure_button)
 	codex_configure_button.disabled = codex_enabled
-	codex_configure_button.pressed.connect(host._configure_codex_port)
+	codex_configure_button.pressed.connect(
+		func() -> void: codex_configure_requested.emit()
+	)
 	codex_button_row.add_child(codex_configure_button)
 	var codex_reconnect_button := Button.new()
 	codex_reconnect_button.name = "CodexReconnectButton"
 	codex_reconnect_button.text = "重新連線接收器"
 	codex_reconnect_button.custom_minimum_size = Vector2(0, 40)
 	codex_reconnect_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	host._style_codex_action_button(codex_reconnect_button)
+	_style_codex_action_button(codex_reconnect_button)
 	codex_reconnect_button.disabled = not codex_enabled
-	codex_reconnect_button.pressed.connect(host._reconnect_codex_receiver)
+	codex_reconnect_button.pressed.connect(
+		func() -> void: codex_reconnect_requested.emit()
+	)
 	codex_button_row.add_child(codex_reconnect_button)
 	settings_content.add_child(codex_button_row)
 
-	var codex_feedback: Label = host._new_label(
+	var codex_feedback: Label = _new_label(
 		"通知已關閉；選擇通訊埠後按「設定通訊埠」。",
 		13,
-		host._details_color("#68747a", "#9da1a6")
+		_details_color("#68747a", "#9da1a6")
 	)
 	codex_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_content.add_child(codex_feedback)
@@ -296,31 +330,33 @@ func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	var autostart_check_box := CheckBox.new()
 	autostart_check_box.text = "登入 Windows 時自動開啟桌寵"
 	autostart_check_box.add_theme_font_size_override("font_size", 16)
-	host._style_checkbox(autostart_check_box)
+	_style_checkbox(autostart_check_box)
 	autostart_check_box.custom_minimum_size = Vector2(0, 40)
 	autostart_check_box.button_pressed = false
 	autostart_check_box.disabled = true
-	autostart_check_box.toggled.connect(host._on_autostart_toggled)
+	autostart_check_box.toggled.connect(
+		func(enabled: bool) -> void: autostart_toggled.emit(enabled)
+	)
 	settings_content.add_child(autostart_check_box)
 
-	var settings_feedback: Label = host._new_label(
+	var settings_feedback: Label = _new_label(
 		"請使用打包版設定開機啟動。"
-		if OS.has_feature("editor")
+		if not autostart_supported
 		else "正在讀取 Windows 開機啟動設定…",
 		13,
-		host._details_color("#68747a", "#9da1a6")
+		_details_color("#68747a", "#9da1a6")
 	)
 	settings_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_content.add_child(settings_feedback)
-	if host._is_autostart_supported():
-		host.call_deferred("_start_autostart_operation", "query", false)
-	elif not OS.has_feature("editor"):
+	if autostart_supported:
+		autostart_query_requested.emit()
+	else:
 		settings_feedback.text = "目前平台不支援 Windows 開機啟動設定。"
 
 	var settings_close_button := Button.new()
 	settings_close_button.text = "關閉詳細面板"
 	settings_close_button.custom_minimum_size.y = 42
-	settings_close_button.pressed.connect(host._destroy_stats_window)
+	settings_close_button.pressed.connect(func() -> void: close_requested.emit())
 	settings_content.add_child(settings_close_button)
 
 	return {
@@ -337,7 +373,7 @@ func build_settings_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	}
 
 
-func build_character_tab(tabs: TabContainer, host: Node) -> Dictionary:
+func build_character_tab(tabs: TabContainer, stats_window: Window) -> Dictionary:
 	var character_scroll := ScrollContainer.new()
 	character_scroll.name = "角色"
 	character_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -356,15 +392,15 @@ func build_character_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	content.add_theme_constant_override("separation", 12)
 	margin.add_child(content)
 
-	var title: Label = host._new_label(
-		"角色管理", 24, host._details_color("#20272b", "#f0f0f0")
+	var title: Label = _new_label(
+		"角色管理", 24, _details_color("#20272b", "#f0f0f0")
 	)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(title)
-	var hint: Label = host._new_label(
+	var hint: Label = _new_label(
 		"角色清單只會在開啟這個頁面時讀取，不會增加平常常駐耗能。",
 		13,
-		host._details_color("#68747a", "#9da1a6")
+		_details_color("#68747a", "#9da1a6")
 	)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -374,7 +410,9 @@ func build_character_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	character_list.name = "CharacterList"
 	character_list.custom_minimum_size = Vector2(0, 260)
 	character_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	character_list.item_selected.connect(host._on_character_selected)
+	character_list.item_selected.connect(
+		func(index: int) -> void: character_selected.emit(index)
+	)
 	content.add_child(character_list)
 
 	var action_row := HFlowContainer.new()
@@ -385,16 +423,20 @@ func build_character_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	character_use_button.text = "使用選取角色"
 	character_use_button.custom_minimum_size = Vector2(145, 40)
 	character_use_button.disabled = true
-	host._apply_primary_button_style(character_use_button)
-	character_use_button.pressed.connect(host._use_selected_character)
+	_apply_primary_button_style(character_use_button)
+	character_use_button.pressed.connect(
+		func() -> void: character_use_requested.emit()
+	)
 	action_row.add_child(character_use_button)
 	var character_delete_button := Button.new()
 	character_delete_button.name = "CharacterDeleteButton"
 	character_delete_button.text = "刪除角色包"
 	character_delete_button.custom_minimum_size = Vector2(125, 40)
 	character_delete_button.disabled = true
-	host._apply_danger_button_style(character_delete_button)
-	character_delete_button.pressed.connect(host._confirm_delete_selected_character)
+	_apply_danger_button_style(character_delete_button)
+	character_delete_button.pressed.connect(
+		func() -> void: character_delete_requested.emit()
+	)
 	action_row.add_child(character_delete_button)
 	content.add_child(action_row)
 
@@ -405,20 +447,24 @@ func build_character_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	import_button.name = "CharacterImportButton"
 	import_button.text = "匯入角色包"
 	import_button.custom_minimum_size = Vector2(135, 40)
-	import_button.pressed.connect(host._open_character_import_dialog)
+	import_button.pressed.connect(
+		func() -> void: character_import_requested.emit()
+	)
 	import_row.add_child(import_button)
 	var open_folder_button := Button.new()
 	open_folder_button.name = "CharacterPacksFolderButton"
 	open_folder_button.text = "開啟角色資料夾"
 	open_folder_button.custom_minimum_size = Vector2(145, 40)
-	open_folder_button.pressed.connect(host._open_character_packs_folder)
+	open_folder_button.pressed.connect(
+		func() -> void: open_character_packs_folder_requested.emit()
+	)
 	import_row.add_child(open_folder_button)
 	content.add_child(import_row)
 
-	var character_feedback: Label = host._new_label(
+	var character_feedback: Label = _new_label(
 		"切換角色會儲存目前進度，並直接在目前視窗載入。",
 		13,
-		host._details_color("#238b9d", "#4fc1ff")
+		_details_color("#238b9d", "#4fc1ff")
 	)
 	character_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	character_feedback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -431,20 +477,26 @@ func build_character_tab(tabs: TabContainer, host: Node) -> Dictionary:
 	character_import_dialog.access = FileDialog.ACCESS_FILESYSTEM
 	character_import_dialog.use_native_dialog = true
 	character_import_dialog.add_filter("*.petpack, *.zip", "桌寵角色包")
-	character_import_dialog.file_selected.connect(host._install_character_archive)
-	host._stats_window.add_child(character_import_dialog)
+	character_import_dialog.file_selected.connect(
+		func(path: String) -> void: character_archive_selected.emit(path)
+	)
+	stats_window.add_child(character_import_dialog)
 
 	var character_update_dialog := ConfirmationDialog.new()
 	character_update_dialog.name = "CharacterUpdateDialog"
 	character_update_dialog.title = "更新角色包"
-	character_update_dialog.confirmed.connect(host._install_pending_character_archive)
-	host._stats_window.add_child(character_update_dialog)
+	character_update_dialog.confirmed.connect(
+		func() -> void: character_update_confirmed.emit()
+	)
+	stats_window.add_child(character_update_dialog)
 
 	var character_delete_dialog := ConfirmationDialog.new()
 	character_delete_dialog.name = "CharacterDeleteDialog"
 	character_delete_dialog.title = "刪除角色包"
-	character_delete_dialog.confirmed.connect(host._delete_selected_character)
-	host._stats_window.add_child(character_delete_dialog)
+	character_delete_dialog.confirmed.connect(
+		func() -> void: character_delete_confirmed.emit()
+	)
+	stats_window.add_child(character_delete_dialog)
 
 	return {
 		"character_tab_index": character_tab_index,
@@ -456,3 +508,158 @@ func build_character_tab(tabs: TabContainer, host: Node) -> Dictionary:
 		"character_update_dialog": character_update_dialog,
 		"character_delete_dialog": character_delete_dialog,
 	}
+
+
+func _new_label(text: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	return label
+
+
+func _details_color(light: String, dark: String) -> Color:
+	return Color(dark if theme_mode == "dark" else light)
+
+
+func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	return style
+
+
+func _add_stat_row(parent: VBoxContainer, label_text: String, key: String, color: Color) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var label := _new_label(label_text, 15, _details_color("#445057", "#cccccc"))
+	label.custom_minimum_size.x = 48
+	row.add_child(label)
+	var bar := ProgressBar.new()
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.custom_minimum_size.y = 22
+	bar.show_percentage = true
+	var background := StyleBoxFlat.new()
+	background.bg_color = _details_color("#e8edef", "#333333")
+	background.set_corner_radius_all(8)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = color
+	fill.set_corner_radius_all(8)
+	bar.add_theme_stylebox_override("background", background)
+	bar.add_theme_stylebox_override("fill", fill)
+	bar.add_theme_color_override("font_color", _details_color("#263238", "#f0f0f0"))
+	bar.add_theme_color_override("font_outline_color", _details_color("#ffffff", "#1e1e1e"))
+	bar.add_theme_constant_override("outline_size", 1)
+	row.add_child(bar)
+	stats_bars[key] = bar
+	parent.add_child(row)
+
+
+func _style_spin_box(spin_box: SpinBox) -> void:
+	var line_edit := spin_box.get_line_edit()
+	var normal := _details_style(
+		_details_color("#ffffff", "#252526"),
+		_details_color("#d6dee2", "#3c3c3c"), 6
+	)
+	var hover := _details_style(
+		_details_color("#f7fcfd", "#2a2d2e"),
+		_details_color("#78c8d5", "#4e94ce"), 6
+	)
+	var focus := _details_style(
+		_details_color("#ffffff", "#252526"),
+		_details_color("#35a9bd", "#3794ff"), 6
+	)
+	line_edit.add_theme_stylebox_override("normal", normal)
+	line_edit.add_theme_stylebox_override("hover", hover)
+	line_edit.add_theme_stylebox_override("focus", focus)
+	line_edit.add_theme_color_override("font_color", _details_color("#30383c", "#d4d4d4"))
+	line_edit.add_theme_color_override("font_uneditable_color", _details_color("#68747a", "#9da1a6"))
+	line_edit.add_theme_color_override("caret_color", _details_color("#176f7e", "#4fc1ff"))
+	spin_box.add_theme_color_override("font_color", _details_color("#30383c", "#d4d4d4"))
+
+
+func _style_codex_action_button(button: Button) -> void:
+	var normal := _details_style(
+		_details_color("#ffffff", "#252526"),
+		_details_color("#cbd5d9", "#454545"), 8
+	)
+	var hover := _details_style(
+		_details_color("#edf8fa", "#2a2d2e"),
+		_details_color("#78c8d5", "#4e94ce"), 8
+	)
+	var pressed := _details_style(
+		_details_color("#d9f0f4", "#094771"),
+		_details_color("#35a9bd", "#3794ff"), 8
+	)
+	var disabled := _details_style(
+		_details_color("#dfe6e8", "#292e31"),
+		_details_color("#b9c4c8", "#4a5054"), 8
+	)
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", pressed)
+	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_color_override("font_color", _details_color("#30383c", "#d4d4d4"))
+	button.add_theme_color_override("font_hover_color", _details_color("#145f6c", "#ffffff"))
+	button.add_theme_color_override("font_pressed_color", _details_color("#145f6c", "#ffffff"))
+	button.add_theme_color_override("font_focus_color", _details_color("#145f6c", "#ffffff"))
+	button.add_theme_color_override("font_disabled_color", _details_color("#9aa6aa", "#6d6d6d"))
+
+
+func _style_checkbox(check_box: CheckBox) -> void:
+	check_box.add_theme_constant_override("h_separation", 10)
+	check_box.add_theme_color_override("font_color", _details_color("#30383c", "#cccccc"))
+	check_box.add_theme_color_override("font_hover_color", _details_color("#176f7e", "#ffffff"))
+	check_box.add_theme_color_override("font_pressed_color", _details_color("#145f6c", "#ffffff"))
+	check_box.add_theme_color_override("font_hover_pressed_color", _details_color("#145f6c", "#ffffff"))
+	check_box.add_theme_color_override("font_focus_color", _details_color("#145f6c", "#ffffff"))
+	check_box.add_theme_color_override("font_disabled_color", _details_color("#99a3a8", "#6d6d6d"))
+
+
+func _apply_primary_button_style(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", _details_style(
+		_details_color("#35a9bd", "#0e639c"), _details_color("#35a9bd", "#1177bb"), 8
+	))
+	button.add_theme_stylebox_override("hover", _details_style(
+		_details_color("#278fa1", "#1177bb"), _details_color("#278fa1", "#3794ff"), 8
+	))
+	button.add_theme_stylebox_override("pressed", _details_style(
+		_details_color("#1d7888", "#094771"), _details_color("#1d7888", "#3794ff"), 8
+	))
+	button.add_theme_color_override("font_color", Color("#ffffff"))
+	button.add_theme_color_override("font_hover_color", Color("#ffffff"))
+	button.add_theme_color_override("font_pressed_color", Color("#ffffff"))
+
+
+func _apply_danger_button_style(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", _details_style(
+		_details_color("#fffafa", "#2b2020"), _details_color("#e7b4b4", "#8b4545"), 8
+	))
+	button.add_theme_stylebox_override("hover", _details_style(
+		_details_color("#fff0f0", "#3b2424"), _details_color("#d97b7b", "#d16969"), 8
+	))
+	button.add_theme_stylebox_override("pressed", _details_style(
+		_details_color("#f8dddd", "#512b2b"), _details_color("#c85f5f", "#f48771"), 8
+	))
+	button.add_theme_color_override("font_color", _details_color("#b34747", "#f48771"))
+	button.add_theme_color_override("font_hover_color", _details_color("#a53636", "#ff9b8a"))
+	button.add_theme_color_override("font_pressed_color", _details_color("#8f2d2d", "#ffffff"))
+
+
+func _interaction_label(action: String) -> String:
+	if interaction_label.is_valid():
+		return String(interaction_label.call(action))
+	return action
+
+
+func _interaction_icon(action: String) -> String:
+	if interaction_icon.is_valid():
+		return String(interaction_icon.call(action))
+	return ""

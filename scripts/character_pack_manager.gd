@@ -2,8 +2,9 @@ class_name CharacterPackManager
 extends RefCounted
 
 const PACKS_ROOT := "user://character_packs"
+const CharacterPackValidatorScript = preload("res://scripts/character_pack_validator.gd")
 const REQUIRED_ACTIONS := ["idle", "pet", "eat", "drink", "sleep", "move", "drag", "work"]
-const ALLOWED_IMAGE_EXTENSIONS := ["png", "jpg", "jpeg", "webp", "svg"]
+const ALLOWED_PREVIEW_EXTENSIONS := ["png", "jpg", "jpeg", "webp", "svg"]
 const MAX_ARCHIVE_FILES := 2048
 const MAX_ARCHIVE_BYTES := 256 * 1024 * 1024
 const MAX_SINGLE_FILE_BYTES := 32 * 1024 * 1024
@@ -157,42 +158,15 @@ static func validate_pack(root: String) -> Dictionary:
 	for required_action: String in REQUIRED_ACTIONS:
 		if not actions.has(required_action):
 			return _failure("角色包缺少必要動作：%s。" % required_action)
+	var validator = CharacterPackValidatorScript.new()
 	for action_id: String in actions:
-		var definition: Variant = actions[action_id]
-		if definition is not Dictionary:
-			return _failure("動作 %s 的設定不是物件。" % action_id)
-		var relative_path := String(definition.get("file", ""))
-		if not _is_safe_relative_path(relative_path):
-			return _failure("動作 %s 使用了不安全的圖片路徑。" % action_id)
-		if relative_path.get_extension().to_lower() not in ALLOWED_IMAGE_EXTENSIONS:
-			return _failure("動作 %s 使用了不支援的圖片格式。" % action_id)
-		if not FileAccess.file_exists(root.path_join(relative_path)):
-			return _failure("動作 %s 找不到圖片：%s。" % [action_id, relative_path])
-		var columns := int(definition.get("columns", 1))
-		var rows := int(definition.get("rows", 1))
-		if columns <= 0 or rows <= 0 or columns * rows > 4096:
-			return _failure("動作 %s 的影格格線無效。" % action_id)
-		var sequence: Variant = definition.get("sequence", [0])
-		if sequence is not Array or sequence.is_empty() or sequence.size() > 120:
-			return _failure("動作 %s 的 sequence 無效。" % action_id)
-		for frame: Variant in sequence:
-			if int(frame) < 0 or int(frame) >= columns * rows:
-				return _failure("動作 %s 的 sequence 含有超出格線的影格。" % action_id)
-		if action_id == "sleep":
-			for phase_key: String in ["enter_sequence", "loop_sequence", "wake_sequence"]:
-				if not definition.has(phase_key):
-					continue
-				var phase: Variant = definition[phase_key]
-				if phase is not Array or phase.is_empty() or phase.size() > 120:
-					return _failure("睡眠動作的 %s 無效。" % phase_key)
-				for frame: Variant in phase:
-					if int(frame) < 0 or int(frame) >= columns * rows:
-						return _failure("睡眠動作的 %s 含有超出格線的影格。" % phase_key)
+		if not validator.validate_action(action_id, actions[action_id], root, false, true):
+			return _failure("動作 %s 驗證失敗。" % action_id)
 	var preview := String(manifest.get("preview", ""))
 	if not preview.is_empty():
 		if not _is_safe_relative_path(preview):
 			return _failure("角色預覽圖路徑不安全。")
-		if preview.get_extension().to_lower() not in ALLOWED_IMAGE_EXTENSIONS:
+		if preview.get_extension().to_lower() not in ALLOWED_PREVIEW_EXTENSIONS:
 			return _failure("角色預覽圖格式不受支援。")
 		if not FileAccess.file_exists(root.path_join(preview)):
 			return _failure("找不到角色預覽圖。")

@@ -3,6 +3,8 @@ extends Node2D
 const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
 const CodexIntegrationControllerScript = preload("res://scripts/codex_integration_controller.gd")
 const DetailsWindowControllerScript = preload("res://scripts/details_window_controller.gd")
+const DesktopWindowServiceScript = preload("res://scripts/desktop_window_service.gd")
+const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_STATS_SIZE := Vector2i(500, 620)
 const MIN_STATS_SIZE := Vector2i(360, 480)
@@ -12,8 +14,6 @@ const CODEX_NOTIFICATION_QUEUE_LIMIT := 16
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
 const AUTONOMOUS_MOVE_MIN_PX := 96
 const AUTONOMOUS_MOVE_MAX_PX := 120
-const AUTOSTART_REGISTRY_KEY := "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
-const AUTOSTART_VALUE_NAME := "Open Desktop Pet"
 const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 
 @onready var state: Node = $PetState
@@ -53,9 +53,8 @@ var _character_delete_dialog: ConfirmationDialog
 var _pending_character_archive := ""
 var _stats_bars: Dictionary = {}
 var _care_action_buttons: Dictionary = {}
-var _autostart_threads: Dictionary = {}
-var _autostart_operation_serial := 0
-var _latest_autostart_operation_id := 0
+var _autostart_service
+var _window_service
 var _dragging := false
 var _left_press_pending := false
 var _drag_offset := Vector2i.ZERO
@@ -83,6 +82,7 @@ var _codex_bubble_press := false
 
 
 func _ready() -> void:
+	_window_service = DesktopWindowServiceScript.new()
 	get_tree().auto_accept_quit = false
 	# PetVisual is ready before this parent node. Keep its first loaded frame
 	# hidden until the native transparent window has been positioned and shaped.
@@ -97,8 +97,9 @@ func _ready() -> void:
 	_setup_context_menu()
 	_setup_status_indicator()
 	_setup_codex_integration()
+	_setup_autostart_service()
 	_setup_idle_behavior()
-	_last_global_mouse = DisplayServer.mouse_get_position()
+	_last_global_mouse = _window_service.mouse_position()
 	_last_user_activity_ms = Time.get_ticks_msec()
 	call_deferred("_finish_window_setup")
 
@@ -113,7 +114,7 @@ func _process(_delta: float) -> void:
 	if (_dragging or _left_press_pending) \
 			and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_finish_left_press()
-	var mouse := DisplayServer.mouse_get_position()
+	var mouse: Vector2i = _window_service.mouse_position()
 	if mouse.distance_to(_last_global_mouse) > 1.0:
 		_last_user_activity_ms = Time.get_ticks_msec()
 		if is_instance_valid(_auto_move_tween):
@@ -140,19 +141,19 @@ func _update_drag_position(mouse: Vector2i) -> void:
 	# can separate the cursor from the shaped transparent window at a screen
 	# edge, causing Windows to deliver the eventual release somewhere else.
 	# The restored idle pose is clamped once the button is released instead.
-	DisplayServer.window_set_position(mouse - _drag_offset)
+	_window_service.set_window_position(mouse - _drag_offset)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		_handle_drag_mouse_motion(DisplayServer.mouse_get_position())
+		_handle_drag_mouse_motion(_window_service.mouse_position())
 		return
 	if event is not InputEventMouseButton:
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		if event.double_click and event.pressed:
 			var double_click_local := Vector2(
-				DisplayServer.mouse_get_position() - DisplayServer.window_get_position()
+				_window_service.mouse_position() - _window_service.window_position()
 			)
 			if _codex_notification_active and _is_speech_overlay_at(double_click_local):
 				_focus_codex_interface()
@@ -168,11 +169,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.pressed:
 			_left_press_pending = true
-			_drag_origin = DisplayServer.mouse_get_position()
+			_drag_origin = _window_service.mouse_position()
 			_last_drag_mouse = _drag_origin
-			_drag_offset = _drag_origin - DisplayServer.window_get_position()
+			_drag_offset = _drag_origin - _window_service.window_position()
 			_codex_bubble_press = _codex_notification_active and _is_speech_overlay_at(
-				Vector2(_drag_origin - DisplayServer.window_get_position())
+				Vector2(_drag_origin - _window_service.window_position())
 			)
 		else:
 			_finish_left_press()
@@ -197,7 +198,7 @@ func _handle_drag_mouse_motion(mouse: Vector2i) -> void:
 
 func _on_stats_window_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		_handle_drag_mouse_motion(DisplayServer.mouse_get_position())
+		_handle_drag_mouse_motion(_window_service.mouse_position())
 	elif event is InputEventMouseButton \
 			and event.button_index == MOUSE_BUTTON_LEFT \
 			and not event.pressed:
@@ -222,7 +223,7 @@ func _begin_drag(mouse: Vector2i) -> void:
 		)
 		# A character-defined anchor gives its drag pose a consistent pickup
 		# point. Packs without one retain the exact point the user pressed.
-		DisplayServer.window_set_position(mouse - _drag_offset)
+		_window_service.set_window_position(mouse - _drag_offset)
 
 	_set_cursor_shape(Input.CURSOR_DRAG)
 	_refresh_interaction_polygon()
@@ -337,8 +338,7 @@ func _restore_from_system_minimize() -> void:
 	# This borderless desktop pet has no user-facing minimize command. Check on
 	# every rendered frame so short Show Desktop minimize transitions are not
 	# missed between slower timer ticks.
-	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	_window_service.restore_if_minimized()
 
 func _layout_speech_bubble(text: String) -> void:
 	const BUBBLE_WIDTH := 200.0
@@ -412,28 +412,24 @@ func _apply_interaction_polygon(polygon: PackedVector2Array) -> void:
 
 
 func _refresh_interaction_polygon() -> void:
-	get_window().mouse_passthrough = false
-	if not bubble.visible:
-		get_window().mouse_passthrough_polygon = _pet_interaction_polygon
-		return
-	var combined_points := PackedVector2Array(_pet_interaction_polygon)
 	var bubble_rect := bubble.get_global_rect()
-	combined_points.append_array(PackedVector2Array([
-		bubble_rect.position,
-		Vector2(bubble_rect.end.x, bubble_rect.position.y),
-		bubble_rect.end,
-		Vector2(bubble_rect.position.x, bubble_rect.end.y),
-	]))
+	var tail_points := PackedVector2Array()
 	for point: Vector2 in bubble_tail.polygon:
-		combined_points.append(bubble_tail.to_global(point))
-	get_window().mouse_passthrough_polygon = Geometry2D.convex_hull(combined_points)
+		tail_points.append(bubble_tail.to_global(point))
+	_window_service.apply_interaction_polygon(
+		get_window(),
+		_pet_interaction_polygon,
+		bubble.visible,
+		bubble_rect,
+		tail_points
+	)
 
 
 func _set_cursor_shape(shape: Input.CursorShape) -> void:
 	if shape == _cursor_shape:
 		return
 	_cursor_shape = shape
-	Input.set_default_cursor_shape(shape)
+	_window_service.set_cursor_shape(shape)
 
 
 func _connect_signals() -> void:
@@ -461,6 +457,11 @@ func _setup_codex_integration() -> void:
 	_codex_controller.notification_received.connect(_handle_codex_notification)
 	_codex_controller.state_changed.connect(_refresh_codex_settings_ui)
 	_codex_controller.load_settings()
+
+
+func _setup_autostart_service() -> void:
+	_autostart_service = WindowsAutostartServiceScript.new()
+	_autostart_service.operation_completed.connect(_finish_autostart_operation)
 
 
 func _refresh_codex_settings_ui() -> void:
@@ -828,8 +829,22 @@ func _build_stats_window() -> void:
 
 	if _details_window_controller == null:
 		_details_window_controller = DetailsWindowControllerScript.new()
+		_connect_details_window_signals()
+	_details_window_controller.theme_mode = _details_theme_mode
+	_details_window_controller.last_state_message = _last_state_message
+	_details_window_controller.codex_enabled = (
+		_codex_controller != null and _codex_controller.enabled
+	)
+	_details_window_controller.codex_port = (
+		_codex_controller.port
+		if _codex_controller != null
+		else CodexIntegrationControllerScript.DEFAULT_PORT
+	)
+	_details_window_controller.autostart_supported = _is_autostart_supported()
+	_details_window_controller.interaction_label = Callable(self, "_interaction_label")
+	_details_window_controller.interaction_icon = Callable(self, "_interaction_icon")
 	var status_refs: Dictionary = _details_window_controller.build_status_tab(
-		tabs, self
+		tabs
 	)
 	_stats_status = status_refs["stats_status"] as Label
 	_companion_status = status_refs["companion_status"] as Label
@@ -837,9 +852,10 @@ func _build_stats_window() -> void:
 	_unlock_status = status_refs["unlock_status"] as Label
 	_last_message_status = status_refs["last_message_status"] as Label
 	_care_action_buttons = status_refs["care_action_buttons"] as Dictionary
+	_stats_bars = status_refs["stats_bars"] as Dictionary
 
 	var settings_refs: Dictionary = _details_window_controller.build_settings_tab(
-		tabs, self
+		tabs
 	)
 	_fps_option_button = settings_refs["fps_option_button"] as OptionButton
 	_details_theme_option_button = settings_refs["details_theme_option_button"] as OptionButton
@@ -854,7 +870,7 @@ func _build_stats_window() -> void:
 	_refresh_codex_settings_ui()
 
 	var character_refs: Dictionary = _details_window_controller.build_character_tab(
-		tabs, self
+		tabs, _stats_window
 	)
 	_character_tab_index = int(character_refs["character_tab_index"])
 	_character_list = character_refs["character_list"] as ItemList
@@ -866,6 +882,61 @@ func _build_stats_window() -> void:
 	_character_delete_dialog = character_refs["character_delete_dialog"] as ConfirmationDialog
 	tabs.tab_changed.connect(_on_stats_tab_changed)
 	_select_stats_tab(0)
+
+
+func _connect_details_window_signals() -> void:
+	_details_window_controller.care_action_requested.connect(
+		_on_care_action_requested
+	)
+	_details_window_controller.close_requested.connect(_destroy_stats_window)
+	_details_window_controller.target_fps_selected.connect(_on_target_fps_selected)
+	_details_window_controller.details_theme_selected.connect(_on_details_theme_selected)
+	_details_window_controller.codex_state_selected.connect(_on_codex_state_selected)
+	_details_window_controller.codex_port_changed.connect(_on_codex_port_changed)
+	_details_window_controller.codex_configure_requested.connect(_configure_codex_port)
+	_details_window_controller.codex_reconnect_requested.connect(_reconnect_codex_receiver)
+	_details_window_controller.autostart_toggled.connect(_on_autostart_toggled)
+	_details_window_controller.autostart_query_requested.connect(
+		_on_autostart_query_requested
+	)
+	_details_window_controller.character_selected.connect(_on_character_selected)
+	_details_window_controller.character_use_requested.connect(_use_selected_character)
+	_details_window_controller.character_delete_requested.connect(
+		_confirm_delete_selected_character
+	)
+	_details_window_controller.character_import_requested.connect(
+		_open_character_import_dialog
+	)
+	_details_window_controller.open_character_packs_folder_requested.connect(
+		_open_character_packs_folder
+	)
+	_details_window_controller.character_archive_selected.connect(
+		_install_character_archive
+	)
+	_details_window_controller.character_update_confirmed.connect(
+		_install_pending_character_archive
+	)
+	_details_window_controller.character_delete_confirmed.connect(
+		_delete_selected_character
+	)
+
+
+func _on_care_action_requested(action: String) -> void:
+	match action:
+		"feed":
+			_run_care_action(1)
+		"water":
+			_run_care_action(2)
+		"pet":
+			_run_care_action(3)
+		"work":
+			_run_care_action(4)
+		"sleep":
+			_run_care_action(5)
+
+
+func _on_autostart_query_requested() -> void:
+	call_deferred("_start_autostart_operation", "query", false)
 
 
 func _on_stats_tab_changed(tab_index: int) -> void:
@@ -1769,119 +1840,13 @@ func _rebuild_stats_window_after_theme_change(
 
 
 func _is_autostart_supported() -> bool:
-	return OS.get_name() == "Windows" and not OS.has_feature("editor")
-
-
-func _autostart_command(executable_path := OS.get_executable_path()) -> String:
-	return "\"%s\"" % _native_windows_path(executable_path)
-
-
-func _native_windows_path(path: String) -> String:
-	return path.replace("/", "\\")
-
-
-func _registry_executable() -> String:
-	var windows_root := OS.get_environment("SystemRoot")
-	if windows_root.is_empty():
-		windows_root = "C:\\Windows"
-	return windows_root.path_join("System32").path_join("reg.exe")
-
-
-func _query_registry_value_blocking(
-	registry_key: String,
-	value_name: String,
-	expected_executable_path: String
-) -> Dictionary:
-	var output: Array = []
-	var exit_code := OS.execute(
-		_registry_executable(),
-		PackedStringArray([
-			"query", registry_key, "/v", value_name
-		]),
-		output,
-		true,
-		false
-	)
-	var exists := exit_code == 0
-	var expected_command := _autostart_command(expected_executable_path)
-	var legacy_command := "\"%s\"" % expected_executable_path.replace("\\", "/")
-	var output_text := "\n".join(PackedStringArray(output)).strip_edges()
-	return {
-		"exists": exists,
-		"matches": exists and output_text.to_lower().contains(
-			expected_command.to_lower()
-		),
-		"legacy_matches": exists and output_text.to_lower().contains(
-			legacy_command.to_lower()
-		),
-		"output": output_text,
-	}
-
-
-func _query_autostart_state_blocking() -> Dictionary:
-	return _query_registry_value_blocking(
-		AUTOSTART_REGISTRY_KEY,
-		AUTOSTART_VALUE_NAME,
-		OS.get_executable_path()
-	)
+	return _autostart_service != null and _autostart_service.is_supported()
 
 
 func _on_autostart_toggled(enabled: bool) -> void:
 	if not _is_autostart_supported():
 		return
 	_start_autostart_operation("set", enabled)
-
-
-func _write_registry_autostart_blocking(
-	registry_key: String,
-	value_name: String,
-	enabled: bool,
-	executable_path: String
-) -> bool:
-	var arguments := PackedStringArray()
-	if enabled:
-		arguments = PackedStringArray([
-			"add",
-			registry_key,
-			"/v",
-			value_name,
-			"/t",
-			"REG_SZ",
-			"/d",
-			# reg.exe is a native Windows command-line program. The literal
-			# quotes required by Run values must survive its argv parser.
-			"\\\"%s\\\"" % _native_windows_path(executable_path),
-			"/f",
-		])
-	else:
-		arguments = PackedStringArray([
-			"delete",
-			registry_key,
-			"/v",
-			value_name,
-			"/f",
-		])
-	var output: Array = []
-	var exit_code := OS.execute(
-		_registry_executable(), arguments, output, true, false
-	)
-	if exit_code != 0:
-		push_warning(
-			"Windows autostart registry command failed (%d): %s" % [
-				exit_code,
-				"\n".join(PackedStringArray(output)).strip_edges(),
-			]
-		)
-	return exit_code == 0
-
-
-func _set_autostart_enabled_blocking(enabled: bool) -> bool:
-	return _write_registry_autostart_blocking(
-		AUTOSTART_REGISTRY_KEY,
-		AUTOSTART_VALUE_NAME,
-		enabled,
-		OS.get_executable_path()
-	)
 
 
 func _start_autostart_operation(operation: String, enabled: bool) -> void:
@@ -1893,43 +1858,16 @@ func _start_autostart_operation(operation: String, enabled: bool) -> void:
 			if operation == "query"
 			else "正在套用開機啟動設定…"
 		)
-	_autostart_operation_serial += 1
-	var operation_id := _autostart_operation_serial
-	_latest_autostart_operation_id = operation_id
-	var operation_thread := Thread.new()
-	_autostart_threads[operation_id] = operation_thread
-	var start_error := operation_thread.start(
-		Callable(self, "_run_autostart_operation").bind(
-			operation_id, operation, enabled
-		)
-	)
-	if start_error != OK:
-		_autostart_threads.erase(operation_id)
+	if _autostart_service == null:
 		_finish_autostart_operation(
-			operation_id,
-			operation,
-			enabled,
-			{"exists": false, "matches": false}
-			if operation == "query"
-			else {"success": false}
+			-1, operation, enabled,
+			{"exists": false, "matches": false, "success": false}
 		)
-
-
-func _run_autostart_operation(
-	operation_id: int, operation: String, enabled: bool
-) -> void:
-	var result: Variant
+		return
 	if operation == "query":
-		result = _query_autostart_state_blocking()
+		_autostart_service.query()
 	else:
-		result = {"success": _set_autostart_enabled_blocking(enabled)}
-	call_deferred(
-		"_finish_autostart_operation",
-		operation_id,
-		operation,
-		enabled,
-		result
-	)
+		_autostart_service.set_enabled(enabled)
 
 
 func _finish_autostart_operation(
@@ -1938,10 +1876,11 @@ func _finish_autostart_operation(
 	enabled: bool,
 	result: Dictionary
 ) -> void:
-	_finish_autostart_thread(operation_id)
 	# A panel can be closed and recreated while an older registry request is
 	# finishing. Only the newest request may update the current controls.
-	if operation_id != _latest_autostart_operation_id:
+	if _autostart_service != null \
+			and operation_id >= 0 \
+			and not _autostart_service.is_latest_operation(operation_id):
 		return
 	if not is_instance_valid(_autostart_check_box) \
 			or _autostart_check_box.is_queued_for_deletion():
@@ -1972,20 +1911,6 @@ func _finish_autostart_operation(
 	else:
 		_autostart_check_box.set_pressed_no_signal(not enabled)
 		_settings_feedback.text = "設定失敗，請稍後再試。"
-
-
-func _finish_autostart_thread(operation_id: int) -> void:
-	var operation_thread: Thread = _autostart_threads.get(operation_id)
-	if is_instance_valid(operation_thread) and operation_thread.is_started():
-		operation_thread.wait_to_finish()
-	_autostart_threads.erase(operation_id)
-
-
-func _finish_all_autostart_threads() -> void:
-	for operation_id: int in _autostart_threads.keys():
-		_finish_autostart_thread(operation_id)
-
-
 func _request_shutdown() -> void:
 	if _shutting_down:
 		return
@@ -2008,7 +1933,8 @@ func _prepare_shutdown() -> void:
 	bubble_tail.visible = false
 	_save_stats_window_size()
 	state.save_state()
-	_finish_all_autostart_threads()
+	if _autostart_service != null:
+		_autostart_service.shutdown()
 	if _codex_controller != null:
 		_codex_controller.shutdown()
 	_remove_status_indicator()
@@ -2138,12 +2064,9 @@ func _celebrate_unlock(action: String) -> void:
 
 
 func _place_bottom_right() -> void:
-	var screen := DisplayServer.window_get_current_screen()
-	if screen < 0:
-		screen = DisplayServer.get_primary_screen()
-	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var usable: Rect2i = _window_service.usable_rect()
 	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
-	DisplayServer.window_set_position(Vector2i(
+	_window_service.set_window_position(Vector2i(
 		usable.end.x - ceili(visual_bounds.end.x) - 24,
 		usable.end.y - ceili(visual_bounds.end.y)
 	))
@@ -2157,36 +2080,23 @@ func _recover_pet() -> void:
 		_auto_move_tween.kill()
 		_auto_move_tween = null
 		pet.cancel_roll()
-	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	_window_service.restore_if_minimized()
 	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, true)
 	var screen := DisplayServer.get_primary_screen()
-	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var usable: Rect2i = _window_service.usable_rect(screen)
 	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
-	DisplayServer.window_set_position(Vector2i(
+	_window_service.set_window_position(Vector2i(
 		usable.end.x - ceili(visual_bounds.end.x) - 24,
 		usable.end.y - ceili(visual_bounds.end.y)
 	))
 
 
 func _clamp_window_position(requested: Vector2i) -> Vector2i:
-	var window_size := DisplayServer.window_get_size()
-	var screen := DisplayServer.get_screen_from_rect(Rect2i(requested, window_size))
-	if screen < 0:
-		screen = DisplayServer.get_primary_screen()
-	var usable := DisplayServer.screen_get_usable_rect(screen)
 	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
-	return Vector2i(
-		clampi(
-			requested.x,
-			usable.position.x - floori(visual_bounds.position.x),
-			usable.end.x - ceili(visual_bounds.end.x)
-		),
-		clampi(
-			requested.y,
-			usable.position.y - floori(visual_bounds.position.y),
-			usable.end.y - ceili(visual_bounds.end.y)
-		)
+	return _window_service.clamp_window_position(
+		requested,
+		_window_service.window_size(),
+		visual_bounds
 	)
 
 

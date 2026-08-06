@@ -5,6 +5,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
+& (Join-Path $PSScriptRoot 'run_architecture_checks.ps1')
+if ($LASTEXITCODE -ne 0) {
+	throw 'Architecture checks failed.'
+}
 $isolatedAppData = Join-Path $env:TEMP (
     'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')
 )
