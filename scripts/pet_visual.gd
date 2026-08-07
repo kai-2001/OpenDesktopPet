@@ -4,23 +4,14 @@ extends Node2D
 signal action_completed(request_id: int, requested_action: String, success: bool)
 signal interaction_region_changed(polygon: PackedVector2Array)
 
-const BUNDLED_CUSTOM_PACK_ROOT := "res://characters/custom/"
-const PUBLIC_PACK_ROOT := "res://characters/public/"
-const INSTALLED_PACKS_ROOT := "user://character_packs/"
-const CHARACTER_SETTINGS_PATH := "user://ui_settings.cfg"
-const PUBLIC_CHARACTER_ID := "open_desktop_pet_default"
 const PetHitboxCalculatorScript = preload("res://scripts/pet_hitbox_calculator.gd")
-const CharacterPackRuntimeScript = preload("res://scripts/character_pack_runtime.gd")
+const CharacterPackProfileScript = preload("res://scripts/character_pack_profile.gd")
 const FRAME_VIEWPORT_PADDING := 2.0
 
-var _pack_runtime = CharacterPackRuntimeScript.new()
+var _profile = CharacterPackProfileScript.new()
 var _hitbox_calculator = PetHitboxCalculatorScript.new()
 var _sprite: Sprite2D
-var _manifest: Dictionary = {}
-var _actions: Dictionary = {}
-var _aliases: Dictionary = {}
 var _texture_cache: Dictionary = {}
-var _progression: Dictionary = {"level": 1, "affection": 0}
 var _busy := false
 var _dragging := false
 var _drag_moving := false
@@ -29,7 +20,6 @@ var _drag_frame_step := 0
 var _sleep_loop_active := false
 var _facing_direction := -1
 var _visual_size := 1.0
-var _pack_scale := 0.31
 var _time := 0.0
 var _idle_clock := 0.0
 var _idle_step := 0
@@ -37,7 +27,6 @@ var _home_position := Vector2.ZERO
 var _animation_serial := 0
 var _current_action := ""
 var _progressive_move_sequence_index := -1
-var _pack_root := ""
 var _active_request_id := 0
 var _active_requested_action := ""
 var _action_tween: Tween
@@ -57,7 +46,7 @@ func _ready() -> void:
 	if _load_pack():
 		_show_action_frame("idle", _first_frame("idle"))
 		print("CHARACTER_PACK_LOADED id=%s root=%s" % [
-			get_character_id(), _pack_root
+			get_character_id(), get_pack_root()
 		])
 	else:
 		push_error("No valid character pack was found.")
@@ -79,7 +68,7 @@ func _process(delta: float) -> void:
 		var sway := sin(_time * 8.0) * (0.025 if _drag_moving else 0.008)
 		rotation = sway
 		return
-	if _busy or not _actions.has("idle"):
+	if _busy or not _profile.has_action("idle"):
 		return
 	_idle_clock += delta
 	var breath := 1.0 + sin(_time * 2.0) * 0.009
@@ -94,8 +83,7 @@ func _process(delta: float) -> void:
 
 
 func set_progression(snapshot: Dictionary) -> void:
-	_progression.level = int(snapshot.get("level", 1))
-	_progression.affection = int(snapshot.get("affection", 0))
+	_profile.set_progression(snapshot)
 
 
 func reload_character() -> bool:
@@ -115,14 +103,11 @@ func reload_character() -> bool:
 	scale = Vector2.ONE * _visual_size
 	_restore_base_geometry()
 	_sprite.texture = null
-	_manifest.clear()
-	_actions.clear()
-	_aliases.clear()
 	_texture_cache.clear()
 	_hit_image_cache.clear()
 	_hit_polygon_cache.clear()
 	_opaque_bounds_cache.clear()
-	_pack_root = ""
+	_profile.clear()
 	if not _load_pack():
 		queue_redraw()
 		_emit_interaction_region()
@@ -167,7 +152,7 @@ func cancel_autonomous_action() -> bool:
 
 
 func start_sleep_loop() -> void:
-	if _sleep_loop_active or _dragging or not _actions.has("sleep"):
+	if _sleep_loop_active or _dragging or not _profile.has_action("sleep"):
 		return
 	_stop_current_animation(false)
 	_sleep_loop_active = true
@@ -296,10 +281,10 @@ func cancel_roll() -> void:
 
 
 func begin_progressive_move() -> bool:
-	if _busy or _dragging or not _actions.has("idle"):
+	if _busy or _dragging or not _profile.has_action("idle"):
 		return false
 	var action := _resolve_action("move")
-	if not _actions.has(action) or not is_action_unlocked(action):
+	if not _profile.has_action(action) or not is_action_unlocked(action):
 		return false
 	_animation_serial += 1
 	_busy = true
@@ -420,22 +405,22 @@ func get_interaction_polygon() -> PackedVector2Array:
 
 
 func play_action(requested_action: String, request_id := 0) -> void:
-	if _busy or _dragging or not _actions.has("idle"):
+	if _busy or _dragging or not _profile.has_action("idle"):
 		if request_id > 0:
 			action_completed.emit(request_id, requested_action, false)
 		return
 	var action := _resolve_action(requested_action)
-	if not _actions.has(action):
+	if not _profile.has_action(action):
 		if request_id > 0:
 			action_completed.emit(request_id, requested_action, false)
 			return
-		action = String(_manifest.get("fallback_action", "idle"))
+		action = _profile.fallback_action()
 	if not is_action_unlocked(action):
 		if request_id > 0:
 			action_completed.emit(request_id, requested_action, false)
 			return
-		action = String(_manifest.get("fallback_action", "idle"))
-	if not _actions.has(action):
+		action = _profile.fallback_action()
+	if not _profile.has_action(action):
 		if request_id > 0:
 			action_completed.emit(request_id, requested_action, false)
 		return
@@ -463,106 +448,55 @@ func play_action(requested_action: String, request_id := 0) -> void:
 
 
 func pick_autonomous_action(allow_move: bool) -> String:
-	var candidates: Array[Dictionary] = []
-	var total_weight := 0
-	for action: String in _actions:
-		var definition := _action_definition(action)
-		var weight := int(definition.get("autonomous_weight", 0))
-		if weight <= 0 or not is_action_unlocked(action):
-			continue
-		if action == "move" and not allow_move:
-			continue
-		total_weight += weight
-		candidates.append({"id": action, "ceiling": total_weight})
-	if total_weight <= 0:
-		return ""
-	var roll := randi_range(1, total_weight)
-	for candidate: Dictionary in candidates:
-		if roll <= int(candidate.ceiling):
-			return String(candidate.id)
-	return ""
+	return _profile.pick_autonomous_action(allow_move)
 
 
 func get_unlocked_action_ids() -> Array[String]:
-	var result: Array[String] = []
-	for action: String in _actions:
-		if is_action_unlocked(action):
-			result.append(action)
-	return result
+	return _profile.unlocked_action_ids()
 
 
 func get_next_unlock() -> Dictionary:
-	var best: Dictionary = {}
-	var best_distance := 1000000
-	for action: String in _actions:
-		var definition := _action_definition(action)
-		var unlock: Dictionary = definition.get("unlock", {})
-		if unlock.is_empty() or is_action_unlocked(action):
-			continue
-		var level_need := int(unlock.get("level", 1))
-		var affection_need := int(unlock.get("affection", 0))
-		var distance := maxi(level_need - int(_progression.level), 0) * 100 \
-			+ maxi(affection_need - int(_progression.affection), 0)
-		if distance < best_distance:
-			best_distance = distance
-			best = {
-				"id": action,
-				"name": String(definition.get("display_name", action)),
-				"level": level_need,
-				"affection": affection_need,
-			}
-	return best
+	return _profile.next_unlock()
 
 
 func get_dialogue(key: String, fallback: String) -> String:
-	var dialogue: Variant = _manifest.get("dialogue", {})
-	if dialogue is not Dictionary or not dialogue.has(key):
-		return fallback
-	var entry: Variant = dialogue[key]
-	if entry is String:
-		return String(entry)
-	if entry is Array and not entry.is_empty():
-		return String(entry.pick_random())
-	return fallback
+	return _profile.get_dialogue(key, fallback)
 
 
 func get_character_id() -> String:
-	var character_id := String(_manifest.get("id", "")).strip_edges()
-	return character_id if not character_id.is_empty() else "default"
+	return _profile.character_id()
 
 
 func get_character_name() -> String:
-	return String(_manifest.get("name", get_character_id()))
+	return _profile.character_name()
 
 
 func get_character_version() -> String:
-	return String(_manifest.get("version", "1.0.0"))
+	return _profile.character_version()
 
 
 func get_drag_anchor() -> Variant:
-	var anchor: Variant = _manifest.get("drag_anchor", null)
-	if anchor is not Array or anchor.size() < 2:
-		return null
-	if anchor[0] is not float and anchor[0] is not int:
-		return null
-	if anchor[1] is not float and anchor[1] is not int:
-		return null
-	var result := Vector2(float(anchor[0]), float(anchor[1]))
-	if not is_finite(result.x) or not is_finite(result.y):
-		return null
-	return result
+	return _profile.drag_anchor()
 
 
 func get_pack_root() -> String:
-	return _pack_root
+	return _profile.pack_root()
+
+
+func set_action_definition(action: String, definition: Dictionary) -> void:
+	_profile.set_action_definition(action, definition)
+
+
+func remove_action_definition(action: String) -> void:
+	_profile.remove_action_definition(action)
 
 
 func get_interaction_label(action: String, fallback: String) -> String:
-	return String(_interaction_value(action, "label", fallback))
+	return _profile.get_interaction_label(action, fallback)
 
 
 func get_interaction_icon(action: String, fallback: String) -> String:
-	return String(_interaction_value(action, "icon", fallback))
+	return _profile.get_interaction_icon(action, fallback)
 
 
 func get_interaction_wish(
@@ -570,37 +504,15 @@ func get_interaction_wish(
 	fallback: String,
 	minutes: int
 ) -> String:
-	var template := String(_interaction_value(action, "wish", fallback))
-	return template.replace("{minutes}", str(minutes))
-
-
-func _interaction_value(action: String, key: String, fallback: Variant) -> Variant:
-	var interactions: Variant = _manifest.get("interactions", {})
-	if interactions is not Dictionary:
-		return fallback
-	var definition: Variant = interactions.get(action, {})
-	if definition is not Dictionary:
-		return fallback
-	return definition.get(key, fallback)
+	return _profile.get_interaction_wish(action, fallback, minutes)
 
 
 func is_action_unlocked(action: String) -> bool:
-	if not _actions.has(action):
-		return false
-	var unlock: Dictionary = _action_definition(action).get("unlock", {})
-	return int(_progression.level) >= int(unlock.get("level", 1)) \
-		and int(_progression.affection) >= int(unlock.get("affection", 0))
+	return _profile.is_action_unlocked(action)
 
 
 func get_action_duration(requested_action: String) -> float:
-	var action := _resolve_action(requested_action)
-	if not _actions.has(action):
-		return 0.0
-	var definition := _action_definition(action)
-	var frame_time := float(definition.get("frame_time", 0.16))
-	if String(definition.get("behavior", "sequence")) == "pulse":
-		return maxi(int(definition.get("pulses", 4)), 1) * frame_time
-	return _sequence_for(definition).size() * frame_time
+	return _profile.action_duration(requested_action)
 
 
 func _play_sequence(action: String, definition: Dictionary, serial: int) -> void:
@@ -672,9 +584,9 @@ func _show_action_frame(action: String, frame: int) -> void:
 func _apply_sprite_scale(definition: Dictionary) -> void:
 	if not is_instance_valid(_sprite):
 		return
-	var action_scale := float(definition.get("scale", _pack_scale)) \
+	var action_scale := float(definition.get("scale", _profile.pack_scale())) \
 		if not definition.is_empty() \
-		else _pack_scale
+		else _profile.pack_scale()
 	_sprite.flip_h = _is_action_flipped(definition)
 	_sprite.scale = Vector2.ONE * action_scale
 
@@ -692,7 +604,7 @@ func _frame_offset(definition: Dictionary, frame: int) -> Vector2:
 
 func _is_action_flipped(definition: Dictionary) -> bool:
 	var source_facing := String(definition.get(
-		"source_facing", _manifest.get("source_facing", "left")
+		"source_facing", _profile.source_facing()
 	)).to_lower()
 	if source_facing not in ["left", "right"]:
 		source_facing = "left"
@@ -701,32 +613,30 @@ func _is_action_flipped(definition: Dictionary) -> bool:
 
 
 func _sequence_for(definition: Dictionary) -> Array:
-	var sequence: Array = definition.get("sequence", [0])
-	return sequence if not sequence.is_empty() else [0]
+	return _profile.sequence_for(definition)
 
 
 func _optional_sequence(definition: Dictionary, key: String) -> Array:
-	var value: Variant = definition.get(key, [])
-	return value if value is Array else []
+	return _profile.optional_sequence(definition, key)
 
 
 func _first_frame(action: String) -> int:
-	return int(_sequence_for(_action_definition(action))[0])
+	return _profile.first_frame(action)
 
 
 func _action_definition(action: String) -> Dictionary:
-	return _actions.get(action, {})
+	return _profile.action_definition(action)
 
 
 func _resolve_action(action: String) -> String:
-	return String(_aliases.get(action, action))
+	return _profile.resolve_action(action)
 
 
 func _texture_for(definition: Dictionary) -> Texture2D:
 	var relative_path := String(definition.get("file", ""))
 	if relative_path.is_empty():
 		return null
-	var path := _pack_root.path_join(relative_path)
+	var path := _profile.pack_root().path_join(relative_path)
 	if _texture_cache.has(path):
 		return _texture_cache[path] as Texture2D
 	var texture := _load_texture(path)
@@ -736,49 +646,7 @@ func _texture_for(definition: Dictionary) -> Texture2D:
 
 
 func _load_pack() -> bool:
-	var candidates: Array[String] = []
-	var selected_id := _selected_character_id()
-	if selected_id == PUBLIC_CHARACTER_ID:
-		candidates.append(PUBLIC_PACK_ROOT)
-	elif not selected_id.is_empty():
-		candidates.append(INSTALLED_PACKS_ROOT.path_join(selected_id))
-	if selected_id != PUBLIC_CHARACTER_ID:
-		candidates.append(BUNDLED_CUSTOM_PACK_ROOT)
-		candidates.append(PUBLIC_PACK_ROOT)
-	for candidate_root: String in candidates:
-		if _load_pack_from(candidate_root):
-			return true
-	return false
-
-
-func _selected_character_id() -> String:
-	var config := ConfigFile.new()
-	if config.load(CHARACTER_SETTINGS_PATH) != OK:
-		return ""
-	var selected := String(config.get_value("character", "selected_id", ""))
-	if selected.is_empty():
-		return ""
-	var sanitized := selected.to_lower()
-	var safe := ""
-	for index in sanitized.length():
-		var character := sanitized.substr(index, 1)
-		if character >= "a" and character <= "z" \
-				or character >= "0" and character <= "9" \
-				or character == "_" or character == "-":
-			safe += character
-	return safe if safe == selected else ""
-
-
-func _load_pack_from(candidate_root: String) -> bool:
-	var loaded: Dictionary = _pack_runtime.load_pack(candidate_root)
-	if not bool(loaded.get("ok", false)):
-		return false
-	_manifest = loaded.manifest
-	_actions = loaded.actions
-	_aliases = loaded.aliases
-	_pack_scale = float(loaded.scale)
-	_pack_root = String(loaded.root)
-	return true
+	return _profile.load_selected_pack()
 
 
 func _restore_idle() -> void:
@@ -1000,7 +868,7 @@ func _emit_interaction_region() -> void:
 
 
 func _draw() -> void:
-	if _actions.has("idle"):
+	if _profile.has_action("idle"):
 		return
 	draw_circle(Vector2.ZERO, 72.0, Color("#a9d9e8"))
 	draw_circle(Vector2(0, 18), 49.0, Color("#f6ead2"))

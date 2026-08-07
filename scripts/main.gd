@@ -1,9 +1,11 @@
 extends Node2D
 
-const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
+const CharacterPackCoordinatorScript = preload("res://scripts/character_pack_coordinator.gd")
 const CodexIntegrationControllerScript = preload("res://scripts/codex_integration_controller.gd")
-const DetailsWindowControllerScript = preload("res://scripts/details_window_controller.gd")
 const DesktopWindowServiceScript = preload("res://scripts/desktop_window_service.gd")
+const PetGameplayCoordinatorScript = preload("res://scripts/pet_gameplay_coordinator.gd")
+const PetInputControllerScript = preload("res://scripts/pet_input_controller.gd")
+const StatsWindowCoordinatorScript = preload("res://scripts/stats_window_coordinator.gd")
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_STATS_SIZE := Vector2i(500, 620)
@@ -12,8 +14,6 @@ const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 const CODEX_NOTIFICATION_QUEUE_LIMIT := 16
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
-const AUTONOMOUS_MOVE_MIN_PX := 96
-const AUTONOMOUS_MOVE_MAX_PX := 120
 const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 
 @onready var state: Node = $PetState
@@ -55,34 +55,53 @@ var _stats_bars: Dictionary = {}
 var _care_action_buttons: Dictionary = {}
 var _autostart_service
 var _window_service
-var _dragging := false
-var _left_press_pending := false
-var _drag_offset := Vector2i.ZERO
-var _drag_origin := Vector2i.ZERO
+var _gameplay_coordinator
+var _character_coordinator
+var _input_controller
+var _stats_window_coordinator
 var _bubble_token := 0
 var _shutting_down := false
 var _idle_count := 0
-var _last_global_mouse := Vector2i.ZERO
-var _last_drag_mouse := Vector2i.ZERO
 var _last_user_activity_ms := 0
-var _auto_move_tween: Tween
 var _known_unlocked_actions: Dictionary = {}
 var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
 var _pet_interaction_polygon := PackedVector2Array()
-var _cursor_shape := Input.CURSOR_ARROW
 var _status_indicator: StatusIndicator
 var _tray_exit_menu: PopupMenu
 var _details_theme_mode := "light"
 var _codex_controller: CodexIntegrationController
-var _details_window_controller: DetailsWindowController
+var _details_window_controller
 var _codex_notification_queue: Array[Dictionary] = []
 var _codex_notification_active := false
-var _codex_bubble_press := false
 
 
 func _ready() -> void:
 	_window_service = DesktopWindowServiceScript.new()
+	_gameplay_coordinator = PetGameplayCoordinatorScript.new()
+	_gameplay_coordinator.configure(self, state, pet, _window_service)
+	_character_coordinator = CharacterPackCoordinatorScript.new()
+	_character_coordinator.configure(state, pet)
+	_input_controller = PetInputControllerScript.new()
+	_input_controller.configure(
+		self,
+		state,
+		pet,
+		_window_service,
+		Callable(self, "_is_speech_overlay_at"),
+		Callable(self, "_is_codex_notification_active"),
+		Callable(self, "_interrupt_autonomous_action")
+	)
+	_input_controller.user_activity.connect(_on_user_activity)
+	_input_controller.single_click_requested.connect(_single_click_reaction)
+	_input_controller.care_double_click_requested.connect(
+		func() -> void: _run_care_action(3)
+	)
+	_input_controller.context_menu_requested.connect(_show_context_menu)
+	_input_controller.codex_focus_requested.connect(_focus_codex_interface)
+	_input_controller.interaction_region_refresh_requested.connect(
+		_refresh_interaction_polygon
+	)
 	get_tree().auto_accept_quit = false
 	# PetVisual is ready before this parent node. Keep its first loaded frame
 	# hidden until the native transparent window has been positioned and shaped.
@@ -99,7 +118,6 @@ func _ready() -> void:
 	_setup_codex_integration()
 	_setup_autostart_service()
 	_setup_idle_behavior()
-	_last_global_mouse = _window_service.mouse_position()
 	_last_user_activity_ms = Time.get_ticks_msec()
 	call_deferred("_finish_window_setup")
 
@@ -108,185 +126,34 @@ func _process(_delta: float) -> void:
 	if _codex_controller != null:
 		_codex_controller.poll()
 	_restore_from_system_minimize()
-	# A drag pose can replace the native window's shaped hit region. If Windows
-	# drops the release event during that transition, reconcile against the
-	# physical button state so the pet can never remain attached to the cursor.
-	if (_dragging or _left_press_pending) \
-			and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		_finish_left_press()
-	var mouse: Vector2i = _window_service.mouse_position()
-	if mouse.distance_to(_last_global_mouse) > 1.0:
-		_last_user_activity_ms = Time.get_ticks_msec()
-		if is_instance_valid(_auto_move_tween):
-			_auto_move_tween.kill()
-			_auto_move_tween = null
-			pet.cancel_roll()
-	_last_global_mouse = mouse
-	_update_cursor(mouse)
-	# Mouse events are routed to whichever native Godot window is under the
-	# cursor. Keep an active drag following the global cursor when it crosses
-	# over the separate details window (or another application window).
-	if _dragging and mouse != _last_drag_mouse:
-		_update_drag_position(mouse)
+	_input_controller.process()
 
 
-func _update_drag_position(mouse: Vector2i) -> void:
-	if mouse.distance_to(_last_drag_mouse) > 1.0:
-		pet.set_facing_direction(1 if mouse.x > _last_drag_mouse.x else -1)
-		pet.set_drag_motion(true)
-	else:
-		pet.set_drag_motion(false)
-	_last_drag_mouse = mouse
-	# Keep the pickup point under the cursor for the entire drag. Clamping here
-	# can separate the cursor from the shaped transparent window at a screen
-	# edge, causing Windows to deliver the eventual release somewhere else.
-	# The restored idle pose is clamped once the button is released instead.
-	_window_service.set_window_position(mouse - _drag_offset)
+func _on_user_activity(timestamp: int) -> void:
+	_last_user_activity_ms = timestamp
+	_gameplay_coordinator.cancel_autonomous_action()
+
+
+func _is_codex_notification_active() -> bool:
+	return _codex_notification_active
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion:
-		_handle_drag_mouse_motion(_window_service.mouse_position())
-		return
-	if event is not InputEventMouseButton:
-		return
-	if event.button_index == MOUSE_BUTTON_LEFT:
-		if event.double_click and event.pressed:
-			var double_click_local := Vector2(
-				_window_service.mouse_position() - _window_service.window_position()
-			)
-			if _codex_notification_active and _is_speech_overlay_at(double_click_local):
-				_focus_codex_interface()
-				_codex_bubble_press = false
-				return
-			_left_press_pending = false
-			_dragging = false
-			pet.set_dragging(false)
-			if state.wake_sleep("double_click"):
-				_last_user_activity_ms = Time.get_ticks_msec()
-				return
-			_run_care_action(3)
-			return
-		if event.pressed:
-			_left_press_pending = true
-			_drag_origin = _window_service.mouse_position()
-			_last_drag_mouse = _drag_origin
-			_drag_offset = _drag_origin - _window_service.window_position()
-			_codex_bubble_press = _codex_notification_active and _is_speech_overlay_at(
-				Vector2(_drag_origin - _window_service.window_position())
-			)
-		else:
-			_finish_left_press()
-	elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		_left_press_pending = false
-		_dragging = false
-		pet.set_dragging(false)
-		_show_context_menu(Vector2i(event.position))
-
-
-func _handle_drag_mouse_motion(mouse: Vector2i) -> void:
-	if _left_press_pending \
-			and not _dragging \
-			and mouse.distance_to(_drag_origin) >= DRAG_DISTANCE_THRESHOLD_PX:
-		if state.is_sleeping():
-			state.wake_sleep("drag")
-		if _can_begin_drag():
-			_begin_drag(mouse)
-	if _dragging:
-		_update_drag_position(mouse)
+	_input_controller.handle_input(event)
 
 
 func _on_stats_window_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion:
-		_handle_drag_mouse_motion(_window_service.mouse_position())
-	elif event is InputEventMouseButton \
-			and event.button_index == MOUSE_BUTTON_LEFT \
-			and not event.pressed:
-		_finish_left_press()
-
-
-func _begin_drag(mouse: Vector2i) -> void:
-	if not _interrupt_autonomous_action():
-		return
-
-	_left_press_pending = false
-	_dragging = true
-	_last_drag_mouse = mouse
-
-	pet.set_dragging(true)
-	pet.set_drag_motion(true)
-	var configured_anchor: Variant = pet.get_drag_anchor()
-	if configured_anchor is Vector2:
-		_drag_offset = Vector2i(
-			roundi(configured_anchor.x),
-			roundi(configured_anchor.y)
-		)
-		# A character-defined anchor gives its drag pose a consistent pickup
-		# point. Packs without one retain the exact point the user pressed.
-		_window_service.set_window_position(mouse - _drag_offset)
-
-	_set_cursor_shape(Input.CURSOR_DRAG)
-	_refresh_interaction_polygon()
-
-
-func _finish_left_press() -> void:
-	if not _left_press_pending and not _dragging:
-		return
-	var was_dragging := _dragging
-	_left_press_pending = false
-	_dragging = false
-	if was_dragging:
-		var window_position := DisplayServer.window_get_position()
-		var window_size := DisplayServer.window_get_size()
-		var screen := DisplayServer.get_screen_from_rect(
-			Rect2i(window_position, window_size)
-		)
-		if screen < 0:
-			screen = DisplayServer.get_primary_screen()
-		var usable := DisplayServer.screen_get_usable_rect(screen)
-		var drag_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
-		var was_at_bottom := absf(
-			float(window_position.y) + drag_bounds.end.y - float(usable.end.y)
-		) <= 2.0
-		pet.set_dragging(false)
-		# Native transparent-window geometry settles after the drag frame is
-		# replaced. Preserve contact with the taskbar when drag and idle poses
-		# have different visible heights.
-		call_deferred("_settle_drag_release", screen, was_at_bottom)
-		_set_cursor_shape(Input.CURSOR_POINTING_HAND)
-		_codex_bubble_press = false
-	else:
-		if _codex_bubble_press:
-			_codex_bubble_press = false
-			_focus_codex_interface()
-		else:
-			_single_click_reaction()
-	_refresh_interaction_polygon()
-
-
-func _settle_drag_release(screen: int, preserve_bottom_contact: bool) -> void:
-	await get_tree().process_frame
-	if _dragging or _left_press_pending:
-		return
-	var requested := DisplayServer.window_get_position()
-	if preserve_bottom_contact:
-		var usable := DisplayServer.screen_get_usable_rect(screen)
-		var idle_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
-		requested.y = usable.end.y - ceili(idle_bounds.end.y)
-	DisplayServer.window_set_position(_clamp_window_position(requested))
+	_input_controller.handle_secondary_window_input(event)
 
 
 func _can_begin_drag() -> bool:
-	return not state.is_action_busy()
+	return _gameplay_coordinator.can_begin_drag()
 
 
 func _interrupt_autonomous_action() -> bool:
 	if state.is_action_busy():
 		return false
-	if is_instance_valid(_auto_move_tween):
-		_auto_move_tween.kill()
-		_auto_move_tween = null
-	return pet.cancel_autonomous_action()
+	return _gameplay_coordinator.cancel_autonomous_action()
 
 
 func _notification(what: int) -> void:
@@ -330,7 +197,6 @@ func say(text: String, seconds := 6.0, codex_priority := false) -> void:
 		_refresh_interaction_polygon()
 		if codex_priority:
 			_codex_notification_active = false
-			_codex_bubble_press = false
 			call_deferred("_show_next_codex_notification")
 
 
@@ -380,15 +246,6 @@ func _finish_window_setup() -> void:
 	_say_dialogue("startup", "右鍵操作・雙擊摸摸", 5.0)
 
 
-func _update_cursor(global_mouse: Vector2i) -> void:
-	if _dragging:
-		_set_cursor_shape(Input.CURSOR_DRAG)
-		return
-	var local_mouse := Vector2(global_mouse - DisplayServer.window_get_position())
-	var over_pet := _is_pet_interactive_at(local_mouse)
-	_set_cursor_shape(Input.CURSOR_POINTING_HAND if over_pet else Input.CURSOR_ARROW)
-
-
 func _is_pet_interactive_at(local_point: Vector2) -> bool:
 	if _is_speech_overlay_at(local_point):
 		return true
@@ -423,13 +280,6 @@ func _refresh_interaction_polygon() -> void:
 		bubble_rect,
 		tail_points
 	)
-
-
-func _set_cursor_shape(shape: Input.CursorShape) -> void:
-	if shape == _cursor_shape:
-		return
-	_cursor_shape = shape
-	_window_service.set_cursor_shape(shape)
 
 
 func _connect_signals() -> void:
@@ -612,12 +462,12 @@ func _setup_context_menu() -> void:
 
 
 func _show_context_menu(at: Vector2i) -> void:
-	context_menu.position = DisplayServer.window_get_position() + at
+	context_menu.position = _window_service.window_position() + at
 	context_menu.popup()
 
 
 func _setup_status_indicator() -> void:
-	if not DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR):
+	if not _window_service.has_status_indicator():
 		return
 	_tray_exit_menu = PopupMenu.new()
 	_tray_exit_menu.add_item("❌  儲存並離開", 7)
@@ -705,147 +555,48 @@ func _can_act_autonomously(require_mouse_idle := false) -> bool:
 	return (not require_mouse_idle or mouse_is_idle) \
 		and not context_menu.visible \
 		and not _is_stats_window_open() \
-		and not _dragging \
+		and not _input_controller.is_dragging() \
 		and not state.is_sleeping() \
-		and not pet.is_busy() \
-		and not state.is_action_busy()
+		and _gameplay_coordinator.can_start_action()
 
 
 func _run_autonomous_action() -> void:
-	if state.is_sleeping():
-		return
 	var mouse_is_idle := Time.get_ticks_msec() - _last_user_activity_ms >= 4500
-	var action: String = pet.pick_autonomous_action(mouse_is_idle)
-	if action == "move":
-		_autonomous_small_roll()
-	elif not action.is_empty():
-		pet.play_action(action)
+	_gameplay_coordinator.run_autonomous_action(mouse_is_idle)
 
 
 func _autonomous_small_roll() -> void:
-	if not _can_act_autonomously(true):
-		return
-	var screen := DisplayServer.window_get_current_screen()
-	if screen < 0:
-		screen = DisplayServer.get_primary_screen()
-	var usable := DisplayServer.screen_get_usable_rect(screen)
-	var distance := randi_range(
-		AUTONOMOUS_MOVE_MIN_PX,
-		AUTONOMOUS_MOVE_MAX_PX
-	) * (-1 if randf() < 0.5 else 1)
-	if not pet.begin_progressive_move():
-		return
-	# The first move frame can change the transparent window geometry. Read the
-	# actual position and size after it is shown so the tween starts from the
-	# same native window that the user sees.
-	var start := DisplayServer.window_get_position()
-	var window_size := DisplayServer.window_get_size()
-	var target_x := clampi(start.x + distance, usable.position.x, usable.end.x - window_size.x)
-	if target_x == start.x:
-		target_x = clampi(start.x - distance, usable.position.x, usable.end.x - window_size.x)
-	var target := Vector2i(target_x, start.y)
-	var move_duration: float = pet.get_action_duration("move")
-	pet.set_facing_direction(1 if target_x > start.x else -1)
-	pet.update_progressive_move(0.0)
-	var tween := create_tween()
-	_auto_move_tween = tween
-	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_method(
-		func(weight: float) -> void:
-			pet.update_progressive_move(weight)
-			DisplayServer.window_set_position(Vector2i(Vector2(start).lerp(Vector2(target), weight))),
-		0.0, 1.0, move_duration
-	)
-	tween.finished.connect(func() -> void:
-		if _auto_move_tween != tween:
-			return
-		_auto_move_tween = null
-		pet.finish_progressive_move()
-	)
+	_gameplay_coordinator.start_autonomous_move(_can_act_autonomously(true))
 
 
 func _build_stats_window() -> void:
 	_stats_bars.clear()
 	_care_action_buttons.clear()
-	_stats_window = Window.new()
-	_stats_window.name = "StatsWindow"
-	_stats_window.title = "桌寵詳細狀態"
-	_stats_window.size = DEFAULT_STATS_SIZE
-	_stats_window.min_size = MIN_STATS_SIZE
-	_stats_window.unresizable = false
-	_stats_window.transient = false
-	_stats_window.always_on_top = false
-	_stats_window.visible = false
-	_stats_window.close_requested.connect(_destroy_stats_window)
-	_stats_window.window_input.connect(_on_stats_window_input)
-	add_child(_stats_window)
-
-	var panel := PanelContainer.new()
-	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	panel.theme = _create_details_theme()
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = _details_color("#f7f8f9", "#181818")
-	panel_style.border_color = _details_color("#dce3e6", "#333333")
-	panel_style.set_border_width_all(1)
-	panel_style.set_corner_radius_all(12)
-	panel.add_theme_stylebox_override("panel", panel_style)
-	_stats_window.add_child(panel)
-
-	var root_layout := VBoxContainer.new()
-	root_layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root_layout.add_theme_constant_override("separation", 0)
-	panel.add_child(root_layout)
-
-	var navigation_margin := MarginContainer.new()
-	navigation_margin.add_theme_constant_override("margin_left", 14)
-	navigation_margin.add_theme_constant_override("margin_top", 10)
-	navigation_margin.add_theme_constant_override("margin_right", 14)
-	navigation_margin.add_theme_constant_override("margin_bottom", 8)
-	root_layout.add_child(navigation_margin)
-	var navigation := HBoxContainer.new()
-	navigation.add_theme_constant_override("separation", 8)
-	navigation_margin.add_child(navigation)
-	_stats_tab_buttons.clear()
-	for tab_index: int in 3:
-		var navigation_button := Button.new()
-		navigation_button.text = ["狀態", "設定", "角色"][tab_index]
-		navigation_button.custom_minimum_size.y = 40
-		navigation_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		navigation_button.focus_mode = Control.FOCUS_NONE
-		navigation_button.pressed.connect(
-			Callable(self, "_select_stats_tab").bind(tab_index)
-		)
-		navigation.add_child(navigation_button)
-		_stats_tab_buttons.append(navigation_button)
-
-	var tabs := TabContainer.new()
-	tabs.name = "DetailsTabs"
-	_stats_tabs = tabs
-	tabs.theme = panel.theme
-	tabs.tabs_visible = false
-	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root_layout.add_child(tabs)
-
-	if _details_window_controller == null:
-		_details_window_controller = DetailsWindowControllerScript.new()
-		_connect_details_window_signals()
-	_details_window_controller.theme_mode = _details_theme_mode
-	_details_window_controller.last_state_message = _last_state_message
-	_details_window_controller.codex_enabled = (
+	_stats_window_coordinator = StatsWindowCoordinatorScript.new()
+	_stats_window_coordinator.theme_mode = _details_theme_mode
+	_stats_window_coordinator.last_state_message = _last_state_message
+	_stats_window_coordinator.codex_enabled = (
 		_codex_controller != null and _codex_controller.enabled
 	)
-	_details_window_controller.codex_port = (
+	_stats_window_coordinator.codex_port = (
 		_codex_controller.port
 		if _codex_controller != null
 		else CodexIntegrationControllerScript.DEFAULT_PORT
 	)
-	_details_window_controller.autostart_supported = _is_autostart_supported()
-	_details_window_controller.interaction_label = Callable(self, "_interaction_label")
-	_details_window_controller.interaction_icon = Callable(self, "_interaction_icon")
-	var status_refs: Dictionary = _details_window_controller.build_status_tab(
-		tabs
-	)
+	_stats_window_coordinator.autostart_supported = _is_autostart_supported()
+	_stats_window_coordinator.interaction_label = Callable(self, "_interaction_label")
+	_stats_window_coordinator.interaction_icon = Callable(self, "_interaction_icon")
+	var refs: Dictionary = _stats_window_coordinator.build(self)
+	_stats_window = refs["window"] as Window
+	_stats_tabs = refs["tabs"] as TabContainer
+	_stats_tab_buttons = refs["tab_buttons"] as Array[Button]
+	_details_window_controller = refs["details_controller"]
+	_connect_details_window_signals()
+	_stats_window_coordinator.close_requested.connect(_destroy_stats_window)
+	_stats_window_coordinator.window_input.connect(_on_stats_window_input)
+	_stats_window_coordinator.tab_selected.connect(_select_stats_tab)
+	_stats_window_coordinator.tab_changed.connect(_on_stats_tab_changed)
+	var status_refs: Dictionary = refs["status_refs"]
 	_stats_status = status_refs["stats_status"] as Label
 	_companion_status = status_refs["companion_status"] as Label
 	_wish_status = status_refs["wish_status"] as Label
@@ -854,9 +605,7 @@ func _build_stats_window() -> void:
 	_care_action_buttons = status_refs["care_action_buttons"] as Dictionary
 	_stats_bars = status_refs["stats_bars"] as Dictionary
 
-	var settings_refs: Dictionary = _details_window_controller.build_settings_tab(
-		tabs
-	)
+	var settings_refs: Dictionary = refs["settings_refs"]
 	_fps_option_button = settings_refs["fps_option_button"] as OptionButton
 	_details_theme_option_button = settings_refs["details_theme_option_button"] as OptionButton
 	_codex_state_option_button = settings_refs["codex_state_option_button"] as OptionButton
@@ -869,9 +618,7 @@ func _build_stats_window() -> void:
 	_settings_feedback = settings_refs["settings_feedback"] as Label
 	_refresh_codex_settings_ui()
 
-	var character_refs: Dictionary = _details_window_controller.build_character_tab(
-		tabs, _stats_window
-	)
+	var character_refs: Dictionary = refs["character_refs"]
 	_character_tab_index = int(character_refs["character_tab_index"])
 	_character_list = character_refs["character_list"] as ItemList
 	_character_use_button = character_refs["character_use_button"] as Button
@@ -880,7 +627,6 @@ func _build_stats_window() -> void:
 	_character_import_dialog = character_refs["character_import_dialog"] as FileDialog
 	_character_update_dialog = character_refs["character_update_dialog"] as ConfirmationDialog
 	_character_delete_dialog = character_refs["character_delete_dialog"] as ConfirmationDialog
-	tabs.tab_changed.connect(_on_stats_tab_changed)
 	_select_stats_tab(0)
 
 
@@ -1009,11 +755,7 @@ func _refresh_character_list(message := "") -> void:
 		"installed": false,
 		"builtin": true,
 	})
-	for entry: Dictionary in CharacterPackManagerScript.list_installed():
-		var installed_entry := entry.duplicate()
-		installed_entry.installed = true
-		installed_entry.builtin = false
-		_character_entries.append(installed_entry)
+	_character_entries.append_array(_character_coordinator.list_entries().slice(1))
 	var active_id: String = pet.get_character_id()
 	var active_found := false
 	for entry: Dictionary in _character_entries:
@@ -1080,13 +822,13 @@ func _open_character_import_dialog() -> void:
 
 
 func _install_character_archive(path: String) -> void:
-	var inspection: Dictionary = CharacterPackManagerScript.inspect_archive(path)
+	var inspection: Dictionary = _character_coordinator.inspect_archive(path)
 	if not bool(inspection.get("ok", false)):
 		_character_feedback.text = "匯入失敗：%s" % String(inspection.get(
 			"message", "未知錯誤"
 		))
 		return
-	for entry: Dictionary in CharacterPackManagerScript.list_installed():
+	for entry: Dictionary in _character_coordinator.list_entries():
 		if String(entry.id) != String(inspection.id):
 			continue
 		_pending_character_archive = path
@@ -1113,7 +855,7 @@ func _install_pending_character_archive() -> void:
 
 func _install_character_archive_now(path: String) -> void:
 	_character_feedback.text = "正在驗證並安裝角色包…"
-	var result: Dictionary = CharacterPackManagerScript.install_archive(path)
+	var result: Dictionary = _character_coordinator.install_archive(path)
 	if not bool(result.get("ok", false)):
 		_character_feedback.text = "匯入失敗：%s" % String(result.get(
 			"message", "未知錯誤"
@@ -1137,12 +879,8 @@ func _use_selected_character() -> void:
 
 
 func _apply_character_without_restart(character_id: String, is_reload: bool) -> bool:
-	var previous_character_id: String = pet.get_character_id()
-	_set_selected_character_id(character_id)
-	if not pet.reload_character() or pet.get_character_id() != character_id:
-		_set_selected_character_id(previous_character_id)
-		pet.reload_character()
-		state.configure_profile(pet.get_character_id())
+	var switch_result: Dictionary = _character_coordinator.switch_character(character_id)
+	if not bool(switch_result.get("ok", false)):
 		_character_feedback.text = "角色載入失敗，已恢復原本角色。"
 		_refresh_interaction_polygon()
 		return false
@@ -1213,10 +951,7 @@ func _refresh_json_driven_ui() -> void:
 
 
 func _set_selected_character_id(character_id: String) -> void:
-	var config := ConfigFile.new()
-	config.load(UI_SETTINGS_PATH)
-	config.set_value("character", "selected_id", character_id)
-	config.save(UI_SETTINGS_PATH)
+	_character_coordinator.save_selected_character_id(character_id)
 
 
 func _confirm_delete_selected_character() -> void:
@@ -1239,7 +974,7 @@ func _delete_selected_character() -> void:
 	if was_active:
 		_set_selected_character_id("open_desktop_pet_default")
 		state.save_state()
-	var result: Dictionary = CharacterPackManagerScript.remove_pack(character_id)
+	var result: Dictionary = _character_coordinator.remove_pack(character_id)
 	if not bool(result.get("ok", false)):
 		_character_feedback.text = "刪除失敗：%s" % String(result.get(
 			"message", "未知錯誤"
@@ -1251,151 +986,21 @@ func _delete_selected_character() -> void:
 
 
 func _open_character_packs_folder() -> void:
-	if CharacterPackManagerScript.ensure_packs_root() != OK:
+	if _character_coordinator.ensure_packs_root() != OK:
 		_character_feedback.text = "無法建立角色包資料夾。"
 		return
 	OS.shell_open(ProjectSettings.globalize_path(
-		CharacterPackManagerScript.PACKS_ROOT
+		_character_coordinator.packs_root()
 	))
 
 
 func _run_care_action(id: int) -> void:
-	if state.is_sleeping():
-		state.wake_sleep("care_action")
+	var result: String = _gameplay_coordinator.request_care_action(id)
+	if result == "woke":
 		_last_user_activity_ms = Time.get_ticks_msec()
 		return
-	if state.is_action_busy() or not _interrupt_autonomous_action():
+	if result == "busy":
 		_say_dialogue("action_busy", "先等目前的動作完成～", 1.5)
-		return
-	match id:
-		1:
-			state.feed()
-		2:
-			state.water()
-		3:
-			state.pet()
-		4:
-			state.work()
-		5:
-			state.sleep()
-
-
-func _add_stat_row(parent: VBoxContainer, label_text: String, key: String, color: Color) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	var label := _new_label(label_text, 15, _details_color("#445057", "#cccccc"))
-	label.custom_minimum_size.x = 48
-	row.add_child(label)
-	var bar := ProgressBar.new()
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.custom_minimum_size.y = 22
-	bar.show_percentage = true
-	var background := StyleBoxFlat.new()
-	background.bg_color = _details_color("#e8edef", "#333333")
-	background.set_corner_radius_all(8)
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = color
-	fill.set_corner_radius_all(8)
-	bar.add_theme_stylebox_override("background", background)
-	bar.add_theme_stylebox_override("fill", fill)
-	bar.add_theme_color_override("font_color", _details_color("#263238", "#f0f0f0"))
-	bar.add_theme_color_override("font_outline_color", _details_color("#ffffff", "#1e1e1e"))
-	bar.add_theme_constant_override("outline_size", 1)
-	row.add_child(bar)
-	_stats_bars[key] = bar
-	parent.add_child(row)
-
-
-func _create_details_theme() -> Theme:
-	var theme := Theme.new()
-	var empty_panel := StyleBoxEmpty.new()
-	theme.set_stylebox("panel", "TabContainer", empty_panel)
-	theme.set_stylebox("panel", "ScrollContainer", empty_panel)
-	var normal := _details_style(
-		_details_color("#ffffff", "#252526"),
-		_details_color("#d6dee2", "#3c3c3c"), 8
-	)
-	var hover := _details_style(
-		_details_color("#edf8fa", "#2a2d2e"),
-		_details_color("#78c8d5", "#4e94ce"), 8
-	)
-	var pressed := _details_style(
-		_details_color("#d9f0f4", "#094771"),
-		_details_color("#35a9bd", "#3794ff"), 8
-	)
-	var disabled := _details_style(
-		_details_color("#eef1f2", "#232323"),
-		_details_color("#e1e6e8", "#333333"), 8
-	)
-	for type_name: String in ["Button", "OptionButton"]:
-		theme.set_stylebox("normal", type_name, normal)
-		theme.set_stylebox("hover", type_name, hover)
-		theme.set_stylebox("pressed", type_name, pressed)
-		theme.set_stylebox("focus", type_name, pressed)
-		theme.set_stylebox("disabled", type_name, disabled)
-		theme.set_color("font_color", type_name, _details_color("#30383c", "#cccccc"))
-		theme.set_color("font_hover_color", type_name, _details_color("#176f7e", "#ffffff"))
-		theme.set_color("font_pressed_color", type_name, _details_color("#145f6c", "#ffffff"))
-		theme.set_color("font_focus_color", type_name, _details_color("#145f6c", "#ffffff"))
-		theme.set_color("font_disabled_color", type_name, _details_color("#99a3a8", "#6d6d6d"))
-		theme.set_font_size("font_size", type_name, 14)
-
-	var list_panel := _details_style(
-		_details_color("#ffffff", "#1e1e1e"),
-		_details_color("#dce3e6", "#3c3c3c"), 9
-	)
-	var list_selected := _details_style(
-		_details_color("#cfeef3", "#094771"),
-		_details_color("#59b9c8", "#3794ff"), 7
-	)
-	var list_hover := _details_style(
-		_details_color("#e7f5f7", "#2a2d2e"),
-		_details_color("#a8d9e0", "#3c3c3c"), 7
-	)
-	var list_focus := _details_style(
-		Color(0, 0, 0, 0), _details_color("#8bcbd5", "#4e94ce"), 9
-	)
-	theme.set_stylebox("panel", "ItemList", list_panel)
-	theme.set_stylebox("selected", "ItemList", list_selected)
-	theme.set_stylebox("selected_focus", "ItemList", list_selected)
-	theme.set_stylebox("hovered", "ItemList", list_hover)
-	theme.set_stylebox("hovered_selected", "ItemList", list_selected)
-	theme.set_stylebox("focus", "ItemList", list_focus)
-	theme.set_color("font_color", "ItemList", _details_color("#30383c", "#cccccc"))
-	theme.set_color("font_hovered_color", "ItemList", _details_color("#164f59", "#ffffff"))
-	theme.set_color("font_selected_color", "ItemList", _details_color("#103f47", "#ffffff"))
-	theme.set_font_size("font_size", "ItemList", 14)
-	var popup_panel := _details_style(
-		_details_color("#ffffff", "#252526"),
-		_details_color("#d6dee2", "#454545"), 8
-	)
-	var popup_hover := _details_style(
-		_details_color("#dff2f5", "#094771"),
-		_details_color("#91cfd8", "#3794ff"), 6
-	)
-	theme.set_stylebox("panel", "PopupMenu", popup_panel)
-	theme.set_stylebox("hover", "PopupMenu", popup_hover)
-	theme.set_color("font_color", "PopupMenu", _details_color("#30383c", "#cccccc"))
-	theme.set_color("font_hover_color", "PopupMenu", _details_color("#103f47", "#ffffff"))
-	var tooltip_panel := _details_style(
-		_details_color("#243136", "#252526"),
-		_details_color("#40545b", "#555555"), 6
-	)
-	theme.set_stylebox("panel", "TooltipPanel", tooltip_panel)
-	theme.set_color("font_color", "TooltipLabel", Color("#f5f5f5"))
-	theme.set_font_size("font_size", "TooltipLabel", 13)
-
-	var separator := StyleBoxLine.new()
-	separator.color = _details_color("#dde4e7", "#3c3c3c")
-	separator.thickness = 1
-	theme.set_stylebox("separator", "HSeparator", separator)
-	theme.set_color("font_color", "CheckBox", _details_color("#30383c", "#cccccc"))
-	theme.set_color("font_hover_color", "CheckBox", _details_color("#176f7e", "#ffffff"))
-	theme.set_color("font_disabled_color", "CheckBox", _details_color("#99a3a8", "#6d6d6d"))
-	theme.set_color("font_selected_color", "TabBar", Color("#ffffff"))
-	theme.set_color("font_unselected_color", "TabBar", _details_color("#0f0f0f", "#9da1a6"))
-	theme.set_color("font_hovered_color", "TabBar", _details_color("#0f0f0f", "#ffffff"))
-	return theme
 
 
 func _details_color(light: String, dark: String) -> Color:
@@ -1428,155 +1033,12 @@ func _update_codex_state_option() -> void:
 	_style_codex_state_option()
 
 
-func _style_codex_action_button(button: Button) -> void:
-	var normal := _details_style(
-		_details_color("#ffffff", "#252526"),
-		_details_color("#cbd5d9", "#454545"), 8
-	)
-	var hover := _details_style(
-		_details_color("#edf8fa", "#2a2d2e"),
-		_details_color("#78c8d5", "#4e94ce"), 8
-	)
-	var pressed := _details_style(
-		_details_color("#d9f0f4", "#094771"),
-		_details_color("#35a9bd", "#3794ff"), 8
-	)
-	var disabled := _details_style(
-		_details_color("#dfe6e8", "#292e31"),
-		_details_color("#b9c4c8", "#4a5054"), 8
-	)
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", hover)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_stylebox_override("focus", pressed)
-	button.add_theme_stylebox_override("disabled", disabled)
-	button.add_theme_color_override(
-		"font_color", _details_color("#30383c", "#d4d4d4")
-	)
-	button.add_theme_color_override(
-		"font_hover_color", _details_color("#145f6c", "#ffffff")
-	)
-	button.add_theme_color_override(
-		"font_pressed_color", _details_color("#145f6c", "#ffffff")
-	)
-	button.add_theme_color_override(
-		"font_focus_color", _details_color("#145f6c", "#ffffff")
-	)
-	button.add_theme_color_override(
-		"font_disabled_color", _details_color("#9aa6aa", "#6d6d6d")
-	)
-
-
 func _set_codex_action_button_disabled(button: Button, disabled: bool) -> void:
 	button.disabled = disabled
 	button.modulate = Color("#8c979b") if disabled else Color.WHITE
 	button.mouse_default_cursor_shape = (
 		Control.CURSOR_FORBIDDEN if disabled else Control.CURSOR_POINTING_HAND
 	)
-
-
-func _style_checkbox(check_box: CheckBox) -> void:
-	# Keep the native CheckBox artwork; only control spacing and text states.
-	# This fixes the old hover text collision without replacing the checkbox
-	# with a sharp custom bitmap.
-	check_box.add_theme_constant_override("h_separation", 10)
-	check_box.add_theme_color_override(
-		"font_color", _details_color("#30383c", "#cccccc")
-	)
-	check_box.add_theme_color_override(
-		"font_hover_color", _details_color("#176f7e", "#ffffff")
-	)
-	check_box.add_theme_color_override(
-		"font_pressed_color", _details_color("#145f6c", "#ffffff")
-	)
-	check_box.add_theme_color_override(
-		"font_hover_pressed_color", _details_color("#145f6c", "#ffffff")
-	)
-	check_box.add_theme_color_override(
-		"font_focus_color", _details_color("#145f6c", "#ffffff")
-	)
-	check_box.add_theme_color_override(
-		"font_disabled_color", _details_color("#99a3a8", "#6d6d6d")
-	)
-
-
-func _style_spin_box(spin_box: SpinBox) -> void:
-	var line_edit := spin_box.get_line_edit()
-	var normal := _details_style(
-		_details_color("#ffffff", "#252526"),
-		_details_color("#d6dee2", "#3c3c3c"), 6
-	)
-	var hover := _details_style(
-		_details_color("#f7fcfd", "#2a2d2e"),
-		_details_color("#78c8d5", "#4e94ce"), 6
-	)
-	var focus := _details_style(
-		_details_color("#ffffff", "#252526"),
-		_details_color("#35a9bd", "#3794ff"), 6
-	)
-	line_edit.add_theme_stylebox_override("normal", normal)
-	line_edit.add_theme_stylebox_override("hover", hover)
-	line_edit.add_theme_stylebox_override("focus", focus)
-	line_edit.add_theme_color_override(
-		"font_color", _details_color("#30383c", "#d4d4d4")
-	)
-	line_edit.add_theme_color_override(
-		"font_uneditable_color", _details_color("#68747a", "#9da1a6")
-	)
-	line_edit.add_theme_color_override(
-		"caret_color", _details_color("#176f7e", "#4fc1ff")
-	)
-	spin_box.add_theme_color_override(
-		"font_color", _details_color("#30383c", "#d4d4d4")
-	)
-
-
-func _apply_primary_button_style(button: Button) -> void:
-	button.add_theme_stylebox_override(
-		"normal", _details_style(
-			_details_color("#35a9bd", "#0e639c"),
-			_details_color("#35a9bd", "#1177bb"), 8
-		)
-	)
-	button.add_theme_stylebox_override(
-		"hover", _details_style(
-			_details_color("#278fa1", "#1177bb"),
-			_details_color("#278fa1", "#3794ff"), 8
-		)
-	)
-	button.add_theme_stylebox_override(
-		"pressed", _details_style(
-			_details_color("#1d7888", "#094771"),
-			_details_color("#1d7888", "#3794ff"), 8
-		)
-	)
-	button.add_theme_color_override("font_color", Color("#ffffff"))
-	button.add_theme_color_override("font_hover_color", Color("#ffffff"))
-	button.add_theme_color_override("font_pressed_color", Color("#ffffff"))
-
-
-func _apply_danger_button_style(button: Button) -> void:
-	button.add_theme_stylebox_override(
-		"normal", _details_style(
-			_details_color("#fffafa", "#2b2020"),
-			_details_color("#e7b4b4", "#8b4545"), 8
-		)
-	)
-	button.add_theme_stylebox_override(
-		"hover", _details_style(
-			_details_color("#fff0f0", "#3b2424"),
-			_details_color("#d97b7b", "#d16969"), 8
-		)
-	)
-	button.add_theme_stylebox_override(
-		"pressed", _details_style(
-			_details_color("#f8dddd", "#512b2b"),
-			_details_color("#c85f5f", "#f48771"), 8
-		)
-	)
-	button.add_theme_color_override("font_color", _details_color("#b34747", "#f48771"))
-	button.add_theme_color_override("font_hover_color", _details_color("#a53636", "#ff9b8a"))
-	button.add_theme_color_override("font_pressed_color", _details_color("#8f2d2d", "#ffffff"))
 
 
 func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
@@ -1592,14 +1054,6 @@ func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFl
 	return style
 
 
-func _new_label(text: String, font_size: int, color: Color) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
-	return label
-
-
 func _show_stats_window() -> void:
 	if is_instance_valid(_stats_window):
 		_refresh_ui(state.get_snapshot())
@@ -1607,12 +1061,10 @@ func _show_stats_window() -> void:
 		return
 	_build_stats_window()
 	_refresh_ui(state.get_snapshot())
-	var pet_position := DisplayServer.window_get_position()
-	var pet_size := DisplayServer.window_get_size()
-	var screen := DisplayServer.window_get_current_screen()
-	if screen < 0:
-		screen = DisplayServer.get_primary_screen()
-	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var pet_position: Vector2i = _window_service.window_position()
+	var pet_size: Vector2i = _window_service.window_size()
+	var screen: int = _window_service.current_screen()
+	var usable: Rect2i = _window_service.usable_rect(screen)
 	var preferred_size := _load_stats_window_size()
 	_stats_window.size = Vector2i(
 		clampi(preferred_size.x, MIN_STATS_SIZE.x, usable.size.x - 24),
@@ -1635,7 +1087,7 @@ func _bring_stats_window_forward() -> void:
 	if not _stats_window.visible:
 		_stats_window.show()
 	_stats_window.grab_focus()
-	DisplayServer.window_move_to_foreground(_stats_window.get_window_id())
+	_window_service.bring_to_front(_stats_window.get_window_id())
 
 
 func _is_stats_window_open() -> bool:
@@ -1644,8 +1096,9 @@ func _is_stats_window_open() -> bool:
 
 func _destroy_stats_window() -> void:
 	_save_stats_window_size()
-	if is_instance_valid(_stats_window):
-		_stats_window.queue_free()
+	if _stats_window_coordinator != null:
+		_stats_window_coordinator.destroy()
+	_stats_window_coordinator = null
 	_stats_window = null
 	_stats_tabs = null
 	_stats_tab_buttons.clear()
@@ -1924,9 +1377,7 @@ func _prepare_shutdown() -> void:
 	_shutting_down = true
 	set_process(false)
 	set_process_unhandled_input(false)
-	_left_press_pending = false
-	_dragging = false
-	pet.set_dragging(false)
+	_input_controller.cancel()
 	context_menu.hide()
 	_bubble_token += 1
 	bubble.visible = false
@@ -2073,16 +1524,11 @@ func _place_bottom_right() -> void:
 
 
 func _recover_pet() -> void:
-	_left_press_pending = false
-	_dragging = false
-	pet.set_dragging(false)
-	if is_instance_valid(_auto_move_tween):
-		_auto_move_tween.kill()
-		_auto_move_tween = null
-		pet.cancel_roll()
+	_input_controller.cancel()
+	_gameplay_coordinator.cancel_autonomous_action()
 	_window_service.restore_if_minimized()
-	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, true)
-	var screen := DisplayServer.get_primary_screen()
+	_window_service.set_always_on_top(true)
+	var screen: int = _window_service.current_screen()
 	var usable: Rect2i = _window_service.usable_rect(screen)
 	var visual_bounds: Rect2 = pet.get_visual_bounds_in_canvas()
 	_window_service.set_window_position(Vector2i(

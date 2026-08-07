@@ -18,6 +18,21 @@ func set_window_position(position: Vector2i) -> void:
 	DisplayServer.window_set_position(position)
 
 
+func set_always_on_top(enabled: bool) -> void:
+	DisplayServer.window_set_flag(
+		DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP,
+		enabled
+	)
+
+
+func has_status_indicator() -> bool:
+	return DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR)
+
+
+func bring_to_front(window_id: int) -> void:
+	DisplayServer.window_move_to_foreground(window_id)
+
+
 func restore_if_minimized() -> void:
 	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
