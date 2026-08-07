@@ -284,6 +284,35 @@ func _init() -> void:
 		is_instance_valid(main._autostart_check_box),
 		"details window includes a Windows autostart setting"
 	)
+	var autostart_pressed_style := (
+		main._autostart_check_box.get_theme_stylebox("pressed") as StyleBoxFlat
+	)
+	var autostart_hover_pressed_style := (
+		main._autostart_check_box.get_theme_stylebox("hover_pressed")
+		as StyleBoxFlat
+	)
+	_assert_true(
+		autostart_pressed_style != null
+			and autostart_hover_pressed_style != null,
+		"autostart checkbox defines checked and checked-hover styles"
+	)
+	_assert_equal(
+		autostart_hover_pressed_style.bg_color,
+		autostart_pressed_style.bg_color,
+		"hovering a checked autostart option preserves its selected background"
+	)
+	_assert_equal(
+		autostart_hover_pressed_style.content_margin_left,
+		autostart_pressed_style.content_margin_left,
+		"hovering a checked autostart option preserves its text alignment"
+	)
+	_assert_equal(
+		main._autostart_check_box.get_theme_constant(
+			"align_to_largest_stylebox"
+		),
+		1,
+		"autostart checkbox keeps one layout across interaction states"
+	)
 	var original_target_fps := Engine.max_fps
 	main._set_target_fps(47)
 	_assert_equal(

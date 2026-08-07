@@ -139,17 +139,20 @@ func _create_details_theme() -> Theme:
 		_details_color("#eef1f2", "#232323"),
 		_details_color("#e1e6e8", "#333333"), 8
 	)
-	for type_name: String in ["Button", "OptionButton"]:
+	for type_name: String in ["Button", "OptionButton", "CheckBox"]:
 		theme.set_stylebox("normal", type_name, normal)
 		theme.set_stylebox("hover", type_name, hover)
 		theme.set_stylebox("pressed", type_name, pressed)
+		theme.set_stylebox("hover_pressed", type_name, pressed)
 		theme.set_stylebox("focus", type_name, pressed)
 		theme.set_stylebox("disabled", type_name, disabled)
 		theme.set_color("font_color", type_name, _details_color("#30383c", "#cccccc"))
 		theme.set_color("font_hover_color", type_name, _details_color("#176f7e", "#ffffff"))
 		theme.set_color("font_pressed_color", type_name, _details_color("#145f6c", "#ffffff"))
+		theme.set_color("font_hover_pressed_color", type_name, _details_color("#145f6c", "#ffffff"))
 		theme.set_color("font_focus_color", type_name, _details_color("#145f6c", "#ffffff"))
 		theme.set_color("font_disabled_color", type_name, _details_color("#99a3a8", "#6d6d6d"))
+		theme.set_constant("align_to_largest_stylebox", type_name, 1)
 		theme.set_font_size("font_size", type_name, 14)
 
 	var list_panel := _details_style(
