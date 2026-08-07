@@ -19,11 +19,21 @@ if (-not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) {
     throw "Executable not found: $ExecutablePath"
 }
 
+$extensionFileName = 'open_desktop_pet_windows.windows.template_release.x86_64.dll'
+$extensionPath = Join-Path ([IO.Path]::GetDirectoryName($ExecutablePath)) $extensionFileName
+if (-not (Test-Path -LiteralPath $extensionPath -PathType Leaf)) {
+    $extensionPath = Join-Path $projectRoot "native\windows\bin\$extensionFileName"
+}
+if (-not (Test-Path -LiteralPath $extensionPath -PathType Leaf)) {
+    throw "Windows GDExtension not found: $extensionFileName"
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $toolsOutput = Join-Path $OutputDirectory 'tools'
 New-Item -ItemType Directory -Force -Path $toolsOutput | Out-Null
 
 Copy-Item -LiteralPath $ExecutablePath -Destination (Join-Path $OutputDirectory 'OpenDesktopPet.exe') -Force
+Copy-Item -LiteralPath $extensionPath -Destination (Join-Path $OutputDirectory $extensionFileName) -Force
 foreach ($fileName in @(
     'Install-Codex-Integration.cmd',
     'install_codex_integration.ps1',

@@ -12,7 +12,8 @@ const DEFAULT_STATS_SIZE := Vector2i(500, 620)
 const MIN_STATS_SIZE := Vector2i(360, 480)
 const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
-const CODEX_NOTIFICATION_QUEUE_LIMIT := 16
+const CODEX_NOTIFICATION_DURATION_SECONDS := 60.0
+const CODEX_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3.0
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
 const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 
@@ -34,12 +35,10 @@ var _fps_option_button: OptionButton
 var _details_theme_option_button: OptionButton
 var _autostart_check_box: CheckBox
 var _settings_feedback: Label
-var _codex_state_option_button: OptionButton
+var _codex_enabled_toggle: Button
 var _codex_port_spin_box: SpinBox
 var _codex_status_label: Label
-var _codex_feedback: Label
-var _codex_configure_button: Button
-var _codex_reconnect_button: Button
+var _codex_executable_line_edit: LineEdit
 var _character_list: ItemList
 var _character_feedback: Label
 var _character_use_button: Button
@@ -72,7 +71,6 @@ var _tray_exit_menu: PopupMenu
 var _details_theme_mode := "light"
 var _codex_controller: CodexIntegrationController
 var _details_window_controller
-var _codex_notification_queue: Array[Dictionary] = []
 var _codex_notification_active := false
 
 
@@ -167,11 +165,11 @@ func _exit_tree() -> void:
 
 
 func say(text: String, seconds := 6.0, codex_priority := false) -> void:
-	if not codex_priority \
-			and (_codex_notification_active or not _codex_notification_queue.is_empty()):
+	if not codex_priority and _codex_notification_active:
 		return
 	_bubble_token += 1
 	var token := _bubble_token
+	_style_bubble(codex_priority)
 	# Container layout and the native Windows hit-test region are both applied
 	# asynchronously. Keep the bubble hidden until one layout frame has passed
 	# so the compositor never displays the temporary polygon-shaped state.
@@ -188,7 +186,7 @@ func say(text: String, seconds := 6.0, codex_priority := false) -> void:
 		return
 	_layout_speech_bubble(text)
 	bubble.visible = true
-	bubble_tail.visible = true
+	bubble_tail.visible = not codex_priority
 	_refresh_interaction_polygon()
 	await get_tree().create_timer(seconds).timeout
 	if token == _bubble_token:
@@ -197,7 +195,6 @@ func say(text: String, seconds := 6.0, codex_priority := false) -> void:
 		_refresh_interaction_polygon()
 		if codex_priority:
 			_codex_notification_active = false
-			call_deferred("_show_next_codex_notification")
 
 
 func _restore_from_system_minimize() -> void:
@@ -316,62 +313,47 @@ func _setup_autostart_service() -> void:
 
 func _refresh_codex_settings_ui() -> void:
 	_apply_codex_control_state()
+	if is_instance_valid(_codex_executable_line_edit) \
+			and not _codex_executable_line_edit.has_focus():
+		_codex_executable_line_edit.text = (
+			_codex_controller.executable_path if _codex_controller != null else ""
+		)
 	if not is_instance_valid(_codex_status_label):
 		return
 	if _codex_controller == null or not _codex_controller.enabled:
-		_codex_status_label.text = "狀態：已關閉"
+		_codex_status_label.text = "狀態: 已關閉"
 		_codex_status_label.add_theme_color_override(
 			"font_color", _details_color("#68747a", "#9da1a6")
 		)
-		if is_instance_valid(_codex_feedback):
-			_codex_feedback.text = "通知已關閉；選擇通訊埠後按「設定通訊埠」。"
 		return
 	if _codex_controller.is_running():
-		_codex_status_label.text = "狀態：監聽中　127.0.0.1:%d" % _codex_controller.port
+		_codex_status_label.text = "狀態: 監聽中  127.0.0.1:%d" % _codex_controller.port
 		_codex_status_label.add_theme_color_override(
 			"font_color", _details_color("#238b9d", "#4fc1ff")
 		)
-		if is_instance_valid(_codex_feedback):
-			_codex_feedback.text = "通知已開啟；通訊埠目前已鎖定。"
 	else:
-		_codex_status_label.text = "狀態：無法監聽，連接埠可能被占用"
+		_codex_status_label.text = "狀態: 無法監聽，通訊埠可能被占用"
 		_codex_status_label.add_theme_color_override(
 			"font_color", _details_color("#b44949", "#ff8c8c")
 		)
-		if is_instance_valid(_codex_feedback):
-			_codex_feedback.text = "通知已開啟，但目前無法監聽這個通訊埠。"
 
 
 func _apply_codex_control_state() -> void:
 	var enabled := _codex_controller != null and _codex_controller.enabled
-	_update_codex_state_option()
+	_update_codex_enabled_toggle()
 	if is_instance_valid(_codex_port_spin_box):
 		_codex_port_spin_box.editable = not enabled
 		_codex_port_spin_box.mouse_filter = (
-			Control.MOUSE_FILTER_IGNORE
-			if enabled
-			else Control.MOUSE_FILTER_STOP
+			Control.MOUSE_FILTER_IGNORE if enabled else Control.MOUSE_FILTER_STOP
 		)
 		var port_line_edit := _codex_port_spin_box.get_line_edit()
 		port_line_edit.editable = not enabled
 		port_line_edit.mouse_filter = (
-			Control.MOUSE_FILTER_IGNORE
-			if enabled
-			else Control.MOUSE_FILTER_STOP
+			Control.MOUSE_FILTER_IGNORE if enabled else Control.MOUSE_FILTER_STOP
 		)
 		_codex_port_spin_box.modulate = (
 			Color("#8c979b") if enabled else Color.WHITE
 		)
-	if enabled:
-		if is_instance_valid(_codex_configure_button):
-			_set_codex_action_button_disabled(_codex_configure_button, true)
-		if is_instance_valid(_codex_reconnect_button):
-			_set_codex_action_button_disabled(_codex_reconnect_button, false)
-	else:
-		if is_instance_valid(_codex_configure_button):
-			_set_codex_action_button_disabled(_codex_configure_button, false)
-		if is_instance_valid(_codex_reconnect_button):
-			_set_codex_action_button_disabled(_codex_reconnect_button, true)
 
 
 func _handle_codex_notification(
@@ -381,35 +363,40 @@ func _handle_codex_notification(
 
 
 func _enqueue_codex_status(message: String, reaction_action: String) -> void:
-	if _codex_notification_queue.size() >= CODEX_NOTIFICATION_QUEUE_LIMIT:
-		_codex_notification_queue.pop_front()
-	_codex_notification_queue.append({
-		"message": message,
-		"reaction_action": reaction_action,
-	})
-	if not _codex_notification_active:
-		_show_next_codex_notification()
-
-
-func _show_next_codex_notification() -> void:
-	if _codex_notification_queue.is_empty():
-		_codex_notification_active = false
-		return
-	var notification: Dictionary = _codex_notification_queue.pop_front()
 	_codex_notification_active = true
-	var message := String(notification.get("message", "Codex 有新的通知。"))
-	var reaction_action := String(notification.get("reaction_action", "idle"))
 	_last_state_message = message
 	if is_instance_valid(_last_message_status):
 		_last_message_status.text = "最近訊息：%s" % message
-	say(message, 8.0, true)
+	var vscode_is_foreground := (
+		_codex_controller != null
+		and _codex_controller.is_codex_interface_foreground()
+	)
+	say(message, _codex_notification_duration(vscode_is_foreground), true)
 	if not state.is_sleeping() and not state.is_action_busy():
 		pet.play_action(reaction_action)
 
 
+func _codex_notification_duration(vscode_is_foreground: bool) -> float:
+	return (
+		CODEX_FOREGROUND_NOTIFICATION_DURATION_SECONDS
+		if vscode_is_foreground
+		else CODEX_NOTIFICATION_DURATION_SECONDS
+	)
+
+
 func _focus_codex_interface() -> void:
-	if _codex_controller != null:
-		_codex_controller.focus_codex_interface()
+	if _codex_controller != null and _codex_controller.focus_codex_interface():
+		_dismiss_active_codex_notification()
+
+
+func _dismiss_active_codex_notification() -> void:
+	if not _codex_notification_active:
+		return
+	_bubble_token += 1
+	bubble.visible = false
+	bubble_tail.visible = false
+	_codex_notification_active = false
+	_refresh_interaction_polygon()
 
 
 func _show_state_message(key: String, fallback: String) -> void:
@@ -583,6 +570,9 @@ func _build_stats_window() -> void:
 		if _codex_controller != null
 		else CodexIntegrationControllerScript.DEFAULT_PORT
 	)
+	_stats_window_coordinator.codex_executable_path = (
+		_codex_controller.executable_path if _codex_controller != null else ""
+	)
 	_stats_window_coordinator.autostart_supported = _is_autostart_supported()
 	_stats_window_coordinator.interaction_label = Callable(self, "_interaction_label")
 	_stats_window_coordinator.interaction_icon = Callable(self, "_interaction_icon")
@@ -608,12 +598,12 @@ func _build_stats_window() -> void:
 	var settings_refs: Dictionary = refs["settings_refs"]
 	_fps_option_button = settings_refs["fps_option_button"] as OptionButton
 	_details_theme_option_button = settings_refs["details_theme_option_button"] as OptionButton
-	_codex_state_option_button = settings_refs["codex_state_option_button"] as OptionButton
+	_codex_enabled_toggle = settings_refs["codex_enabled_toggle"] as Button
 	_codex_port_spin_box = settings_refs["codex_port_spin_box"] as SpinBox
 	_codex_status_label = settings_refs["codex_status_label"] as Label
-	_codex_configure_button = settings_refs["codex_configure_button"] as Button
-	_codex_reconnect_button = settings_refs["codex_reconnect_button"] as Button
-	_codex_feedback = settings_refs["codex_feedback"] as Label
+	_codex_executable_line_edit = (
+		settings_refs["codex_executable_line_edit"] as LineEdit
+	)
 	_autostart_check_box = settings_refs["autostart_check_box"] as CheckBox
 	_settings_feedback = settings_refs["settings_feedback"] as Label
 	_refresh_codex_settings_ui()
@@ -637,10 +627,11 @@ func _connect_details_window_signals() -> void:
 	_details_window_controller.close_requested.connect(_destroy_stats_window)
 	_details_window_controller.target_fps_selected.connect(_on_target_fps_selected)
 	_details_window_controller.details_theme_selected.connect(_on_details_theme_selected)
-	_details_window_controller.codex_state_selected.connect(_on_codex_state_selected)
+	_details_window_controller.codex_enabled_toggled.connect(_on_codex_enabled_toggled)
 	_details_window_controller.codex_port_changed.connect(_on_codex_port_changed)
-	_details_window_controller.codex_configure_requested.connect(_configure_codex_port)
-	_details_window_controller.codex_reconnect_requested.connect(_reconnect_codex_receiver)
+	_details_window_controller.codex_executable_path_changed.connect(
+		_on_codex_executable_path_changed
+	)
 	_details_window_controller.autostart_toggled.connect(_on_autostart_toggled)
 	_details_window_controller.autostart_query_requested.connect(
 		_on_autostart_query_requested
@@ -1007,38 +998,11 @@ func _details_color(light: String, dark: String) -> Color:
 	return Color(dark if _details_theme_mode == "dark" else light)
 
 
-func _style_codex_state_option() -> void:
-	if not is_instance_valid(_codex_state_option_button):
+func _update_codex_enabled_toggle() -> void:
+	if not is_instance_valid(_codex_enabled_toggle):
 		return
-	_codex_state_option_button.add_theme_color_override(
-		"font_color", _details_color("#30383c", "#d4d4d4")
-	)
-	_codex_state_option_button.add_theme_color_override(
-		"font_hover_color", _details_color("#145f6c", "#ffffff")
-	)
-	_codex_state_option_button.add_theme_color_override(
-		"font_pressed_color", _details_color("#145f6c", "#ffffff")
-	)
-	_codex_state_option_button.add_theme_color_override(
-		"font_focus_color", _details_color("#145f6c", "#ffffff")
-	)
-
-
-func _update_codex_state_option() -> void:
-	if not is_instance_valid(_codex_state_option_button):
-		return
-	_codex_state_option_button.select(
-		0 if _codex_controller != null and _codex_controller.enabled else 1
-	)
-	_style_codex_state_option()
-
-
-func _set_codex_action_button_disabled(button: Button, disabled: bool) -> void:
-	button.disabled = disabled
-	button.modulate = Color("#8c979b") if disabled else Color.WHITE
-	button.mouse_default_cursor_shape = (
-		Control.CURSOR_FORBIDDEN if disabled else Control.CURSOR_POINTING_HAND
-	)
+	var enabled := _codex_controller != null and _codex_controller.enabled
+	_codex_enabled_toggle.call("set_enabled_state", enabled)
 
 
 func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
@@ -1109,12 +1073,10 @@ func _destroy_stats_window() -> void:
 	_last_message_status = null
 	_fps_option_button = null
 	_details_theme_option_button = null
-	_codex_state_option_button = null
+	_codex_enabled_toggle = null
 	_codex_port_spin_box = null
 	_codex_status_label = null
-	_codex_feedback = null
-	_codex_configure_button = null
-	_codex_reconnect_button = null
+	_codex_executable_line_edit = null
 	_autostart_check_box = null
 	_settings_feedback = null
 	_character_list = null
@@ -1209,11 +1171,6 @@ func _on_details_theme_selected(index: int) -> void:
 	)
 
 
-func _on_codex_state_selected(index: int) -> void:
-	_on_codex_enabled_toggled(index == 0)
-	call_deferred("_apply_codex_control_state")
-
-
 func _on_codex_enabled_toggled(enabled: bool) -> void:
 	if _codex_controller == null:
 		return
@@ -1222,12 +1179,6 @@ func _on_codex_enabled_toggled(enabled: bool) -> void:
 	_codex_controller.set_enabled(enabled)
 	_apply_codex_control_state()
 	call_deferred("_apply_codex_control_state")
-	if is_instance_valid(_codex_feedback):
-		_codex_feedback.text = (
-			"Codex 完成通知已開啟；通訊埠目前已鎖定。"
-			if enabled
-			else "Codex 完成通知已關閉；現在可以修改通訊埠。"
-		)
 
 
 func _on_codex_port_changed(value: float) -> void:
@@ -1238,45 +1189,14 @@ func _on_codex_port_changed(value: float) -> void:
 			_codex_port_spin_box.set_value_no_signal(_codex_controller.port)
 		return
 	var pending_port := _codex_controller.normalize_port(roundi(value))
-	_codex_controller.set_pending_port(pending_port)
-	if is_instance_valid(_codex_feedback):
-		_codex_feedback.text = (
-			"待設定通訊埠：%d；按「設定通訊埠」後才會套用。"
-			% pending_port
-		)
+	_codex_controller.set_port(pending_port)
 
 
-func _configure_codex_port() -> void:
-	if _codex_controller == null or _codex_controller.enabled:
-		if is_instance_valid(_codex_feedback):
-			_codex_feedback.text = "請先關閉通知開關，才能修改或設定通訊埠。"
+func _on_codex_executable_path_changed(path: String) -> void:
+	if _codex_controller == null:
 		return
-	var selected_port := _codex_controller.port
-	if is_instance_valid(_codex_port_spin_box):
-		selected_port = _codex_controller.normalize_port(
-			roundi(_codex_port_spin_box.value)
-		)
-	var configured := _codex_controller.configure_port(selected_port)
-	if is_instance_valid(_codex_feedback):
-		_codex_feedback.text = (
-			"已設定本機通訊埠 127.0.0.1:%d；請重新啟動 VS Code/Codex。"
-			% selected_port
-			if configured
-			else "找不到 Codex 通知設定工具，請確認 tools 資料夾存在。"
-		)
-
-
-func _reconnect_codex_receiver() -> void:
-	if _codex_controller == null or not _codex_controller.enabled:
-		return
-	var connected := _codex_controller.reconnect()
+	_codex_controller.set_executable_path(path)
 	_refresh_codex_settings_ui()
-	if is_instance_valid(_codex_feedback):
-		_codex_feedback.text = (
-			"已重新連線接收器。"
-			if connected
-			else "重新連線失敗，請確認通訊埠沒有被其他程式占用。"
-		)
 
 
 func _rebuild_stats_window_after_theme_change(
@@ -1546,9 +1466,13 @@ func _clamp_window_position(requested: Vector2i) -> Vector2i:
 	)
 
 
-func _style_bubble() -> void:
+func _style_bubble(codex_notification := false) -> void:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.953, 0.988, 0.996, 0.82)
+	style.bg_color = (
+		Color(0.886, 0.957, 0.973, 0.92)
+		if codex_notification
+		else Color(0.953, 0.988, 0.996, 0.82)
+	)
 	style.border_color = Color(0.204, 0.498, 0.6, 0.82)
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(14)

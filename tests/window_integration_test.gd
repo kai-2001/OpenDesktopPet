@@ -354,6 +354,70 @@ func _init() -> void:
 	_assert_equal(main.bubble_label.text, "💤", "latest speech replaces earlier speech")
 	await create_timer(0.2).timeout
 	_assert_true(not main.bubble.visible, "speech hides after its duration")
+	_assert_equal(
+		main.CODEX_NOTIFICATION_DURATION_SECONDS,
+		60.0,
+		"Codex notification remains available for one minute"
+	)
+	_assert_equal(
+		main.bubble.mouse_default_cursor_shape,
+		Control.CURSOR_POINTING_HAND,
+		"speech bubble advertises a pointing-hand cursor"
+	)
+	var regular_bubble_color: Color = (
+		main.bubble.get_theme_stylebox("panel") as StyleBoxFlat
+	).bg_color
+	main._enqueue_codex_status("Codex 測試通知", "idle")
+	await process_frame
+	await process_frame
+	_assert_true(
+		main._codex_notification_active and main.bubble.visible,
+		"Codex notification displays as an active speech bubble"
+	)
+	_assert_true(
+		not main.bubble_tail.visible,
+		"Codex notification uses a rectangular bubble without a speech tail"
+	)
+	var codex_bubble_color: Color = (
+		main.bubble.get_theme_stylebox("panel") as StyleBoxFlat
+	).bg_color
+	_assert_true(
+		not codex_bubble_color.is_equal_approx(regular_bubble_color),
+		"Codex notification background differs from regular speech"
+	)
+	_assert_equal(
+		main._codex_notification_duration(true),
+		3.0,
+		"Codex notification lasts three seconds when VS Code is foreground"
+	)
+	_assert_equal(
+		main._codex_notification_duration(false),
+		60.0,
+		"Codex notification keeps the normal duration outside VS Code"
+	)
+	var first_codex_bubble_token: int = main._bubble_token
+	main._enqueue_codex_status("Codex 最新通知", "idle")
+	await process_frame
+	await process_frame
+	_assert_true(
+		main._codex_notification_active and main.bubble.visible,
+		"replacement Codex notification remains active"
+	)
+	_assert_equal(
+		main.bubble_label.text,
+		"Codex 最新通知",
+		"latest Codex notification replaces the previous bubble"
+	)
+	_assert_true(
+		main._bubble_token > first_codex_bubble_token,
+		"replacing a Codex notification invalidates the previous timer"
+	)
+	main._dismiss_active_codex_notification()
+	await process_frame
+	_assert_true(
+		not main._codex_notification_active and not main.bubble.visible,
+		"click acknowledgement dismisses the active Codex notification"
+	)
 
 	_assert_true(
 		not main.has_method("_schedule_restart_after_exit")

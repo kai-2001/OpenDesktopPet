@@ -13,6 +13,7 @@ var theme_mode := "light"
 var last_state_message := "尚無紀錄"
 var codex_enabled := false
 var codex_port := CodexIntegrationControllerScript.DEFAULT_PORT
+var codex_executable_path := ""
 var autostart_supported := false
 var interaction_label: Callable
 var interaction_icon: Callable
@@ -85,6 +86,7 @@ func build(owner: Node) -> Dictionary:
 	details_controller.last_state_message = last_state_message
 	details_controller.codex_enabled = codex_enabled
 	details_controller.codex_port = codex_port
+	details_controller.codex_executable_path = codex_executable_path
 	details_controller.autostart_supported = autostart_supported
 	details_controller.interaction_label = interaction_label
 	details_controller.interaction_icon = interaction_icon

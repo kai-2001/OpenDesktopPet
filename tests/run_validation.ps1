@@ -12,6 +12,7 @@ if ($LASTEXITCODE -ne 0) {
 $isolatedAppData = Join-Path $env:TEMP (
     'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')
 )
+$isolatedCodexHome = Join-Path $isolatedAppData 'codex-home'
 $productionSave = Join-Path $env:APPDATA 'Godot\app_userdata\Open Desktop Pet\save_v2.json'
 $productionHashBefore = if (Test-Path $productionSave) {
     (Get-FileHash -LiteralPath $productionSave -Algorithm SHA256).Hash
@@ -21,8 +22,10 @@ $productionHashBefore = if (Test-Path $productionSave) {
 
 New-Item -ItemType Directory -Force -Path $isolatedAppData | Out-Null
 $originalAppData = $env:APPDATA
+$originalCodexHome = $env:CODEX_HOME
 try {
     $env:APPDATA = $isolatedAppData
+    $env:CODEX_HOME = $isolatedCodexHome
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     $gameplayOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/gameplay_state_test.gd' 2>&1
@@ -40,6 +43,15 @@ try {
     $codexNotificationOutput | Write-Output
     if ($codexNotificationExitCode -ne 0 -or -not ($codexNotificationOutput -match 'CODEX_NOTIFICATION_RECEIVER_TEST_OK')) {
         throw 'Codex notification receiver validation failed.'
+    }
+
+    $ErrorActionPreference = 'Continue'
+    $windowsActivatorOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/windows_window_activator_test.gd' 2>&1
+    $windowsActivatorExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+    $windowsActivatorOutput | Write-Output
+    if ($windowsActivatorExitCode -ne 0 -or -not ($windowsActivatorOutput -match 'WINDOWS_WINDOW_ACTIVATOR_TEST_OK')) {
+        throw 'Windows window activator validation failed.'
     }
 
     $ErrorActionPreference = 'Continue'
@@ -62,6 +74,7 @@ try {
 finally {
     $ErrorActionPreference = 'Stop'
     $env:APPDATA = $originalAppData
+    $env:CODEX_HOME = $originalCodexHome
 }
 
 $productionHashAfter = if (Test-Path $productionSave) {

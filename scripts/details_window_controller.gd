@@ -2,16 +2,16 @@ class_name DetailsWindowController
 extends RefCounted
 
 const CodexIntegrationControllerScript = preload("res://scripts/codex_integration_controller.gd")
+const CodexToggleSwitchScript = preload("res://scripts/codex_toggle_switch.gd")
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 
 signal care_action_requested(action: String)
 signal close_requested
 signal target_fps_selected(index: int)
 signal details_theme_selected(index: int)
-signal codex_state_selected(index: int)
+signal codex_enabled_toggled(enabled: bool)
 signal codex_port_changed(value: float)
-signal codex_configure_requested
-signal codex_reconnect_requested
+signal codex_executable_path_changed(path: String)
 signal autostart_toggled(enabled: bool)
 signal autostart_query_requested
 signal character_selected(index: int)
@@ -27,6 +27,7 @@ var theme_mode := "light"
 var last_state_message := "尚無紀錄"
 var codex_enabled := false
 var codex_port := CodexIntegrationControllerScript.DEFAULT_PORT
+var codex_executable_path := ""
 var autostart_supported := false
 var interaction_label: Callable
 var interaction_icon: Callable
@@ -232,99 +233,118 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	settings_content.add_child(theme_hint)
 	settings_content.add_child(HSeparator.new())
 
-	var codex_title: Label = _new_label(
-		"Codex 完成通知", 18, _details_color("#30383c", "#d4d4d4")
-	)
-	codex_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	settings_content.add_child(codex_title)
-
-	var codex_switch_row := HBoxContainer.new()
-	codex_switch_row.add_theme_constant_override("separation", 12)
-	var codex_switch_label: Label = _new_label(
-		"通知狀態", 16, _details_color("#30383c", "#d4d4d4")
-	)
-	codex_switch_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	codex_switch_row.add_child(codex_switch_label)
-	var codex_state_option_button := OptionButton.new()
-	codex_state_option_button.name = "CodexStateOptionButton"
-	codex_state_option_button.add_item("開啟", 0)
-	codex_state_option_button.add_item("關閉", 1)
-	codex_state_option_button.select(0 if codex_enabled else 1)
-	codex_state_option_button.custom_minimum_size = Vector2(112, 40)
-	codex_state_option_button.item_selected.connect(
-		func(index: int) -> void: codex_state_selected.emit(index)
-	)
-	codex_switch_row.add_child(codex_state_option_button)
-	settings_content.add_child(codex_switch_row)
-
 	var codex_port_row := HBoxContainer.new()
-	codex_port_row.add_theme_constant_override("separation", 12)
+	codex_port_row.add_theme_constant_override("separation", 8)
 	var codex_port_label: Label = _new_label(
-		"本機通訊埠", 16, _details_color("#30383c", "#d4d4d4")
+		"Codex 完成通知", 16, _details_color("#30383c", "#d4d4d4")
 	)
 	codex_port_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	codex_port_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	codex_port_label.tooltip_text = "Codex 完成通知使用的本機通訊埠"
 	codex_port_row.add_child(codex_port_label)
+	var codex_port_value_label: Label = _new_label(
+		"通訊埠", 14, _details_color("#68747a", "#9da1a6")
+	)
+	codex_port_value_label.tooltip_text = "Codex 與桌寵必須使用相同通訊埠"
+	codex_port_row.add_child(codex_port_value_label)
 	var codex_port_spin_box := SpinBox.new()
 	codex_port_spin_box.name = "CodexPortSpinBox"
+	codex_port_spin_box.tooltip_text = "Codex 完成通知使用的本機通訊埠"
 	codex_port_spin_box.min_value = CodexIntegrationControllerScript.MIN_PORT
 	codex_port_spin_box.max_value = CodexIntegrationControllerScript.MAX_PORT
 	codex_port_spin_box.step = 1
 	codex_port_spin_box.value = codex_port
-	codex_port_spin_box.custom_minimum_size = Vector2(140, 40)
+	codex_port_spin_box.custom_minimum_size = Vector2(120, 40)
 	_style_spin_box(codex_port_spin_box)
 	codex_port_spin_box.value_changed.connect(
 		func(value: float) -> void: codex_port_changed.emit(value)
 	)
 	codex_port_row.add_child(codex_port_spin_box)
+	var codex_enabled_toggle := CodexToggleSwitchScript.new()
+	codex_enabled_toggle.name = "CodexEnabledToggle"
+	codex_enabled_toggle.tooltip_text = "開啟或關閉 Codex 完成通知"
+	codex_enabled_toggle.configure(theme_mode, codex_enabled)
+	codex_enabled_toggle.toggled.connect(
+		func(enabled: bool) -> void:
+			codex_enabled_toggled.emit(enabled)
+	)
+	codex_port_row.add_child(codex_enabled_toggle)
 	settings_content.add_child(codex_port_row)
 
 	var codex_status_label: Label = _new_label(
 		"", 14, _details_color("#238b9d", "#4fc1ff")
 	)
-	codex_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	codex_status_label.name = "CodexStatusLabel"
+	codex_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	codex_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_content.add_child(codex_status_label)
 
-	var codex_hint: Label = _new_label(
-		"通知開啟時通訊埠會鎖定；關閉後才可以修改。",
-		13,
-		_details_color("#68747a", "#9da1a6")
+	var codex_executable_label: Label = _new_label(
+		"VS Code 執行檔", 14, _details_color("#30383c", "#d4d4d4")
 	)
-	codex_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	settings_content.add_child(codex_hint)
+	settings_content.add_child(codex_executable_label)
+	var codex_executable_row := HBoxContainer.new()
+	codex_executable_row.add_theme_constant_override("separation", 8)
+	var codex_executable_line_edit := LineEdit.new()
+	codex_executable_line_edit.name = "CodexExecutablePath"
+	codex_executable_line_edit.text = codex_executable_path
+	codex_executable_line_edit.placeholder_text = "選擇 Code.exe"
+	codex_executable_line_edit.tooltip_text = "點擊 Codex 通知時使用的 VS Code 執行檔"
+	codex_executable_line_edit.clear_button_enabled = true
+	codex_executable_line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	codex_executable_line_edit.custom_minimum_size.y = 40
+	codex_executable_row.add_child(codex_executable_line_edit)
+	var codex_executable_browse_button := Button.new()
+	codex_executable_browse_button.name = "CodexExecutableBrowseButton"
+	codex_executable_browse_button.text = "📁"
+	codex_executable_browse_button.tooltip_text = "選擇 VS Code 執行檔"
+	codex_executable_browse_button.custom_minimum_size = Vector2(48, 40)
+	codex_executable_browse_button.mouse_default_cursor_shape = (
+		Control.CURSOR_POINTING_HAND
+	)
+	codex_executable_row.add_child(codex_executable_browse_button)
+	settings_content.add_child(codex_executable_row)
 
-	var codex_button_row := HBoxContainer.new()
-	codex_button_row.add_theme_constant_override("separation", 8)
-	var codex_configure_button := Button.new()
-	codex_configure_button.name = "CodexConfigureButton"
-	codex_configure_button.text = "設定通訊埠"
-	codex_configure_button.custom_minimum_size = Vector2(0, 40)
-	codex_configure_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_style_codex_action_button(codex_configure_button)
-	codex_configure_button.disabled = codex_enabled
-	codex_configure_button.pressed.connect(
-		func() -> void: codex_configure_requested.emit()
+	var codex_executable_hint: Label = _new_label(
+		"", 13, _details_color("#68747a", "#9da1a6")
 	)
-	codex_button_row.add_child(codex_configure_button)
-	var codex_reconnect_button := Button.new()
-	codex_reconnect_button.name = "CodexReconnectButton"
-	codex_reconnect_button.text = "重新連線接收器"
-	codex_reconnect_button.custom_minimum_size = Vector2(0, 40)
-	codex_reconnect_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_style_codex_action_button(codex_reconnect_button)
-	codex_reconnect_button.disabled = not codex_enabled
-	codex_reconnect_button.pressed.connect(
-		func() -> void: codex_reconnect_requested.emit()
+	codex_executable_hint.name = "CodexExecutableHint"
+	codex_executable_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	settings_content.add_child(codex_executable_hint)
+	_update_codex_executable_hint(
+		codex_executable_line_edit.text, codex_executable_hint
 	)
-	codex_button_row.add_child(codex_reconnect_button)
-	settings_content.add_child(codex_button_row)
 
-	var codex_feedback: Label = _new_label(
-		"通知已關閉；選擇通訊埠後按「設定通訊埠」。",
-		13,
-		_details_color("#68747a", "#9da1a6")
+	var codex_executable_dialog := FileDialog.new()
+	codex_executable_dialog.name = "CodexExecutableDialog"
+	codex_executable_dialog.title = "選擇 VS Code 執行檔"
+	codex_executable_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	codex_executable_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	codex_executable_dialog.use_native_dialog = true
+	codex_executable_dialog.filters = PackedStringArray([
+		"*.exe ; Windows 執行檔",
+	])
+	settings_scroll.add_child(codex_executable_dialog)
+	codex_executable_browse_button.pressed.connect(func() -> void:
+		var current_path := codex_executable_line_edit.text.strip_edges()
+		if FileAccess.file_exists(current_path):
+			codex_executable_dialog.current_path = current_path
+		codex_executable_dialog.popup_centered_ratio(0.8)
 	)
-	codex_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	settings_content.add_child(codex_feedback)
+	codex_executable_dialog.file_selected.connect(func(path: String) -> void:
+		codex_executable_line_edit.text = path
+		_update_codex_executable_hint(path, codex_executable_hint)
+		codex_executable_path_changed.emit(path)
+	)
+	codex_executable_line_edit.text_submitted.connect(func(path: String) -> void:
+		_update_codex_executable_hint(path, codex_executable_hint)
+		codex_executable_path_changed.emit(path)
+	)
+	codex_executable_line_edit.focus_exited.connect(func() -> void:
+		var path := codex_executable_line_edit.text
+		_update_codex_executable_hint(path, codex_executable_hint)
+		codex_executable_path_changed.emit(path)
+	)
 	settings_content.add_child(HSeparator.new())
 
 	var autostart_check_box := CheckBox.new()
@@ -362,15 +382,33 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	return {
 		"fps_option_button": fps_option_button,
 		"details_theme_option_button": details_theme_option_button,
-		"codex_state_option_button": codex_state_option_button,
+		"codex_enabled_toggle": codex_enabled_toggle,
 		"codex_port_spin_box": codex_port_spin_box,
 		"codex_status_label": codex_status_label,
-		"codex_configure_button": codex_configure_button,
-		"codex_reconnect_button": codex_reconnect_button,
-		"codex_feedback": codex_feedback,
+		"codex_executable_line_edit": codex_executable_line_edit,
 		"autostart_check_box": autostart_check_box,
 		"settings_feedback": settings_feedback,
 	}
+
+
+func _update_codex_executable_hint(path: String, hint: Label) -> void:
+	var normalized := path.strip_edges().trim_prefix('"').trim_suffix('"')
+	if normalized.is_empty():
+		hint.text = "尚未找到 VS Code；請按資料夾按鈕選擇 Code.exe。"
+		hint.add_theme_color_override(
+			"font_color", _details_color("#b44949", "#ff8c8c")
+		)
+	elif normalized.get_extension().to_lower() != "exe" \
+			or not FileAccess.file_exists(normalized):
+		hint.text = "找不到這個執行檔；通知氣泡會保留，直到路徑修正。"
+		hint.add_theme_color_override(
+			"font_color", _details_color("#b44949", "#ff8c8c")
+		)
+	else:
+		hint.text = "點擊 Codex 通知時會使用這個 VS Code 視窗。"
+		hint.add_theme_color_override(
+			"font_color", _details_color("#238b9d", "#4fc1ff")
+		)
 
 
 func build_character_tab(tabs: TabContainer, stats_window: Window) -> Dictionary:
@@ -582,35 +620,6 @@ func _style_spin_box(spin_box: SpinBox) -> void:
 	line_edit.add_theme_color_override("font_uneditable_color", _details_color("#68747a", "#9da1a6"))
 	line_edit.add_theme_color_override("caret_color", _details_color("#176f7e", "#4fc1ff"))
 	spin_box.add_theme_color_override("font_color", _details_color("#30383c", "#d4d4d4"))
-
-
-func _style_codex_action_button(button: Button) -> void:
-	var normal := _details_style(
-		_details_color("#ffffff", "#252526"),
-		_details_color("#cbd5d9", "#454545"), 8
-	)
-	var hover := _details_style(
-		_details_color("#edf8fa", "#2a2d2e"),
-		_details_color("#78c8d5", "#4e94ce"), 8
-	)
-	var pressed := _details_style(
-		_details_color("#d9f0f4", "#094771"),
-		_details_color("#35a9bd", "#3794ff"), 8
-	)
-	var disabled := _details_style(
-		_details_color("#dfe6e8", "#292e31"),
-		_details_color("#b9c4c8", "#4a5054"), 8
-	)
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", hover)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_stylebox_override("focus", pressed)
-	button.add_theme_stylebox_override("disabled", disabled)
-	button.add_theme_color_override("font_color", _details_color("#30383c", "#d4d4d4"))
-	button.add_theme_color_override("font_hover_color", _details_color("#145f6c", "#ffffff"))
-	button.add_theme_color_override("font_pressed_color", _details_color("#145f6c", "#ffffff"))
-	button.add_theme_color_override("font_focus_color", _details_color("#145f6c", "#ffffff"))
-	button.add_theme_color_override("font_disabled_color", _details_color("#9aa6aa", "#6d6d6d"))
 
 
 func _style_checkbox(check_box: CheckBox) -> void:

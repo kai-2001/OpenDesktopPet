@@ -8,6 +8,18 @@ $codexHome = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
     $env:CODEX_HOME
 }
 $portFile = Join-Path $codexHome 'open_desktop_pet_notify_port.txt'
+$enabledFile = Join-Path $codexHome 'open_desktop_pet_notify_enabled.txt'
+if (-not (Test-Path -LiteralPath $enabledFile)) {
+    exit 0
+}
+try {
+    $senderEnabled = (Get-Content -LiteralPath $enabledFile -Raw).Trim() -eq '1'
+} catch {
+    $senderEnabled = $false
+}
+if (-not $senderEnabled) {
+    exit 0
+}
 if (Test-Path -LiteralPath $portFile) {
     try {
         $configuredPort = [int](Get-Content -LiteralPath $portFile -Raw).Trim()

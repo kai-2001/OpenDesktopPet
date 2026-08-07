@@ -25,6 +25,10 @@ $gameplay = Read-Source 'scripts/pet_gameplay_coordinator.gd'
 $statsCoordinator = Read-Source 'scripts/stats_window_coordinator.gd'
 $inputController = Read-Source 'scripts/pet_input_controller.gd'
 $characterCoordinator = Read-Source 'scripts/character_pack_coordinator.gd'
+$codexController = Read-Source 'scripts/codex_integration_controller.gd'
+$windowsActivator = Read-Source 'native/windows/src/windows_window_activator.cpp'
+$windowsExtension = Read-Source 'native/windows/windows_window_activator.gdextension'
+$releasePreparation = Read-Source 'tools/prepare_windows_release.ps1'
 
 Assert-Architecture ($details -notmatch 'host\.') `
 	'DetailsWindowController must not depend on host private APIs.'
@@ -74,6 +78,34 @@ Assert-Architecture ($main -match 'CharacterPackCoordinatorScript') `
 	'main.gd must delegate character-pack coordination.'
 Assert-Architecture ($main -notmatch 'CharacterPackManagerScript') `
 	'main.gd must not depend directly on CharacterPackManager.'
+Assert-Architecture ($main -notmatch '_codex_notification_queue') `
+	'Codex notifications must replace the active bubble instead of queueing.'
+Assert-Architecture ($codexController -match 'OS\.create_process\(executable_path') `
+	'Codex focus must launch the configured VS Code executable directly.'
+Assert-Architecture ($codexController -match '"--reuse-window"') `
+	'Codex focus must reuse the selected VS Code window.'
+Assert-Architecture ($codexController -match 'ClassDB\.instantiate\("WindowsWindowActivator"\)') `
+	'Codex focus must use the in-process Windows GDExtension.'
+Assert-Architecture ($codexController -match 'focus_executable') `
+	'Codex focus must verify native window activation.'
+Assert-Architecture ($codexController -notmatch 'SetForegroundWindow|AppActivate|EncodedCommand|WindowsForegroundAppMonitor') `
+	'Codex runtime integration must not launch a PowerShell foreground helper.'
+Assert-Architecture ($windowsActivator -match 'QueryFullProcessImageNameW') `
+	'The native activator must match windows by configured executable path.'
+Assert-Architecture ($windowsActivator -match 'SetForegroundWindow') `
+	'The native activator must use the Win32 foreground API in-process.'
+Assert-Architecture ($windowsActivator -match 'is_executable_foreground') `
+	'The native activator must support a one-shot foreground check.'
+Assert-Architecture ($windowsActivator -notmatch 'powershell|cmd\.exe|CreateProcess') `
+	'The native activator must not launch a shell or helper process.'
+Assert-Architecture ($main -match 'CODEX_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3\.0') `
+	'Codex notifications must use a three-second foreground duration.'
+Assert-Architecture ($windowsExtension -match 'windows\.debug\.x86_64') `
+	'The Windows GDExtension must provide an x64 debug library.'
+Assert-Architecture ($windowsExtension -match 'windows\.release\.x86_64') `
+	'The Windows GDExtension must provide an x64 release library.'
+Assert-Architecture ($releasePreparation -match [regex]::Escape('open_desktop_pet_windows.windows.template_release.x86_64.dll')) `
+	'The release package must include the native Windows GDExtension.'
 
 & git -C $projectRoot diff --check
 if ($LASTEXITCODE -ne 0) {

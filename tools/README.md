@@ -2,9 +2,10 @@
 
 `codex_notify.ps1` 是 Open Desktop Pet 與 Codex 的 Windows 本機通知橋接器。
 
-它會將 Codex 的 `agent-turn-complete` 轉成 UDP 訊息送到
-`127.0.0.1:38571`，不依賴任何固定專案路徑，因此打包成 EXE 後可在其他
-電腦使用。不會轉送 Codex 回答、提示詞、程式碼或完整對話內容。
+桌寵內開啟「Codex 完成通知」後，它會將 Codex 的
+`agent-turn-complete` 轉成 UDP 訊息送到桌寵設定的本機通訊埠。關閉功能或
+桌寵正常結束時，橋接器不會傳送 UDP。橋接器不依賴任何固定專案路徑，
+也不會轉送 Codex 回答、提示詞、程式碼或完整對話內容。
 
 橋接器只記錄事件類型、工作目錄與處理結果，診斷檔位於：
 
@@ -26,8 +27,10 @@
 Install-Codex-Integration.cmd
 ```
 
-安裝器會把橋接器複製到使用者的 `%USERPROFILE%\.codex`，並更新該使用者的
-Codex `config.toml`。若原本已有 `notify` 設定，會先建立可還原的備份。
+第一次在桌寵內開啟通知時，程式會自動執行安裝器。安裝器會把橋接器複製到
+使用者的 `%USERPROFILE%\.codex`，並更新該使用者的 Codex `config.toml`。
+若原本已有不同的 `notify` 設定，會先建立可還原的備份；重複啟用相同設定
+不會反覆建立備份。第一次安裝後仍須重新啟動 VS Code 或 Codex。
 
 解除安裝：
 
@@ -43,6 +46,7 @@ Codex `config.toml`。若原本已有 `notify` 設定，會先建立可還原的
 
 ```text
 OpenDesktopPet.exe
+open_desktop_pet_windows.windows.template_release.x86_64.dll
 tools/
 ├─ Install-Codex-Integration.cmd
 ├─ install_codex_integration.ps1

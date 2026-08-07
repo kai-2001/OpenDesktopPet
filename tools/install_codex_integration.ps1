@@ -53,15 +53,18 @@ $configText = if (Test-Path -LiteralPath $configPath) {
 
 $notifyPattern = '(?ms)^[ \t]*notify[ \t]*=[ \t]*\[[^\]]*\][ \t]*(?:\r?\n|$)'
 if ([regex]::IsMatch($configText, $notifyPattern)) {
-    $backupPath = "$configPath.open-desktop-pet-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-    Copy-Item -LiteralPath $configPath -Destination $backupPath
-    $configText = [regex]::Replace(
-        $configText,
-        $notifyPattern,
-        $notifyBlock + [Environment]::NewLine,
-        1
-    )
-    Write-Output "Backed up the previous Codex configuration to: $backupPath"
+    $currentNotifyBlock = [regex]::Match($configText, $notifyPattern).Value.Trim()
+    if ($currentNotifyBlock -ne $notifyBlock.Trim()) {
+        $backupPath = "$configPath.open-desktop-pet-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Copy-Item -LiteralPath $configPath -Destination $backupPath
+        $configText = [regex]::Replace(
+            $configText,
+            $notifyPattern,
+            $notifyBlock + [Environment]::NewLine,
+            1
+        )
+        Write-Output "Backed up the previous Codex configuration to: $backupPath"
+    }
 } else {
     if (-not [string]::IsNullOrWhiteSpace($configText) -and -not $configText.EndsWith("`n")) {
         $configText += [Environment]::NewLine

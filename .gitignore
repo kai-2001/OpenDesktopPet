@@ -6,3 +6,7 @@ characters/custom/
 *.log
 tests/trash_window_diagnostic.gd
 tests/trash_window_diagnostic.gd.uid
+native/windows/.sconsign.dblite
+native/windows/src/*.os
+native/windows/bin/*
+!native/windows/bin/*.dll
