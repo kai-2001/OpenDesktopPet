@@ -9,6 +9,10 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 if ($LASTEXITCODE -ne 0) {
 	throw 'Architecture checks failed.'
 }
+& (Join-Path $PSScriptRoot 'codex_integration_installer_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Codex integration installer checks failed.'
+}
 $isolatedAppData = Join-Path $env:TEMP (
     'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')
 )

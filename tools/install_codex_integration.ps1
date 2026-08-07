@@ -52,24 +52,35 @@ $configText = if (Test-Path -LiteralPath $configPath) {
 }
 
 $notifyPattern = '(?ms)^[ \t]*notify[ \t]*=[ \t]*\[[^\]]*\][ \t]*(?:\r?\n|$)'
-if ([regex]::IsMatch($configText, $notifyPattern)) {
-    $currentNotifyBlock = [regex]::Match($configText, $notifyPattern).Value.Trim()
-    if ($currentNotifyBlock -ne $notifyBlock.Trim()) {
-        $backupPath = "$configPath.open-desktop-pet-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-        Copy-Item -LiteralPath $configPath -Destination $backupPath
-        $configText = [regex]::Replace(
-            $configText,
-            $notifyPattern,
-            $notifyBlock + [Environment]::NewLine,
-            1
-        )
-        Write-Output "Backed up the previous Codex configuration to: $backupPath"
+$existingNotify = [regex]::Match($configText, $notifyPattern)
+$normalizedExistingNotify = $existingNotify.Value.Trim() -replace "\r\n?", "`n"
+$normalizedNotifyBlock = $notifyBlock.Trim() -replace "\r\n?", "`n"
+if ($existingNotify.Success -and $normalizedExistingNotify -ne $normalizedNotifyBlock) {
+    $backupPath = "$configPath.open-desktop-pet-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+    Copy-Item -LiteralPath $configPath -Destination $backupPath
+    Write-Output "Backed up the previous Codex configuration to: $backupPath"
+}
+
+# A TOML key belongs to the most recent [table]. Remove any previous notify
+# block first, then insert it before the first table so it remains a root key.
+$configWithoutNotify = [regex]::Replace($configText, $notifyPattern, '', 1)
+$firstTable = [regex]::Match($configWithoutNotify, '(?m)^[ \t]*\[')
+$lineBreak = [Environment]::NewLine
+if ($firstTable.Success) {
+    $rootSettings = $configWithoutNotify.Substring(0, $firstTable.Index).TrimEnd()
+    $tableSettings = $configWithoutNotify.Substring($firstTable.Index).Trim("`r", "`n")
+    $configText = if ([string]::IsNullOrWhiteSpace($rootSettings)) {
+        $notifyBlock + $lineBreak + $lineBreak + $tableSettings
+    } else {
+        $rootSettings + $lineBreak + $lineBreak + $notifyBlock + $lineBreak + $lineBreak + $tableSettings
     }
 } else {
-    if (-not [string]::IsNullOrWhiteSpace($configText) -and -not $configText.EndsWith("`n")) {
-        $configText += [Environment]::NewLine
+    $rootSettings = $configWithoutNotify.TrimEnd()
+    $configText = if ([string]::IsNullOrWhiteSpace($rootSettings)) {
+        $notifyBlock
+    } else {
+        $rootSettings + $lineBreak + $lineBreak + $notifyBlock
     }
-    $configText += [Environment]::NewLine + $notifyBlock + [Environment]::NewLine
 }
 
 Set-Content -LiteralPath $configPath -Value $configText -Encoding UTF8
