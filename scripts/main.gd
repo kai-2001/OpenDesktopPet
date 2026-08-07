@@ -607,6 +607,10 @@ func _build_stats_window() -> void:
 	_autostart_check_box = settings_refs["autostart_check_box"] as CheckBox
 	_settings_feedback = settings_refs["settings_feedback"] as Label
 	_refresh_codex_settings_ui()
+	# The settings builder cannot request this before its signals and control
+	# references exist. Queue the initial query only after initialization.
+	if _is_autostart_supported():
+		call_deferred("_start_autostart_operation", "query", false)
 
 	var character_refs: Dictionary = refs["character_refs"]
 	_character_tab_index = int(character_refs["character_tab_index"])
@@ -633,9 +637,6 @@ func _connect_details_window_signals() -> void:
 		_on_codex_executable_path_changed
 	)
 	_details_window_controller.autostart_toggled.connect(_on_autostart_toggled)
-	_details_window_controller.autostart_query_requested.connect(
-		_on_autostart_query_requested
-	)
 	_details_window_controller.character_selected.connect(_on_character_selected)
 	_details_window_controller.character_use_requested.connect(_use_selected_character)
 	_details_window_controller.character_delete_requested.connect(
@@ -670,10 +671,6 @@ func _on_care_action_requested(action: String) -> void:
 			_run_care_action(4)
 		"sleep":
 			_run_care_action(5)
-
-
-func _on_autostart_query_requested() -> void:
-	call_deferred("_start_autostart_operation", "query", false)
 
 
 func _on_stats_tab_changed(tab_index: int) -> void:

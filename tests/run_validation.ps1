@@ -55,6 +55,15 @@ try {
     }
 
     $ErrorActionPreference = 'Continue'
+    $windowsAutostartOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/windows_autostart_service_test.gd' 2>&1
+    $windowsAutostartExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+    $windowsAutostartOutput | Write-Output
+    if ($windowsAutostartExitCode -ne 0 -or -not ($windowsAutostartOutput -match 'WINDOWS_AUTOSTART_SERVICE_TEST_OK')) {
+        throw 'Windows autostart service validation failed.'
+    }
+
+    $ErrorActionPreference = 'Continue'
     $codexSettingsUiOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_settings_ui_test.gd' 2>&1
     $codexSettingsUiExitCode = $LASTEXITCODE
     $codexSettingsUiOutput | Write-Output

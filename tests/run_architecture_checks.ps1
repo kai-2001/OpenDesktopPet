@@ -46,6 +46,10 @@ Assert-Architecture ($visual -match 'CharacterPackProfileScript') `
 	'PetVisual must delegate character-pack data to CharacterPackProfile.'
 Assert-Architecture ($autostart -match 'class_name WindowsAutostartService') `
 	'WindowsAutostartService is missing.'
+Assert-Architecture ($details -notmatch 'autostart_query_requested') `
+	'DetailsWindowController must not emit autostart queries before signal wiring.'
+Assert-Architecture ($main -match '(?s)_autostart_check_box = settings_refs\["autostart_check_box"\].*call_deferred\("_start_autostart_operation", "query", false\)') `
+	'The initial autostart query must start after settings controls are assigned.'
 Assert-Architecture ($runtime -match 'class_name CharacterPackRuntime') `
 	'CharacterPackRuntime is missing.'
 Assert-Architecture ($manager -match 'CharacterPackValidatorScript') `

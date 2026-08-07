@@ -13,7 +13,6 @@ signal codex_enabled_toggled(enabled: bool)
 signal codex_port_changed(value: float)
 signal codex_executable_path_changed(path: String)
 signal autostart_toggled(enabled: bool)
-signal autostart_query_requested
 signal character_selected(index: int)
 signal character_use_requested
 signal character_delete_requested
@@ -368,9 +367,7 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	)
 	settings_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_content.add_child(settings_feedback)
-	if autostart_supported:
-		autostart_query_requested.emit()
-	else:
+	if not autostart_supported:
 		settings_feedback.text = "目前平台不支援 Windows 開機啟動設定。"
 
 	var settings_close_button := Button.new()
