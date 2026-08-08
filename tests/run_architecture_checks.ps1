@@ -84,10 +84,16 @@ Assert-Architecture ($main -notmatch 'CharacterPackManagerScript') `
 	'main.gd must not depend directly on CharacterPackManager.'
 Assert-Architecture ($main -notmatch '_codex_notification_queue') `
 	'Codex notifications must replace the active bubble instead of queueing.'
-Assert-Architecture ($codexController -match 'OS\.create_process\(executable_path') `
-	'Codex focus must launch the configured VS Code executable directly.'
+Assert-Architecture ($codexController -match '_focus_target\(TARGET_VSCODE\)') `
+	'Codex focus must route VS Code notifications to the configured VS Code target.'
 Assert-Architecture ($codexController -match '"--reuse-window"') `
 	'Codex focus must reuse the selected VS Code window.'
+Assert-Architecture ($codexController -match 'TARGET_CODEX_APP') `
+	'Codex integration must define a separate Codex App target.'
+Assert-Architecture ($codexController -match 'TARGET_TERMINAL') `
+	'Codex integration must define a separate terminal target.'
+Assert-Architecture ($codexController -match '_is_notification_enabled') `
+	'Codex notifications must be filtered by source target and enabled state.'
 Assert-Architecture ($codexController -match 'ClassDB\.instantiate\("WindowsWindowActivator"\)') `
 	'Codex focus must use the in-process Windows GDExtension.'
 Assert-Architecture ($codexController -match 'focus_executable') `

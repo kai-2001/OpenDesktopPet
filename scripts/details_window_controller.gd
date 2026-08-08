@@ -9,9 +9,14 @@ signal care_action_requested(action: String)
 signal close_requested
 signal target_fps_selected(index: int)
 signal details_theme_selected(index: int)
-signal codex_enabled_toggled(enabled: bool)
-signal codex_port_changed(value: float)
-signal codex_executable_path_changed(path: String)
+signal agent_codex_enabled_toggled(enabled: bool)
+signal agent_codex_app_enabled_toggled(enabled: bool)
+signal agent_terminal_codex_enabled_toggled(enabled: bool)
+signal agent_copilot_enabled_toggled(enabled: bool)
+signal agent_port_changed(value: float)
+signal vscode_executable_path_changed(path: String)
+signal codex_app_executable_path_changed(path: String)
+signal terminal_executable_path_changed(path: String)
 signal autostart_toggled(enabled: bool)
 signal character_selected(index: int)
 signal character_use_requested
@@ -25,12 +30,18 @@ signal character_delete_confirmed
 var theme_mode := "light"
 var last_state_message := "尚無紀錄"
 var codex_enabled := false
-var codex_port := CodexIntegrationControllerScript.DEFAULT_PORT
-var codex_executable_path := ""
+var codex_app_enabled := false
+var terminal_codex_enabled := false
+var copilot_enabled := false
+var agent_port := CodexIntegrationControllerScript.DEFAULT_PORT
+var vscode_executable_path := ""
+var codex_app_executable_path := ""
+var terminal_executable_path := ""
 var autostart_supported := false
 var interaction_label: Callable
 var interaction_icon: Callable
 var stats_bars: Dictionary = {}
+var _agent_executable_path_summaries: Array[Label] = []
 
 
 func build_status_tab(tabs: TabContainer) -> Dictionary:
@@ -232,118 +243,6 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	settings_content.add_child(theme_hint)
 	settings_content.add_child(HSeparator.new())
 
-	var codex_port_row := HBoxContainer.new()
-	codex_port_row.add_theme_constant_override("separation", 8)
-	var codex_port_label: Label = _new_label(
-		"Codex 完成通知", 16, _details_color("#30383c", "#d4d4d4")
-	)
-	codex_port_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	codex_port_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	codex_port_label.tooltip_text = "Codex 完成通知使用的本機通訊埠"
-	codex_port_row.add_child(codex_port_label)
-	var codex_port_value_label: Label = _new_label(
-		"通訊埠", 14, _details_color("#68747a", "#9da1a6")
-	)
-	codex_port_value_label.tooltip_text = "Codex 與桌寵必須使用相同通訊埠"
-	codex_port_row.add_child(codex_port_value_label)
-	var codex_port_spin_box := SpinBox.new()
-	codex_port_spin_box.name = "CodexPortSpinBox"
-	codex_port_spin_box.tooltip_text = "Codex 完成通知使用的本機通訊埠"
-	codex_port_spin_box.min_value = CodexIntegrationControllerScript.MIN_PORT
-	codex_port_spin_box.max_value = CodexIntegrationControllerScript.MAX_PORT
-	codex_port_spin_box.step = 1
-	codex_port_spin_box.value = codex_port
-	codex_port_spin_box.custom_minimum_size = Vector2(120, 40)
-	_style_spin_box(codex_port_spin_box)
-	codex_port_spin_box.value_changed.connect(
-		func(value: float) -> void: codex_port_changed.emit(value)
-	)
-	codex_port_row.add_child(codex_port_spin_box)
-	var codex_enabled_toggle := CodexToggleSwitchScript.new()
-	codex_enabled_toggle.name = "CodexEnabledToggle"
-	codex_enabled_toggle.tooltip_text = "開啟或關閉 Codex 完成通知"
-	codex_enabled_toggle.configure(theme_mode, codex_enabled)
-	codex_enabled_toggle.toggled.connect(
-		func(enabled: bool) -> void:
-			codex_enabled_toggled.emit(enabled)
-	)
-	codex_port_row.add_child(codex_enabled_toggle)
-	settings_content.add_child(codex_port_row)
-
-	var codex_status_label: Label = _new_label(
-		"", 14, _details_color("#238b9d", "#4fc1ff")
-	)
-	codex_status_label.name = "CodexStatusLabel"
-	codex_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	codex_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	settings_content.add_child(codex_status_label)
-
-	var codex_executable_label: Label = _new_label(
-		"VS Code 執行檔", 14, _details_color("#30383c", "#d4d4d4")
-	)
-	settings_content.add_child(codex_executable_label)
-	var codex_executable_row := HBoxContainer.new()
-	codex_executable_row.add_theme_constant_override("separation", 8)
-	var codex_executable_line_edit := LineEdit.new()
-	codex_executable_line_edit.name = "CodexExecutablePath"
-	codex_executable_line_edit.text = codex_executable_path
-	codex_executable_line_edit.placeholder_text = "選擇 Code.exe"
-	codex_executable_line_edit.tooltip_text = "點擊 Codex 通知時使用的 VS Code 執行檔"
-	codex_executable_line_edit.clear_button_enabled = true
-	codex_executable_line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	codex_executable_line_edit.custom_minimum_size.y = 40
-	codex_executable_row.add_child(codex_executable_line_edit)
-	var codex_executable_browse_button := Button.new()
-	codex_executable_browse_button.name = "CodexExecutableBrowseButton"
-	codex_executable_browse_button.text = "📁"
-	codex_executable_browse_button.tooltip_text = "選擇 VS Code 執行檔"
-	codex_executable_browse_button.custom_minimum_size = Vector2(48, 40)
-	codex_executable_browse_button.mouse_default_cursor_shape = (
-		Control.CURSOR_POINTING_HAND
-	)
-	codex_executable_row.add_child(codex_executable_browse_button)
-	settings_content.add_child(codex_executable_row)
-
-	var codex_executable_hint: Label = _new_label(
-		"", 13, _details_color("#68747a", "#9da1a6")
-	)
-	codex_executable_hint.name = "CodexExecutableHint"
-	codex_executable_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	settings_content.add_child(codex_executable_hint)
-	_update_codex_executable_hint(
-		codex_executable_line_edit.text, codex_executable_hint
-	)
-
-	var codex_executable_dialog := FileDialog.new()
-	codex_executable_dialog.name = "CodexExecutableDialog"
-	codex_executable_dialog.title = "選擇 VS Code 執行檔"
-	codex_executable_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	codex_executable_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	codex_executable_dialog.use_native_dialog = true
-	codex_executable_dialog.filters = PackedStringArray([
-		"*.exe ; Windows 執行檔",
-	])
-	settings_scroll.add_child(codex_executable_dialog)
-	codex_executable_browse_button.pressed.connect(func() -> void:
-		var current_path := codex_executable_line_edit.text.strip_edges()
-		if FileAccess.file_exists(current_path):
-			codex_executable_dialog.current_path = current_path
-		codex_executable_dialog.popup_centered_ratio(0.8)
-	)
-	codex_executable_dialog.file_selected.connect(func(path: String) -> void:
-		codex_executable_line_edit.text = path
-		_update_codex_executable_hint(path, codex_executable_hint)
-		codex_executable_path_changed.emit(path)
-	)
-	codex_executable_line_edit.text_submitted.connect(func(path: String) -> void:
-		_update_codex_executable_hint(path, codex_executable_hint)
-		codex_executable_path_changed.emit(path)
-	)
-	codex_executable_line_edit.focus_exited.connect(func() -> void:
-		var path := codex_executable_line_edit.text
-		_update_codex_executable_hint(path, codex_executable_hint)
-		codex_executable_path_changed.emit(path)
-	)
 	settings_content.add_child(HSeparator.new())
 
 	var autostart_check_box := CheckBox.new()
@@ -379,19 +278,350 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	return {
 		"fps_option_button": fps_option_button,
 		"details_theme_option_button": details_theme_option_button,
-		"codex_enabled_toggle": codex_enabled_toggle,
-		"codex_port_spin_box": codex_port_spin_box,
-		"codex_status_label": codex_status_label,
-		"codex_executable_line_edit": codex_executable_line_edit,
 		"autostart_check_box": autostart_check_box,
 		"settings_feedback": settings_feedback,
 	}
 
 
-func _update_codex_executable_hint(path: String, hint: Label) -> void:
+func build_agent_tab(tabs: TabContainer) -> Dictionary:
+	var agent_scroll := ScrollContainer.new()
+	agent_scroll.name = "Agent通知"
+	agent_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	tabs.add_child(agent_scroll)
+
+	var agent_margin := MarginContainer.new()
+	agent_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	agent_margin.add_theme_constant_override("margin_left", 24)
+	agent_margin.add_theme_constant_override("margin_top", 20)
+	agent_margin.add_theme_constant_override("margin_right", 24)
+	agent_margin.add_theme_constant_override("margin_bottom", 20)
+	agent_scroll.add_child(agent_margin)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 12)
+	agent_margin.add_child(content)
+	var title: Label = _new_label(
+		"Agent 通知", 24, _details_color("#20272b", "#f0f0f0")
+	)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(title)
+
+	var port_row := HBoxContainer.new()
+	port_row.add_theme_constant_override("separation", 8)
+	var port_title: Label = _new_label(
+		"Agent 通知", 16, _details_color("#30383c", "#d4d4d4")
+	)
+	port_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	port_row.add_child(port_title)
+	port_row.add_child(_new_label(
+		"通訊埠", 14, _details_color("#68747a", "#9da1a6")
+	))
+	var port_spin_box := SpinBox.new()
+	port_spin_box.name = "AgentPortSpinBox"
+	port_spin_box.min_value = CodexIntegrationControllerScript.MIN_PORT
+	port_spin_box.max_value = CodexIntegrationControllerScript.MAX_PORT
+	port_spin_box.step = 1
+	port_spin_box.value = agent_port
+	port_spin_box.custom_minimum_size = Vector2(120, 40)
+	port_spin_box.tooltip_text = "所有 Agent 共用的桌寵本機通訊埠"
+	_style_spin_box(port_spin_box)
+	port_spin_box.value_changed.connect(
+		func(value: float) -> void: agent_port_changed.emit(value)
+	)
+	port_row.add_child(port_spin_box)
+	content.add_child(port_row)
+
+	var status_label: Label = _new_label(
+		"", 14, _details_color("#238b9d", "#4fc1ff")
+	)
+	status_label.name = "AgentStatusLabel"
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(status_label)
+	content.add_child(HSeparator.new())
+
+	var vscode_controls := _build_executable_path_controls(
+		content,
+		agent_scroll,
+		vscode_executable_path,
+		"VscodeExecutablePath",
+		"VscodeExecutableBrowseButton",
+		"VscodeExecutableHint",
+		"VS Code",
+		"選擇 Code.exe",
+		"選擇 VS Code 執行檔",
+		"VS Code",
+		true,
+		func(path: String) -> void: vscode_executable_path_changed.emit(path)
+	)
+	var vscode_path_line_edit := vscode_controls["line_edit"] as LineEdit
+
+	var codex_toggle := CodexToggleSwitchScript.new()
+	codex_toggle.name = "CodexEnabledToggle"
+	codex_toggle.tooltip_text = "開啟或關閉 VS Code 中的 Codex 通知"
+	codex_toggle.configure(theme_mode, codex_enabled)
+	codex_toggle.toggled.connect(
+		func(value: bool) -> void: agent_codex_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Codex", codex_toggle))
+
+	var copilot_toggle := CodexToggleSwitchScript.new()
+	copilot_toggle.name = "CopilotEnabledToggle"
+	copilot_toggle.tooltip_text = "開啟或關閉 Copilot Agent 通知"
+	copilot_toggle.configure(theme_mode, copilot_enabled)
+	copilot_toggle.toggled.connect(
+		func(value: bool) -> void: agent_copilot_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Copilot", copilot_toggle))
+
+	content.add_child(HSeparator.new())
+	var codex_app_controls := _build_executable_path_controls(
+		content,
+		agent_scroll,
+		codex_app_executable_path,
+		"CodexAppExecutablePath",
+		"CodexAppExecutableBrowseButton",
+		"CodexAppExecutableHint",
+		"ChatGPT",
+		"選擇 ChatGPT.exe",
+		"選擇 ChatGPT 執行檔",
+		"ChatGPT",
+		true,
+		func(path: String) -> void: codex_app_executable_path_changed.emit(path)
+	)
+	var codex_app_toggle := CodexToggleSwitchScript.new()
+	codex_app_toggle.name = "CodexAppEnabledToggle"
+	codex_app_toggle.tooltip_text = "開啟或關閉 ChatGPT 中的 Codex 通知"
+	codex_app_toggle.configure(theme_mode, codex_app_enabled)
+	codex_app_toggle.toggled.connect(
+		func(value: bool) -> void: agent_codex_app_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Codex", codex_app_toggle))
+
+	content.add_child(HSeparator.new())
+	var terminal_controls := _build_executable_path_controls(
+		content,
+		agent_scroll,
+		terminal_executable_path,
+		"TerminalExecutablePath",
+		"TerminalExecutableBrowseButton",
+		"TerminalExecutableHint",
+		"終端機",
+		"選擇 WindowsTerminal.exe",
+		"選擇終端機執行檔",
+		"終端機",
+		false,
+		func(path: String) -> void: terminal_executable_path_changed.emit(path)
+	)
+	var terminal_toggle := CodexToggleSwitchScript.new()
+	terminal_toggle.name = "TerminalCodexEnabledToggle"
+	terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Codex CLI 通知"
+	terminal_toggle.configure(theme_mode, terminal_codex_enabled)
+	terminal_toggle.toggled.connect(
+		func(value: bool) -> void: agent_terminal_codex_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Codex", terminal_toggle))
+	_agent_executable_path_summaries = [
+		vscode_controls["summary"] as Label,
+		codex_app_controls["summary"] as Label,
+		terminal_controls["summary"] as Label,
+	]
+
+	var vscode_close_button := Button.new()
+	vscode_close_button.text = "關閉詳細面板"
+	vscode_close_button.custom_minimum_size.y = 42
+	vscode_close_button.pressed.connect(func() -> void: close_requested.emit())
+	content.add_child(vscode_close_button)
+
+	return {
+		"agent_port_spin_box": port_spin_box,
+		"agent_status_label": status_label,
+		"codex_enabled_toggle": codex_toggle,
+		"copilot_enabled_toggle": copilot_toggle,
+		"codex_app_enabled_toggle": codex_app_toggle,
+		"terminal_codex_enabled_toggle": terminal_toggle,
+		"vscode_executable_line_edit": vscode_path_line_edit,
+		"vscode_executable_hint": vscode_controls["hint"] as Label,
+		"vscode_executable_summary": vscode_controls["summary"] as Label,
+		"codex_app_executable_line_edit": codex_app_controls["line_edit"] as LineEdit,
+		"codex_app_executable_hint": codex_app_controls["hint"] as Label,
+		"codex_app_executable_summary": codex_app_controls["summary"] as Label,
+		"terminal_executable_line_edit": terminal_controls["line_edit"] as LineEdit,
+		"terminal_executable_hint": terminal_controls["hint"] as Label,
+		"terminal_executable_summary": terminal_controls["summary"] as Label,
+	}
+
+
+func _build_agent_row(title_text: String, toggle: Button) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var label: Label = _new_label(
+		"　" + title_text, 16, _details_color("#30383c", "#d4d4d4")
+	)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+	row.add_child(toggle)
+	return row
+
+
+func _build_executable_path_controls(
+	content: VBoxContainer,
+	dialog_parent: Node,
+	current_path: String,
+	line_edit_name: String,
+	browse_button_name: String,
+	hint_name: String,
+	path_label_text: String,
+	placeholder: String,
+	dialog_title: String,
+	target_name: String,
+	required: bool,
+	path_changed: Callable
+) -> Dictionary:
+	var header_row := HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", 8)
+	var title_label: Label = _new_label(
+		path_label_text, 19, _details_color("#30383c", "#d4d4d4")
+	)
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_row.add_child(title_label)
+	var line_edit := LineEdit.new()
+	line_edit.name = line_edit_name
+	line_edit.text = current_path
+	line_edit.placeholder_text = placeholder
+	line_edit.tooltip_text = "點擊 Agent 通知時切回這個目標：%s" % current_path
+	line_edit.clear_button_enabled = true
+	line_edit.visible = false
+	content.add_child(line_edit)
+	var path_summary: Label = _new_label(
+		_executable_summary_text(current_path),
+		13,
+		_details_color("#68747a", "#9da1a6")
+	)
+	path_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	path_summary.mouse_filter = Control.MOUSE_FILTER_STOP
+	path_summary.mouse_default_cursor_shape = Control.CURSOR_HELP
+	path_summary.tooltip_text = (
+		"完整執行檔路徑：\n%s" % current_path
+		if not current_path.is_empty() else "尚未設定執行檔位置"
+	)
+	header_row.add_child(path_summary)
+	var browse_button := Button.new()
+	browse_button.name = browse_button_name
+	browse_button.text = "📁"
+	browse_button.tooltip_text = dialog_title
+	browse_button.custom_minimum_size = Vector2(40, 34)
+	browse_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	header_row.add_child(browse_button)
+	content.add_child(header_row)
+	var hint: Label = _new_label(
+		"", 13, _details_color("#68747a", "#9da1a6")
+	)
+	hint.name = hint_name
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.visible = false
+	content.add_child(hint)
+	_update_executable_hint(line_edit.text, hint, target_name, required)
+	_update_executable_summary(line_edit.text, path_summary)
+
+	browse_button.pressed.connect(func() -> void:
+		var dialog := FileDialog.new()
+		dialog.name = line_edit_name + "Dialog"
+		dialog.title = dialog_title
+		dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+		dialog.access = FileDialog.ACCESS_FILESYSTEM
+		dialog.use_native_dialog = true
+		dialog.filters = PackedStringArray(["*.exe ; Windows 執行檔"])
+		dialog_parent.add_child(dialog)
+		dialog.file_selected.connect(func(path: String) -> void:
+			line_edit.text = path
+			line_edit.tooltip_text = "點擊 Agent 通知時切回這個目標：%s" % path
+			_update_executable_hint(path, hint, target_name, required)
+			_update_executable_summary(path, path_summary)
+			path_changed.call(path)
+			dialog.queue_free()
+		)
+		dialog.popup_centered_ratio(0.8)
+	)
+	line_edit.text_submitted.connect(func(path: String) -> void:
+		_update_executable_hint(path, hint, target_name, required)
+		path_changed.call(path)
+	)
+	line_edit.focus_exited.connect(func() -> void:
+		var path := line_edit.text
+		_update_executable_hint(path, hint, target_name, required)
+		path_changed.call(path)
+	)
+	line_edit.text_changed.connect(func(path: String) -> void:
+		_update_executable_summary(path, path_summary)
+	)
+	return {"line_edit": line_edit, "hint": hint, "summary": path_summary}
+
+
+func refresh_executable_path_control(
+	path: String,
+	line_edit: LineEdit,
+	hint: Label,
+	path_summary: Label,
+	target_name: String,
+	required: bool
+) -> void:
+	if is_instance_valid(line_edit) and not line_edit.has_focus():
+		line_edit.text = path
+		line_edit.tooltip_text = "點擊 Agent 通知時切回這個目標：%s" % path
+	if is_instance_valid(hint):
+		_update_executable_hint(path, hint, target_name, required)
+	if is_instance_valid(path_summary):
+		_update_executable_summary(path, path_summary)
+
+
+func set_agent_executable_path_detection_state(detecting: bool) -> void:
+	for path_summary: Label in _agent_executable_path_summaries:
+		if not is_instance_valid(path_summary):
+			continue
+		if detecting:
+			path_summary.text = "通知氣泡會切回：偵測中…"
+			path_summary.tooltip_text = "正在偵測可用的執行檔位置"
+			path_summary.add_theme_color_override(
+				"font_color", _details_color("#68747a", "#9da1a6")
+			)
+
+
+func _executable_display_name(path: String) -> String:
+	var normalized := path.strip_edges().trim_prefix('"').trim_suffix('"')
+	return normalized.get_file() if not normalized.is_empty() else "未設定"
+
+
+func _executable_summary_text(path: String) -> String:
+	return "通知氣泡會切回：%s" % _executable_display_name(path)
+
+
+func _update_executable_summary(path: String, summary: Label) -> void:
+	var normalized := path.strip_edges().trim_prefix('"').trim_suffix('"')
+	summary.text = _executable_summary_text(normalized)
+	summary.tooltip_text = (
+		"完整執行檔路徑：\n%s" % normalized
+		if not normalized.is_empty() else "尚未設定執行檔位置"
+	)
+	if normalized.is_empty() or not FileAccess.file_exists(normalized):
+		summary.add_theme_color_override(
+			"font_color", _details_color("#b44949", "#ff8c8c")
+		)
+	else:
+		summary.add_theme_color_override(
+			"font_color", _details_color("#68747a", "#9da1a6")
+		)
+
+
+func _update_executable_hint(
+	path: String, hint: Label, target_name: String, required: bool
+) -> void:
 	var normalized := path.strip_edges().trim_prefix('"').trim_suffix('"')
 	if normalized.is_empty():
-		hint.text = "尚未找到 VS Code；請按資料夾按鈕選擇 Code.exe。"
+		hint.text = (
+			"尚未找到 %s；請按資料夾按鈕選擇執行檔。" % target_name
+			if required
+			else "尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。"
+		)
 		hint.add_theme_color_override(
 			"font_color", _details_color("#b44949", "#ff8c8c")
 		)
@@ -402,10 +632,14 @@ func _update_codex_executable_hint(path: String, hint: Label) -> void:
 			"font_color", _details_color("#b44949", "#ff8c8c")
 		)
 	else:
-		hint.text = "點擊 Codex 通知時會使用這個 VS Code 視窗。"
+		hint.text = ""
 		hint.add_theme_color_override(
 			"font_color", _details_color("#238b9d", "#4fc1ff")
 		)
+
+
+func _update_vscode_executable_hint(path: String, hint: Label) -> void:
+	_update_executable_hint(path, hint, "VS Code", true)
 
 
 func build_character_tab(tabs: TabContainer, stats_window: Window) -> Dictionary:

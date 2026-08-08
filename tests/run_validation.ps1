@@ -11,7 +11,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 & (Join-Path $PSScriptRoot 'codex_integration_installer_test.ps1')
 if ($LASTEXITCODE -ne 0) {
-    throw 'Codex integration installer checks failed.'
+	throw 'Codex integration installer checks failed.'
+}
+& (Join-Path $PSScriptRoot 'codex_notify_router_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+	throw 'Codex notification router checks failed.'
+}
+& (Join-Path $PSScriptRoot 'copilot_integration_installer_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Copilot integration installer checks failed.'
 }
 $isolatedAppData = Join-Path $env:TEMP (
     'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')

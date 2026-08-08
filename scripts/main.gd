@@ -35,10 +35,21 @@ var _fps_option_button: OptionButton
 var _details_theme_option_button: OptionButton
 var _autostart_check_box: CheckBox
 var _settings_feedback: Label
-var _codex_enabled_toggle: Button
-var _codex_port_spin_box: SpinBox
-var _codex_status_label: Label
-var _codex_executable_line_edit: LineEdit
+var _agent_codex_enabled_toggle: Button
+var _agent_codex_app_enabled_toggle: Button
+var _agent_terminal_codex_enabled_toggle: Button
+var _agent_copilot_enabled_toggle: Button
+var _agent_port_spin_box: SpinBox
+var _agent_status_label: Label
+var _vscode_executable_line_edit: LineEdit
+var _vscode_executable_hint: Label
+var _vscode_executable_summary: Label
+var _codex_app_executable_line_edit: LineEdit
+var _codex_app_executable_hint: Label
+var _codex_app_executable_summary: Label
+var _terminal_executable_line_edit: LineEdit
+var _terminal_executable_hint: Label
+var _terminal_executable_summary: Label
 var _character_list: ItemList
 var _character_feedback: Label
 var _character_use_button: Button
@@ -302,8 +313,30 @@ func _connect_signals() -> void:
 func _setup_codex_integration() -> void:
 	_codex_controller = CodexIntegrationControllerScript.new()
 	_codex_controller.notification_received.connect(_handle_codex_notification)
+	_codex_controller.configuration_failed.connect(_handle_agent_configuration_failed)
 	_codex_controller.state_changed.connect(_refresh_codex_settings_ui)
+	_codex_controller.executable_path_detection_started.connect(
+		_on_executable_path_detection_started
+	)
+	_codex_controller.executable_path_detection_finished.connect(
+		_on_executable_path_detection_finished
+	)
 	_codex_controller.load_settings()
+
+
+func _handle_agent_configuration_failed(target_name: String) -> void:
+	say("%s 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。" % target_name, 8.0)
+
+
+func _on_executable_path_detection_started() -> void:
+	if _details_window_controller != null:
+		_details_window_controller.set_agent_executable_path_detection_state(true)
+
+
+func _on_executable_path_detection_finished() -> void:
+	if _details_window_controller != null:
+		_details_window_controller.set_agent_executable_path_detection_state(false)
+	_refresh_codex_settings_ui()
 
 
 func _setup_autostart_service() -> void:
@@ -312,52 +345,72 @@ func _setup_autostart_service() -> void:
 
 
 func _refresh_codex_settings_ui() -> void:
-	_apply_codex_control_state()
-	if is_instance_valid(_codex_executable_line_edit) \
-			and not _codex_executable_line_edit.has_focus():
-		_codex_executable_line_edit.text = (
-			_codex_controller.executable_path if _codex_controller != null else ""
+	_apply_agent_control_state()
+	if _details_window_controller != null and _codex_controller != null:
+		_details_window_controller.refresh_executable_path_control(
+			_codex_controller.executable_path,
+			_vscode_executable_line_edit,
+			_vscode_executable_hint,
+			_vscode_executable_summary,
+			"VS Code",
+			true
 		)
-	if not is_instance_valid(_codex_status_label):
+		_details_window_controller.refresh_executable_path_control(
+			_codex_controller.codex_app_executable_path,
+			_codex_app_executable_line_edit,
+			_codex_app_executable_hint,
+			_codex_app_executable_summary,
+			"ChatGPT",
+			true
+		)
+		_details_window_controller.refresh_executable_path_control(
+			_codex_controller.terminal_executable_path,
+			_terminal_executable_line_edit,
+			_terminal_executable_hint,
+			_terminal_executable_summary,
+			"終端機",
+			false
+		)
+	if not is_instance_valid(_agent_status_label):
 		return
-	if _codex_controller == null or not _codex_controller.enabled:
-		_codex_status_label.text = "狀態: 已關閉"
-		_codex_status_label.add_theme_color_override(
+	if _codex_controller == null or not _codex_controller.is_any_enabled():
+		_agent_status_label.text = "狀態: 已關閉"
+		_agent_status_label.add_theme_color_override(
 			"font_color", _details_color("#68747a", "#9da1a6")
 		)
 		return
 	if _codex_controller.is_running():
-		_codex_status_label.text = "狀態: 監聽中  127.0.0.1:%d" % _codex_controller.port
-		_codex_status_label.add_theme_color_override(
+		_agent_status_label.text = "狀態: 監聽中  127.0.0.1:%d" % _codex_controller.port
+		_agent_status_label.add_theme_color_override(
 			"font_color", _details_color("#238b9d", "#4fc1ff")
 		)
 	else:
-		_codex_status_label.text = "狀態: 無法監聽，通訊埠可能被占用"
-		_codex_status_label.add_theme_color_override(
+		_agent_status_label.text = "狀態: 無法監聽，通訊埠可能被占用"
+		_agent_status_label.add_theme_color_override(
 			"font_color", _details_color("#b44949", "#ff8c8c")
 		)
 
 
-func _apply_codex_control_state() -> void:
-	var enabled := _codex_controller != null and _codex_controller.enabled
-	_update_codex_enabled_toggle()
-	if is_instance_valid(_codex_port_spin_box):
-		_codex_port_spin_box.editable = not enabled
-		_codex_port_spin_box.mouse_filter = (
+func _apply_agent_control_state() -> void:
+	var enabled := _codex_controller != null and _codex_controller.is_any_enabled()
+	_update_agent_enabled_toggles()
+	if is_instance_valid(_agent_port_spin_box):
+		_agent_port_spin_box.editable = not enabled
+		_agent_port_spin_box.mouse_filter = (
 			Control.MOUSE_FILTER_IGNORE if enabled else Control.MOUSE_FILTER_STOP
 		)
-		var port_line_edit := _codex_port_spin_box.get_line_edit()
+		var port_line_edit := _agent_port_spin_box.get_line_edit()
 		port_line_edit.editable = not enabled
 		port_line_edit.mouse_filter = (
 			Control.MOUSE_FILTER_IGNORE if enabled else Control.MOUSE_FILTER_STOP
 		)
-		_codex_port_spin_box.modulate = (
+		_agent_port_spin_box.modulate = (
 			Color("#8c979b") if enabled else Color.WHITE
 		)
 
 
 func _handle_codex_notification(
-	message: String, reaction_action: String
+	message: String, reaction_action: String, _target_app: String
 ) -> void:
 	_enqueue_codex_status(message, reaction_action)
 
@@ -367,11 +420,11 @@ func _enqueue_codex_status(message: String, reaction_action: String) -> void:
 	_last_state_message = message
 	if is_instance_valid(_last_message_status):
 		_last_message_status.text = "最近訊息：%s" % message
-	var vscode_is_foreground := (
+	var target_is_foreground := (
 		_codex_controller != null
-		and _codex_controller.is_codex_interface_foreground()
+		and _codex_controller.is_current_target_foreground()
 	)
-	say(message, _codex_notification_duration(vscode_is_foreground), true)
+	say(message, _codex_notification_duration(target_is_foreground), true)
 	if not state.is_sleeping() and not state.is_action_busy():
 		pet.play_action(reaction_action)
 
@@ -385,7 +438,7 @@ func _codex_notification_duration(vscode_is_foreground: bool) -> float:
 
 
 func _focus_codex_interface() -> void:
-	if _codex_controller != null and _codex_controller.focus_codex_interface():
+	if _codex_controller != null and _codex_controller.focus_current_target():
 		_dismiss_active_codex_notification()
 
 
@@ -563,7 +616,16 @@ func _build_stats_window() -> void:
 	_stats_window_coordinator.theme_mode = _details_theme_mode
 	_stats_window_coordinator.last_state_message = _last_state_message
 	_stats_window_coordinator.codex_enabled = (
-		_codex_controller != null and _codex_controller.enabled
+		_codex_controller != null and _codex_controller.codex_enabled
+	)
+	_stats_window_coordinator.codex_app_enabled = (
+		_codex_controller != null and _codex_controller.codex_app_enabled
+	)
+	_stats_window_coordinator.terminal_codex_enabled = (
+		_codex_controller != null and _codex_controller.terminal_codex_enabled
+	)
+	_stats_window_coordinator.copilot_enabled = (
+		_codex_controller != null and _codex_controller.copilot_enabled
 	)
 	_stats_window_coordinator.codex_port = (
 		_codex_controller.port
@@ -572,6 +634,14 @@ func _build_stats_window() -> void:
 	)
 	_stats_window_coordinator.codex_executable_path = (
 		_codex_controller.executable_path if _codex_controller != null else ""
+	)
+	_stats_window_coordinator.codex_app_executable_path = (
+		_codex_controller.codex_app_executable_path
+		if _codex_controller != null else ""
+	)
+	_stats_window_coordinator.terminal_executable_path = (
+		_codex_controller.terminal_executable_path
+		if _codex_controller != null else ""
 	)
 	_stats_window_coordinator.autostart_supported = _is_autostart_supported()
 	_stats_window_coordinator.interaction_label = Callable(self, "_interaction_label")
@@ -598,14 +668,34 @@ func _build_stats_window() -> void:
 	var settings_refs: Dictionary = refs["settings_refs"]
 	_fps_option_button = settings_refs["fps_option_button"] as OptionButton
 	_details_theme_option_button = settings_refs["details_theme_option_button"] as OptionButton
-	_codex_enabled_toggle = settings_refs["codex_enabled_toggle"] as Button
-	_codex_port_spin_box = settings_refs["codex_port_spin_box"] as SpinBox
-	_codex_status_label = settings_refs["codex_status_label"] as Label
-	_codex_executable_line_edit = (
-		settings_refs["codex_executable_line_edit"] as LineEdit
-	)
 	_autostart_check_box = settings_refs["autostart_check_box"] as CheckBox
 	_settings_feedback = settings_refs["settings_feedback"] as Label
+	var agent_refs: Dictionary = refs["agent_refs"]
+	_agent_port_spin_box = agent_refs["agent_port_spin_box"] as SpinBox
+	_agent_status_label = agent_refs["agent_status_label"] as Label
+	_agent_codex_enabled_toggle = agent_refs["codex_enabled_toggle"] as Button
+	_agent_codex_app_enabled_toggle = (
+		agent_refs["codex_app_enabled_toggle"] as Button
+	)
+	_agent_terminal_codex_enabled_toggle = (
+		agent_refs["terminal_codex_enabled_toggle"] as Button
+	)
+	_agent_copilot_enabled_toggle = agent_refs["copilot_enabled_toggle"] as Button
+	_vscode_executable_line_edit = (
+		agent_refs["vscode_executable_line_edit"] as LineEdit
+	)
+	_vscode_executable_hint = agent_refs["vscode_executable_hint"] as Label
+	_vscode_executable_summary = agent_refs["vscode_executable_summary"] as Label
+	_codex_app_executable_line_edit = (
+		agent_refs["codex_app_executable_line_edit"] as LineEdit
+	)
+	_codex_app_executable_hint = agent_refs["codex_app_executable_hint"] as Label
+	_codex_app_executable_summary = agent_refs["codex_app_executable_summary"] as Label
+	_terminal_executable_line_edit = (
+		agent_refs["terminal_executable_line_edit"] as LineEdit
+	)
+	_terminal_executable_hint = agent_refs["terminal_executable_hint"] as Label
+	_terminal_executable_summary = agent_refs["terminal_executable_summary"] as Label
 	_refresh_codex_settings_ui()
 	# The settings builder cannot request this before its signals and control
 	# references exist. Queue the initial query only after initialization.
@@ -631,10 +721,27 @@ func _connect_details_window_signals() -> void:
 	_details_window_controller.close_requested.connect(_destroy_stats_window)
 	_details_window_controller.target_fps_selected.connect(_on_target_fps_selected)
 	_details_window_controller.details_theme_selected.connect(_on_details_theme_selected)
-	_details_window_controller.codex_enabled_toggled.connect(_on_codex_enabled_toggled)
-	_details_window_controller.codex_port_changed.connect(_on_codex_port_changed)
-	_details_window_controller.codex_executable_path_changed.connect(
-		_on_codex_executable_path_changed
+	_details_window_controller.agent_codex_enabled_toggled.connect(
+		_on_codex_enabled_toggled
+	)
+	_details_window_controller.agent_codex_app_enabled_toggled.connect(
+		_on_codex_app_enabled_toggled
+	)
+	_details_window_controller.agent_terminal_codex_enabled_toggled.connect(
+		_on_terminal_codex_enabled_toggled
+	)
+	_details_window_controller.agent_copilot_enabled_toggled.connect(
+		_on_copilot_enabled_toggled
+	)
+	_details_window_controller.agent_port_changed.connect(_on_agent_port_changed)
+	_details_window_controller.vscode_executable_path_changed.connect(
+		_on_vscode_executable_path_changed
+	)
+	_details_window_controller.codex_app_executable_path_changed.connect(
+		_on_codex_app_executable_path_changed
+	)
+	_details_window_controller.terminal_executable_path_changed.connect(
+		_on_terminal_executable_path_changed
 	)
 	_details_window_controller.autostart_toggled.connect(_on_autostart_toggled)
 	_details_window_controller.character_selected.connect(_on_character_selected)
@@ -675,6 +782,8 @@ func _on_care_action_requested(action: String) -> void:
 
 func _on_stats_tab_changed(tab_index: int) -> void:
 	_refresh_stats_tab_buttons(tab_index)
+	if tab_index == 2 and _codex_controller != null:
+		_codex_controller.refresh_agent_executable_paths_if_invalid()
 	if tab_index != _character_tab_index or _character_tab_loaded:
 		return
 	_refresh_character_list()
@@ -995,11 +1104,27 @@ func _details_color(light: String, dark: String) -> Color:
 	return Color(dark if _details_theme_mode == "dark" else light)
 
 
-func _update_codex_enabled_toggle() -> void:
-	if not is_instance_valid(_codex_enabled_toggle):
-		return
-	var enabled := _codex_controller != null and _codex_controller.enabled
-	_codex_enabled_toggle.call("set_enabled_state", enabled)
+func _update_agent_enabled_toggles() -> void:
+	if is_instance_valid(_agent_codex_enabled_toggle):
+		_agent_codex_enabled_toggle.call(
+			"set_enabled_state",
+			_codex_controller != null and _codex_controller.codex_enabled
+		)
+	if is_instance_valid(_agent_codex_app_enabled_toggle):
+		_agent_codex_app_enabled_toggle.call(
+			"set_enabled_state",
+			_codex_controller != null and _codex_controller.codex_app_enabled
+		)
+	if is_instance_valid(_agent_terminal_codex_enabled_toggle):
+		_agent_terminal_codex_enabled_toggle.call(
+			"set_enabled_state",
+			_codex_controller != null and _codex_controller.terminal_codex_enabled
+		)
+	if is_instance_valid(_agent_copilot_enabled_toggle):
+		_agent_copilot_enabled_toggle.call(
+			"set_enabled_state",
+			_codex_controller != null and _codex_controller.copilot_enabled
+		)
 
 
 func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
@@ -1070,10 +1195,21 @@ func _destroy_stats_window() -> void:
 	_last_message_status = null
 	_fps_option_button = null
 	_details_theme_option_button = null
-	_codex_enabled_toggle = null
-	_codex_port_spin_box = null
-	_codex_status_label = null
-	_codex_executable_line_edit = null
+	_agent_codex_enabled_toggle = null
+	_agent_codex_app_enabled_toggle = null
+	_agent_terminal_codex_enabled_toggle = null
+	_agent_copilot_enabled_toggle = null
+	_agent_port_spin_box = null
+	_agent_status_label = null
+	_vscode_executable_line_edit = null
+	_vscode_executable_hint = null
+	_vscode_executable_summary = null
+	_codex_app_executable_line_edit = null
+	_codex_app_executable_hint = null
+	_codex_app_executable_summary = null
+	_terminal_executable_line_edit = null
+	_terminal_executable_hint = null
+	_terminal_executable_summary = null
 	_autostart_check_box = null
 	_settings_feedback = null
 	_character_list = null
@@ -1171,28 +1307,64 @@ func _on_details_theme_selected(index: int) -> void:
 func _on_codex_enabled_toggled(enabled: bool) -> void:
 	if _codex_controller == null:
 		return
-	if enabled and is_instance_valid(_codex_port_spin_box):
-		_codex_port_spin_box.set_value_no_signal(_codex_controller.port)
-	_codex_controller.set_enabled(enabled)
-	_apply_codex_control_state()
-	call_deferred("_apply_codex_control_state")
+	_codex_controller.set_codex_enabled(enabled)
+	_apply_agent_control_state()
+	call_deferred("_apply_agent_control_state")
 
 
-func _on_codex_port_changed(value: float) -> void:
+func _on_codex_app_enabled_toggled(enabled: bool) -> void:
 	if _codex_controller == null:
 		return
-	if _codex_controller.enabled:
-		if is_instance_valid(_codex_port_spin_box):
-			_codex_port_spin_box.set_value_no_signal(_codex_controller.port)
+	_codex_controller.set_codex_app_enabled(enabled)
+	_apply_agent_control_state()
+	call_deferred("_apply_agent_control_state")
+
+
+func _on_terminal_codex_enabled_toggled(enabled: bool) -> void:
+	if _codex_controller == null:
+		return
+	_codex_controller.set_terminal_codex_enabled(enabled)
+	_apply_agent_control_state()
+	call_deferred("_apply_agent_control_state")
+
+
+func _on_copilot_enabled_toggled(enabled: bool) -> void:
+	if _codex_controller == null:
+		return
+	_codex_controller.set_copilot_enabled(enabled)
+	_apply_agent_control_state()
+	call_deferred("_apply_agent_control_state")
+
+
+func _on_agent_port_changed(value: float) -> void:
+	if _codex_controller == null:
+		return
+	if _codex_controller.is_any_enabled():
+		if is_instance_valid(_agent_port_spin_box):
+			_agent_port_spin_box.set_value_no_signal(_codex_controller.port)
 		return
 	var pending_port := _codex_controller.normalize_port(roundi(value))
 	_codex_controller.set_port(pending_port)
 
 
-func _on_codex_executable_path_changed(path: String) -> void:
+func _on_vscode_executable_path_changed(path: String) -> void:
 	if _codex_controller == null:
 		return
 	_codex_controller.set_executable_path(path)
+	_refresh_codex_settings_ui()
+
+
+func _on_codex_app_executable_path_changed(path: String) -> void:
+	if _codex_controller == null:
+		return
+	_codex_controller.set_codex_app_executable_path(path)
+	_refresh_codex_settings_ui()
+
+
+func _on_terminal_executable_path_changed(path: String) -> void:
+	if _codex_controller == null:
+		return
+	_codex_controller.set_terminal_executable_path(path)
 	_refresh_codex_settings_ui()
 
 

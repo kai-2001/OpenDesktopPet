@@ -56,6 +56,26 @@ notify = [
     Assert-Installer ($reinstalledConfig -eq $installedConfig) `
         'Reinstalling the same notification configuration must be idempotent.'
 
+    $doubleEscapedScriptPath = $escapedScriptPath.Replace('\\', '\\\\')
+    $computerUseConfig = @"
+model = "gpt-5.6-luna"
+
+notify = [ "C:\\Program Files\\OpenAI\\codex-computer-use.exe", "turn-ended", "--previous-notify", "[\"powershell.exe\",\"-NoProfile\",\"-File\",\"$doubleEscapedScriptPath\"]" ]
+
+[windows]
+sandbox = "elevated"
+"@
+    Set-Content -LiteralPath $configPath -Value $computerUseConfig -Encoding UTF8
+    & $installerPath | Write-Output
+    $wrappedConfig = Get-Content -LiteralPath $configPath -Encoding UTF8 -Raw
+    $wrappedNotifyCount = [regex]::Matches($wrappedConfig, '(?m)^[ \t]*notify[ \t]*=').Count
+    Assert-Installer ($wrappedNotifyCount -eq 1) `
+        'A nested Computer Use notify array must remain a single notify key.'
+    Assert-Installer ($wrappedConfig -match 'codex-computer-use\.exe') `
+        'The existing Computer Use notify wrapper must be preserved.'
+    Assert-Installer ($wrappedConfig -match 'open_desktop_pet_notify\.ps1') `
+        'The existing previous-notify desktop-pet bridge must be preserved.'
+
     Write-Output 'CODEX_INTEGRATION_INSTALLER_TEST_OK'
 }
 finally {

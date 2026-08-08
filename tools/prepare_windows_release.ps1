@@ -38,6 +38,8 @@ foreach ($fileName in @(
     'Install-Codex-Integration.cmd',
     'install_codex_integration.ps1',
     'codex_notify.ps1',
+    'install_copilot_integration.ps1',
+    'vscode_agent_notify.ps1',
     'README.md'
 )) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $fileName) -Destination (Join-Path $toolsOutput $fileName) -Force

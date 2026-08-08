@@ -12,8 +12,13 @@ signal tab_changed(index: int)
 var theme_mode := "light"
 var last_state_message := "尚無紀錄"
 var codex_enabled := false
+var codex_app_enabled := false
+var terminal_codex_enabled := false
+var copilot_enabled := false
 var codex_port := CodexIntegrationControllerScript.DEFAULT_PORT
 var codex_executable_path := ""
+var codex_app_executable_path := ""
+var terminal_executable_path := ""
 var autostart_supported := false
 var interaction_label: Callable
 var interaction_icon: Callable
@@ -25,7 +30,7 @@ func build(owner: Node) -> Dictionary:
 	window = Window.new()
 	window.name = "StatsWindow"
 	window.title = "桌寵詳細狀態"
-	window.size = Vector2i(500, 620)
+	window.size = Vector2i(640, 620)
 	window.min_size = Vector2i(360, 480)
 	window.unresizable = false
 	window.transient = false
@@ -61,9 +66,9 @@ func build(owner: Node) -> Dictionary:
 	navigation.add_theme_constant_override("separation", 8)
 	navigation_margin.add_child(navigation)
 	var tab_buttons: Array[Button] = []
-	for tab_index: int in 3:
+	for tab_index: int in 4:
 		var navigation_button := Button.new()
-		navigation_button.text = ["狀態", "設定", "角色"][tab_index]
+		navigation_button.text = ["狀態", "設定", "Agent 通知", "角色"][tab_index]
 		navigation_button.custom_minimum_size.y = 40
 		navigation_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		navigation_button.focus_mode = Control.FOCUS_NONE
@@ -85,13 +90,19 @@ func build(owner: Node) -> Dictionary:
 	details_controller.theme_mode = theme_mode
 	details_controller.last_state_message = last_state_message
 	details_controller.codex_enabled = codex_enabled
-	details_controller.codex_port = codex_port
-	details_controller.codex_executable_path = codex_executable_path
+	details_controller.codex_app_enabled = codex_app_enabled
+	details_controller.terminal_codex_enabled = terminal_codex_enabled
+	details_controller.copilot_enabled = copilot_enabled
+	details_controller.agent_port = codex_port
+	details_controller.vscode_executable_path = codex_executable_path
+	details_controller.codex_app_executable_path = codex_app_executable_path
+	details_controller.terminal_executable_path = terminal_executable_path
 	details_controller.autostart_supported = autostart_supported
 	details_controller.interaction_label = interaction_label
 	details_controller.interaction_icon = interaction_icon
 	var status_refs: Dictionary = details_controller.build_status_tab(tabs)
 	var settings_refs: Dictionary = details_controller.build_settings_tab(tabs)
+	var agent_refs: Dictionary = details_controller.build_agent_tab(tabs)
 	var character_refs: Dictionary = details_controller.build_character_tab(
 		tabs, window
 	)
@@ -103,6 +114,7 @@ func build(owner: Node) -> Dictionary:
 		"details_controller": details_controller,
 		"status_refs": status_refs,
 		"settings_refs": settings_refs,
+		"agent_refs": agent_refs,
 		"character_refs": character_refs,
 	}
 
@@ -123,6 +135,29 @@ func _create_details_theme() -> Theme:
 	var empty_panel := StyleBoxEmpty.new()
 	theme.set_stylebox("panel", "TabContainer", empty_panel)
 	theme.set_stylebox("panel", "ScrollContainer", empty_panel)
+	var scroll_track := StyleBoxFlat.new()
+	scroll_track.bg_color = _details_color("#eef1f3", "#292929")
+	scroll_track.set_corner_radius_all(6)
+	scroll_track.content_margin_left = 2
+	scroll_track.content_margin_right = 2
+	var scroll_grabber := StyleBoxFlat.new()
+	scroll_grabber.bg_color = _details_color("#b9c5c9", "#5a5a5a")
+	scroll_grabber.set_corner_radius_all(6)
+	scroll_grabber.content_margin_left = 2
+	scroll_grabber.content_margin_right = 2
+	var scroll_grabber_hover := StyleBoxFlat.new()
+	scroll_grabber_hover.bg_color = _details_color("#9eafb4", "#707070")
+	scroll_grabber_hover.set_corner_radius_all(6)
+	var scroll_grabber_pressed := StyleBoxFlat.new()
+	scroll_grabber_pressed.bg_color = _details_color("#84999f", "#858585")
+	scroll_grabber_pressed.set_corner_radius_all(6)
+	for scroll_type: String in ["VScrollBar", "HScrollBar"]:
+		theme.set_stylebox("scroll", scroll_type, scroll_track)
+		theme.set_stylebox("scroll_focus", scroll_type, scroll_track)
+		theme.set_stylebox("grabber", scroll_type, scroll_grabber)
+		theme.set_stylebox("grabber_highlight", scroll_type, scroll_grabber_hover)
+		theme.set_stylebox("grabber_pressed", scroll_type, scroll_grabber_pressed)
+		theme.set_constant("minimum_grabber_size", scroll_type, 24)
 	var normal := _details_style(
 		_details_color("#ffffff", "#252526"),
 		_details_color("#d6dee2", "#3c3c3c"), 8
