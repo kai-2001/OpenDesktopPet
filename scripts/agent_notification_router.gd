@@ -20,6 +20,8 @@ static func normalize_agent(value: String) -> String:
 		return "opencode"
 	if candidate.contains("claude"):
 		return "claude"
+	if candidate.contains("antigravity") or candidate == "agy" or candidate.contains("agy_cli"):
+		return "agy"
 	if candidate.contains("gemini"):
 		return "gemini"
 	return "codex"
@@ -46,8 +48,10 @@ static func display_name(source: String, agent: String) -> String:
 		return "OpenCode"
 	if source == "claude" or agent == "claude":
 		return "Claude Code"
+	if source == "antigravity_cli" or source == "agy" or agent == "agy":
+		return "Antigravity CLI"
 	if source == "gemini" or agent == "gemini":
-		return "Gemini CLI"
+		return "Gemini CLI（舊版）"
 	return "Codex"
 
 
@@ -84,6 +88,8 @@ static func notification_key(source: String, agent: String, target_app: String) 
 				return "claude_vscode"
 			_:
 				return "claude_terminal"
+	if source == "antigravity_cli" or source == "agy" or agent == "agy":
+		return "agy_terminal"
 	if source == "gemini" or agent == "gemini":
 		return "gemini_terminal"
 	match target_app:

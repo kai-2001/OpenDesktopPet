@@ -113,8 +113,16 @@ Assert-Architecture ($codexController -match 'gemini_terminal_enabled') `
 	'Codex integration must keep Gemini CLI terminal state separate.'
 Assert-Architecture ($codexController -match '_run_gemini_cli_configuration_tool') `
 	'Codex integration must configure Gemini CLI through its installer.'
+Assert-Architecture ((Read-Source 'tools/codex_notify.ps1') -match 'Get-ProcessTreeContainsVsCode') `
+	'Codex notification routing must detect VS Code hosts in the process tree.'
+Assert-Architecture ($codexController -match 'agy_terminal_enabled') `
+	'Codex integration must keep Antigravity CLI terminal state separate.'
+Assert-Architecture ($codexController -match '_run_antigravity_cli_configuration_tool') `
+	'Codex integration must configure Antigravity CLI through its installer.'
 Assert-Architecture ($agentRouter -match 'gemini_terminal') `
 	'Agent notification routing must define a Gemini CLI terminal target.'
+Assert-Architecture ($agentRouter -match 'agy_terminal') `
+	'Agent notification routing must define an Antigravity CLI terminal target.'
 Assert-Architecture ($codexController -match 'AgentNotificationRouterScript\.is_notification_enabled') `
 	'Codex notifications must be filtered by source target and enabled state.'
 Assert-Architecture ($agentRouter -match 'class_name AgentNotificationRouter') `

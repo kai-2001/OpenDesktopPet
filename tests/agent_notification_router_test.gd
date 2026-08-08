@@ -11,6 +11,8 @@ func _run() -> void:
 	_assert_equal(RouterScript.normalize_agent("copilot_vscode"), "copilot")
 	_assert_equal(RouterScript.normalize_agent("opencode"), "opencode")
 	_assert_equal(RouterScript.normalize_agent("claude_code"), "claude")
+	_assert_equal(RouterScript.normalize_agent("antigravity_cli"), "agy")
+	_assert_equal(RouterScript.normalize_agent("agy"), "agy")
 	_assert_equal(RouterScript.normalize_agent("gemini_cli"), "gemini")
 	_assert_equal(RouterScript.normalize_agent("codex_vscode"), "codex")
 	_assert_equal(
@@ -36,6 +38,7 @@ func _run() -> void:
 		"claude_vscode": true,
 		"claude_app": false,
 		"gemini_terminal": true,
+		"agy_terminal": true,
 	}
 	_assert_true(
 		RouterScript.is_notification_enabled(
@@ -72,6 +75,12 @@ func _run() -> void:
 			"gemini_cli", "gemini", RouterScript.TARGET_TERMINAL, enabled_by_key
 		),
 		"Gemini CLI terminal route is enabled"
+	)
+	_assert_true(
+		RouterScript.is_notification_enabled(
+			"antigravity_cli", "agy", RouterScript.TARGET_TERMINAL, enabled_by_key
+		),
+		"Antigravity CLI terminal route is enabled"
 	)
 	print("AGENT_NOTIFICATION_ROUTER_TEST_OK")
 	quit(0)

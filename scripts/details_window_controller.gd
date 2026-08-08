@@ -20,6 +20,7 @@ signal agent_claude_vscode_enabled_toggled(enabled: bool)
 signal agent_claude_app_enabled_toggled(enabled: bool)
 signal agent_claude_terminal_enabled_toggled(enabled: bool)
 signal agent_gemini_terminal_enabled_toggled(enabled: bool)
+signal agent_agy_terminal_enabled_toggled(enabled: bool)
 signal agent_port_changed(value: float)
 signal vscode_executable_path_changed(path: String)
 signal codex_app_executable_path_changed(path: String)
@@ -49,6 +50,7 @@ var claude_vscode_enabled := false
 var claude_app_enabled := false
 var claude_terminal_enabled := false
 var gemini_terminal_enabled := false
+var agy_terminal_enabled := false
 var agent_port := CodexIntegrationControllerScript.DEFAULT_PORT
 var vscode_executable_path := ""
 var codex_app_executable_path := ""
@@ -516,12 +518,21 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 
 	var gemini_terminal_toggle := CodexToggleSwitchScript.new()
 	gemini_terminal_toggle.name = "GeminiCliTerminalEnabledToggle"
-	gemini_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Gemini CLI 通知"
+	gemini_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Gemini CLI 舊版通知（企業/API Key）"
 	gemini_terminal_toggle.configure(theme_mode, gemini_terminal_enabled)
 	gemini_terminal_toggle.toggled.connect(
 		func(value: bool) -> void: agent_gemini_terminal_enabled_toggled.emit(value)
 	)
-	content.add_child(_build_agent_row("Gemini CLI", gemini_terminal_toggle))
+	content.add_child(_build_agent_row("Gemini CLI（舊版）", gemini_terminal_toggle))
+
+	var agy_terminal_toggle := CodexToggleSwitchScript.new()
+	agy_terminal_toggle.name = "AgyTerminalEnabledToggle"
+	agy_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Antigravity CLI 通知"
+	agy_terminal_toggle.configure(theme_mode, agy_terminal_enabled)
+	agy_terminal_toggle.toggled.connect(
+		func(value: bool) -> void: agent_agy_terminal_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Antigravity CLI", agy_terminal_toggle))
 
 	var claude_terminal_toggle := CodexToggleSwitchScript.new()
 	claude_terminal_toggle.name = "ClaudeCodeTerminalEnabledToggle"
@@ -561,6 +572,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		"terminal_codex_enabled_toggle": terminal_toggle,
 		"terminal_opencode_enabled_toggle": opencode_toggle,
 		"gemini_terminal_enabled_toggle": gemini_terminal_toggle,
+		"agy_terminal_enabled_toggle": agy_terminal_toggle,
 		"claude_vscode_enabled_toggle": claude_vscode_toggle,
 		"claude_app_enabled_toggle": claude_app_toggle,
 		"claude_terminal_enabled_toggle": claude_terminal_toggle,

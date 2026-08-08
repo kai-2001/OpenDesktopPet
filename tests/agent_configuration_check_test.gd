@@ -29,6 +29,7 @@ func _run() -> void:
 	_assert_true(not controller.is_opencode_configured(), "OpenCode starts invalid")
 	_assert_true(not controller.is_claude_code_configured(), "Claude Code starts invalid")
 	_assert_true(not controller.is_gemini_cli_configured(), "Gemini CLI starts invalid")
+	_assert_true(not controller.is_antigravity_cli_configured(), "Antigravity CLI starts invalid")
 
 	_make_directory(codex_home)
 	_make_directory(integration_home)
@@ -87,6 +88,25 @@ func _run() -> void:
 	_assert_true(controller.is_gemini_cli_configured(), "Gemini CLI hooks are detected")
 	_write(gemini_home.path_join("settings.json"), "{\"hooks\":{\"AfterAgent\":[]}}")
 	_assert_true(not controller.is_gemini_cli_configured(), "Gemini CLI hook drift is detected")
+
+	_write(integration_home.path_join("open_desktop_pet_antigravity_cli_installed.txt"), "OpenDesktopPet Antigravity CLI notification hook")
+	_write(integration_home.path_join("antigravity_cli_notify.ps1"), "# bridge")
+	_make_directory(gemini_home.path_join("config"))
+	_write(
+		gemini_home.path_join("config/hooks.json"),
+		"{\"open-desktop-pet\":{\"Stop\":[{\"type\":\"command\",\"command\":\"antigravity_cli_notify.ps1\",\"timeout\":5}]}}"
+	)
+	_assert_true(controller.is_antigravity_cli_configured(), "Antigravity CLI hook is detected")
+	_write(
+		gemini_home.path_join("config/hooks.json"),
+		"{\"open-desktop-pet\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"antigravity_cli_notify.ps1\"}]}]}}"
+	)
+	_assert_true(
+		not controller.is_antigravity_cli_configured(),
+		"Antigravity CLI wrapped hook drift is detected"
+	)
+	_write(gemini_home.path_join("config/hooks.json"), "{\"open-desktop-pet\":{\"Stop\":[]}}")
+	_assert_true(not controller.is_antigravity_cli_configured(), "Antigravity CLI hook drift is detected")
 
 	_cleanup()
 	print("AGENT_CONFIGURATION_CHECK_TEST_OK")

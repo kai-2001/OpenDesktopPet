@@ -24,12 +24,14 @@ const CLAUDE_CODE_APP_ENABLED_FILE_NAME := "open_desktop_pet_claude_app_enabled.
 const CLAUDE_CODE_TERMINAL_ENABLED_FILE_NAME := "open_desktop_pet_claude_terminal_enabled.txt"
 const CLAUDE_CODE_APP_EXECUTABLE_PATH_FILE_NAME := "open_desktop_pet_claude_app_executable_path.txt"
 const GEMINI_CLI_ENABLED_FILE_NAME := "open_desktop_pet_gemini_enabled.txt"
+const AGY_ENABLED_FILE_NAME := "open_desktop_pet_agy_enabled.txt"
 const LEGACY_ENABLED_FILE_NAME := "open_desktop_pet_notify_enabled.txt"
 const CODEX_INSTALL_MARKER := "open_desktop_pet_codex_installed.txt"
 const COPILOT_INSTALL_MARKER := "open_desktop_pet_copilot_installed.txt"
 const OPENCODE_INSTALL_MARKER := "open_desktop_pet_opencode_installed.txt"
 const CLAUDE_CODE_INSTALL_MARKER := "open_desktop_pet_claude_code_installed.txt"
 const GEMINI_CLI_INSTALL_MARKER := "open_desktop_pet_gemini_cli_installed.txt"
+const AGY_INSTALL_MARKER := "open_desktop_pet_antigravity_cli_installed.txt"
 const CODEX_CONFIG_FILE_NAME := "config.toml"
 const CODEX_NOTIFY_SCRIPT_FILE_NAME := "open_desktop_pet_notify.ps1"
 const COPILOT_HOOK_CONFIG_FILE_NAME := "open-desktop-pet.json"
@@ -40,6 +42,9 @@ const CLAUDE_CODE_NOTIFY_SCRIPT_FILE_NAME := "claude_code_notify.ps1"
 const CLAUDE_CODE_SETTINGS_FILE_NAME := "settings.json"
 const GEMINI_CLI_NOTIFY_SCRIPT_FILE_NAME := "gemini_cli_notify.ps1"
 const GEMINI_CLI_SETTINGS_FILE_NAME := "settings.json"
+const AGY_NOTIFY_SCRIPT_FILE_NAME := "antigravity_cli_notify.ps1"
+const AGY_HOOKS_FILE_NAME := "hooks.json"
+const AGY_HOOK_NAME := "open-desktop-pet"
 const CODEX_URI := "vscode://command/chatgpt.openSidebar"
 const CLAUDE_CODE_VSCODE_URI := "vscode://anthropic.claude-code/open"
 const TARGET_VSCODE := AgentNotificationRouterScript.TARGET_VSCODE
@@ -69,6 +74,7 @@ var claude_vscode_enabled := false
 var claude_app_enabled := false
 var claude_terminal_enabled := false
 var gemini_terminal_enabled := false
+var agy_terminal_enabled := false
 var port := DEFAULT_PORT
 var executable_path := ""
 var codex_app_executable_path := ""
@@ -121,6 +127,9 @@ func load_settings() -> void:
 		)
 		gemini_terminal_enabled = bool(
 			config.get_value("gemini_terminal", "enabled", false)
+		)
+		agy_terminal_enabled = bool(
+			config.get_value("agy_terminal", "enabled", false)
 		)
 		port = normalize_port(int(config.get_value("codex", "port", DEFAULT_PORT)))
 		executable_path = _normalize_executable_path(String(config.get_value(
@@ -290,6 +299,16 @@ func set_gemini_terminal_enabled(value: bool) -> void:
 	_persist_agent_state()
 
 
+func set_agy_terminal_enabled(value: bool) -> void:
+	if value and DisplayServer.get_name() != "headless" \
+			and not _ensure_antigravity_cli_configuration():
+		agy_terminal_enabled = false
+		_persist_agent_state()
+		return
+	agy_terminal_enabled = value
+	_persist_agent_state()
+
+
 func set_codex_app_executable_path(value: String) -> void:
 	codex_app_executable_path = _normalize_executable_path(value)
 	_save_settings()
@@ -322,7 +341,8 @@ func refresh_enabled_executable_paths_if_invalid() -> void:
 		targets.append(TARGET_VSCODE)
 	if codex_app_enabled:
 		targets.append(TARGET_CODEX_APP)
-	if terminal_codex_enabled or terminal_opencode_enabled or gemini_terminal_enabled:
+	if terminal_codex_enabled or terminal_opencode_enabled \
+			or gemini_terminal_enabled or agy_terminal_enabled:
 		targets.append(TARGET_TERMINAL)
 	if vscode_opencode_enabled:
 		targets.append(TARGET_VSCODE)
@@ -441,7 +461,7 @@ func is_any_enabled() -> bool:
 		or terminal_opencode_enabled or vscode_opencode_enabled \
 		or opencode_app_enabled or copilot_enabled \
 		or claude_vscode_enabled or claude_app_enabled or claude_terminal_enabled \
-		or gemini_terminal_enabled
+		or gemini_terminal_enabled or agy_terminal_enabled
 
 
 func is_running() -> bool:
@@ -535,6 +555,36 @@ func is_gemini_cli_configured() -> bool:
 		and settings_text.contains('"Notification"')
 
 
+func is_antigravity_cli_configured() -> bool:
+	var integration_home := _integration_home_path()
+	if integration_home.is_empty():
+		return false
+	if not FileAccess.file_exists(integration_home.path_join(AGY_INSTALL_MARKER)):
+		return false
+	if not FileAccess.file_exists(
+		integration_home.path_join(AGY_NOTIFY_SCRIPT_FILE_NAME)
+	):
+		return false
+	var hooks_text := _read_text_file(
+		_gemini_home_path().path_join("config").path_join(AGY_HOOKS_FILE_NAME)
+	)
+	var parsed_hooks: Variant = JSON.parse_string(hooks_text)
+	if not parsed_hooks is Dictionary:
+		return false
+	var hook_definition: Variant = parsed_hooks.get(AGY_HOOK_NAME, {})
+	if not hook_definition is Dictionary:
+		return false
+	var stop_handlers: Variant = hook_definition.get("Stop", [])
+	if not stop_handlers is Array:
+		return false
+	for handler in stop_handlers:
+		if handler is Dictionary and String(handler.get("command", "")).contains(
+			AGY_NOTIFY_SCRIPT_FILE_NAME
+		):
+			return true
+	return false
+
+
 func _ensure_codex_configuration(target_name: String) -> bool:
 	if is_codex_configured():
 		return true
@@ -580,6 +630,15 @@ func _ensure_gemini_cli_configuration() -> bool:
 	return false
 
 
+func _ensure_antigravity_cli_configuration() -> bool:
+	if is_antigravity_cli_configured():
+		return true
+	if _run_antigravity_cli_configuration_tool() and is_antigravity_cli_configured():
+		return true
+	configuration_failed.emit("Antigravity CLI 終端機")
+	return false
+
+
 func _persist_agent_state() -> void:
 	_save_settings()
 	_write_bridge_files()
@@ -618,6 +677,9 @@ func _ensure_enabled_configurations() -> void:
 			changed = true
 	if gemini_terminal_enabled and not _ensure_gemini_cli_configuration():
 		gemini_terminal_enabled = false
+		changed = true
+	if agy_terminal_enabled and not _ensure_antigravity_cli_configuration():
+		agy_terminal_enabled = false
 		changed = true
 	if changed:
 		_save_settings()
@@ -882,6 +944,7 @@ func _handle_notification(notification: Dictionary) -> void:
 		"claude_vscode": claude_vscode_enabled,
 		"claude_app": claude_app_enabled,
 		"gemini_terminal": gemini_terminal_enabled,
+		"agy_terminal": agy_terminal_enabled,
 	}
 	if not AgentNotificationRouterScript.is_notification_enabled(
 			source, agent, target_app, enabled_by_key
@@ -942,6 +1005,7 @@ func _save_settings() -> void:
 	config.set_value("claude_code_app", "executable_path", claude_app_executable_path)
 	config.set_value("claude_code_terminal", "enabled", claude_terminal_enabled)
 	config.set_value("gemini_terminal", "enabled", gemini_terminal_enabled)
+	config.set_value("agy_terminal", "enabled", agy_terminal_enabled)
 	config.save(UI_SETTINGS_PATH)
 
 
@@ -1081,6 +1145,10 @@ func _write_agent_bridge_files(
 	_write_flag(
 		directory.path_join(GEMINI_CLI_ENABLED_FILE_NAME),
 		gemini_terminal_enabled and not disable_all
+	)
+	_write_flag(
+		directory.path_join(AGY_ENABLED_FILE_NAME),
+		agy_terminal_enabled and not disable_all
 	)
 	_write_text_file(
 		directory.path_join(CLAUDE_CODE_APP_EXECUTABLE_PATH_FILE_NAME),
@@ -1294,6 +1362,23 @@ func _run_claude_code_configuration_tool() -> bool:
 
 func _run_gemini_cli_configuration_tool() -> bool:
 	var installer_path := _tool_path("install_gemini_cli_integration.ps1")
+	if not FileAccess.file_exists(installer_path):
+		return false
+	var output: Array = []
+	var exit_code := OS.execute("powershell.exe", [
+		"-NoProfile",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-WindowStyle",
+		"Hidden",
+		"-File",
+		installer_path,
+	], output, true, false)
+	return exit_code == 0
+
+
+func _run_antigravity_cli_configuration_tool() -> bool:
+	var installer_path := _tool_path("install_antigravity_cli_integration.ps1")
 	if not FileAccess.file_exists(installer_path):
 		return false
 	var output: Array = []

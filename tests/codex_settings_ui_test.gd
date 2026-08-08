@@ -35,6 +35,7 @@ func _init() -> void:
 	test_config.set_value("claude_code_app", "executable_path", "")
 	test_config.set_value("claude_code_terminal", "enabled", false)
 	test_config.set_value("gemini_terminal", "enabled", false)
+	test_config.set_value("agy_terminal", "enabled", false)
 	test_config.save("user://ui_settings.cfg")
 	_main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(_main)
@@ -89,6 +90,9 @@ func _run_test() -> void:
 	var gemini_terminal_toggle := _main.find_child(
 		"GeminiCliTerminalEnabledToggle", true, false
 	) as Button
+	var agy_terminal_toggle := _main.find_child(
+		"AgyTerminalEnabledToggle", true, false
+	) as Button
 	var port_spin_box := _main.find_child(
 		"AgentPortSpinBox", true, false
 	) as SpinBox
@@ -127,6 +131,15 @@ func _run_test() -> void:
 	_assert_true(claude_app_toggle != null, "Claude Desktop enabled toggle exists")
 	_assert_true(claude_terminal_toggle != null, "Terminal Claude Code enabled toggle exists")
 	_assert_true(gemini_terminal_toggle != null, "Terminal Gemini CLI enabled toggle exists")
+	_assert_true(agy_terminal_toggle != null, "Terminal Antigravity CLI enabled toggle exists")
+	_assert_true(
+		(gemini_terminal_toggle.get_parent().get_child(0) as Label).text == "　Gemini CLI（舊版）",
+		"Gemini notification toggle includes the legacy annotation"
+	)
+	_assert_true(
+		(agy_terminal_toggle.get_parent().get_child(0) as Label).text == "　Antigravity CLI",
+		"Antigravity CLI notification toggle is labeled"
+	)
 	_assert_true(port_spin_box != null, "Codex port input exists")
 	_assert_true(status_label != null, "Codex status label exists")
 	_assert_true(executable_path != null, "VS Code executable path input exists")
@@ -187,6 +200,7 @@ func _run_test() -> void:
 	_assert_true(not claude_app_toggle.button_pressed, "Claude Desktop defaults to closed")
 	_assert_true(not claude_terminal_toggle.button_pressed, "Terminal Claude Code defaults to closed")
 	_assert_true(not gemini_terminal_toggle.button_pressed, "Terminal Gemini CLI defaults to closed")
+	_assert_true(not agy_terminal_toggle.button_pressed, "Terminal Antigravity CLI defaults to closed")
 	_assert_true(codex_toggle.text == "關", "closed toggle shows 關")
 	_assert_true(
 		(port_spin_box.get_parent().get_child(0) as Label).text == "Agent 通知",
@@ -244,6 +258,9 @@ func _run_test() -> void:
 	var gemini_terminal_enabled_file := _test_codex_home.path_join(
 		"open_desktop_pet_gemini_enabled.txt"
 	)
+	var agy_terminal_enabled_file := _test_codex_home.path_join(
+		"open_desktop_pet_agy_enabled.txt"
+	)
 	_assert_true(
 		FileAccess.get_file_as_string(vscode_enabled_file).strip_edges() == "0",
 		"closed state disables VS Code Codex sender"
@@ -267,6 +284,10 @@ func _run_test() -> void:
 	_assert_true(
 		FileAccess.get_file_as_string(gemini_terminal_enabled_file).strip_edges() == "0",
 		"closed state disables Gemini CLI sender"
+	)
+	_assert_true(
+		FileAccess.get_file_as_string(agy_terminal_enabled_file).strip_edges() == "0",
+		"closed state disables Antigravity CLI sender"
 	)
 
 	codex_toggle.set_pressed_no_signal(false)

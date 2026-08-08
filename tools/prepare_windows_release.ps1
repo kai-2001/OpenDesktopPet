@@ -49,6 +49,9 @@ foreach ($fileName in @(
     'Install-Gemini-CLI-Integration.cmd',
     'install_gemini_cli_integration.ps1',
     'gemini_cli_notify.ps1',
+    'Install-Antigravity-CLI-Integration.cmd',
+    'install_antigravity_cli_integration.ps1',
+    'antigravity_cli_notify.ps1',
     'README.md'
 )) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $fileName) -Destination (Join-Path $toolsOutput $fileName) -Force

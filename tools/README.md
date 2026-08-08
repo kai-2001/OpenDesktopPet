@@ -1,7 +1,7 @@
 # Agent 通知橋接器
 
 `codex_notify.ps1`、`vscode_agent_notify.ps1`、`opencode_notify.ps1`、
-`claude_code_notify.ps1` 與 `gemini_cli_notify.ps1` 是 Open Desktop Pet 的 Windows 本機通知橋接器。Codex App、VS Code Codex、Codex CLI、VS Code Copilot、終端機 OpenCode、Claude Code 與 Gemini CLI
+`claude_code_notify.ps1`、`gemini_cli_notify.ps1` 與 `antigravity_cli_notify.ps1` 是 Open Desktop Pet 的 Windows 本機通知橋接器。Codex App、VS Code Codex、Codex CLI、VS Code Copilot、終端機 OpenCode、Claude Code、Gemini CLI 與 Antigravity CLI
 共用桌寵的一個 `127.0.0.1` UDP 通訊埠；橋接器會先判斷來源與目標屬地，
 桌寵再統一處理氣泡與視窗切換。
 
@@ -18,6 +18,7 @@
 
 Claude Code bridge 的診斷檔為 `%TEMP%\OpenDesktopPet-claude-code-notify.log`。
 Gemini CLI bridge 的診斷檔為 `%TEMP%\OpenDesktopPet-gemini-cli-notify.log`。
+Antigravity CLI bridge 的診斷檔為 `%TEMP%\OpenDesktopPet-antigravity-cli-notify.log`。
 
 ## 安裝 Codex 設定
 
@@ -115,7 +116,7 @@ CLI、VS Code Extension 與 Claude Desktop 的本機 Code session 共用這份�
 
 Claude Code bridge 只送出完成、等待或錯誤狀態，不會將最後回答或完整對話內容傳給桌寵。
 
-## 安裝 Gemini CLI hooks
+## 安裝 Gemini CLI 舊版 hooks
 
 桌寵會將 Gemini CLI 的 `AfterAgent` 與 `Notification`（只匹配
 `ToolPermission`）hooks 安裝到：
@@ -124,7 +125,7 @@ Claude Code bridge 只送出完成、等待或錯誤狀態，不會將最後回�
 %USERPROFILE%\.gemini\settings.json
 ```
 
-Gemini CLI 第一版只支援終端機。安裝器會保留原本的 Gemini 設定與其他 hooks，
+Gemini CLI 舊版只支援終端機，適用於企業帳號或 API Key。安裝器會保留原本的 Gemini 設定與其他 hooks，
 bridge 只送出完成或權限等待狀態，不會把回答或完整對話內容傳給桌寵：
 
 ```powershell
@@ -138,6 +139,29 @@ bridge 只送出完成或權限等待狀態，不會把回答或完整對話內�
 ```
 
 安裝或解除安裝後請重新啟動 VS Code、Codex、OpenCode、Claude Code／Claude Desktop 或 Gemini CLI。
+
+## 安裝 Antigravity CLI hooks
+
+Antigravity CLI（命令為 `agy`）的通知使用官方 `Stop` hook，設定檔位於：
+
+```text
+%USERPROFILE%\.gemini\config\hooks.json
+```
+
+Antigravity CLI 只送出完成或錯誤狀態，不會把回答、提示詞或完整對話內容傳給桌寵。安裝器會保留其他 hooks，
+只管理自己的 `open-desktop-pet` hook：
+
+```powershell
+.\install_antigravity_cli_integration.ps1
+```
+
+解除安裝：
+
+```powershell
+.\install_antigravity_cli_integration.ps1 -Uninstall
+```
+
+安裝或解除安裝後請重新啟動 Antigravity CLI。桌寵的開關仍採懶載入，只有開啟通知且缺少或失效時才會執行安裝器。
 
 ## 通知 payload
 
@@ -167,7 +191,10 @@ tools/
 ├─ claude_code_notify.ps1
 ├─ Install-Gemini-CLI-Integration.cmd
 ├─ install_gemini_cli_integration.ps1
-└─ gemini_cli_notify.ps1
+├─ gemini_cli_notify.ps1
+├─ Install-Antigravity-CLI-Integration.cmd
+├─ install_antigravity_cli_integration.ps1
+└─ antigravity_cli_notify.ps1
 ```
 
 若已有建置好的 EXE，可以用以下指令準備發布資料夾：

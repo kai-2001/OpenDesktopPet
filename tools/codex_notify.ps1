@@ -61,6 +61,32 @@ function Get-ProcessTreeContainsCodexApp {
     return $false
 }
 
+function Get-ProcessTreeContainsVsCode {
+	if ([string]$env:OPEN_DESKTOP_PET_SKIP_PROCESS_TREE -eq '1') {
+		return $false
+	}
+	try {
+        $parentId = $PID
+        for ($index = 0; $index -lt 8 -and $parentId -gt 0; $index++) {
+            $process = Get-CimInstance Win32_Process -Filter "ProcessId = $parentId"
+            if ($null -eq $process) {
+                break
+            }
+            $processName = [string]$process.Name
+            $commandLine = [string]$process.CommandLine
+			$isVsCodeProcess = $processName -match '(?i)^(code|code-insiders)\.exe$'
+			$isVsCodeCommand = $commandLine -match '(?i)\\Microsoft VS Code\\'
+			if ($isVsCodeProcess -or $isVsCodeCommand) {
+				return $true
+			}
+            $parentId = [int]$process.ParentProcessId
+        }
+    } catch {
+        # Process inspection is only a source hint; never block the hook.
+    }
+    return $false
+}
+
 function Invoke-PreviousNotify([string]$eventJson) {
     if (-not (Test-Path -LiteralPath $previousNotifyFile)) {
         return
@@ -91,16 +117,17 @@ function Invoke-PreviousNotify([string]$eventJson) {
 
 function Get-CodexTarget([object]$event) {
 	$cwd = [string]$event.cwd
+	$isVsCodeEnvironment =
+		([string]$env:TERM_PROGRAM).ToLowerInvariant() -eq 'vscode' -or
+		-not [string]::IsNullOrWhiteSpace([string]$env:VSCODE_PID) -or
+		(Get-ProcessTreeContainsVsCode)
+	if ($isVsCodeEnvironment) {
+		return [ordered]@{ source = 'codex_vscode'; target_app = 'vscode'; target_executable = 'Code.exe'; flag = 'open_desktop_pet_vscode_codex_enabled.txt' }
+	}
+
 	if ($cwd -match '(?i)\\WindowsApps\\OpenAI\.Codex_[^\\]+\\' -or
 		(Get-ProcessTreeContainsCodexApp)) {
 		return [ordered]@{ source = 'codex_app'; target_app = 'codex_app'; target_executable = 'ChatGPT.exe'; flag = 'open_desktop_pet_codex_app_enabled.txt' }
-	}
-
-	$isVsCodeEnvironment =
-		([string]$env:TERM_PROGRAM).ToLowerInvariant() -eq 'vscode' -or
-		-not [string]::IsNullOrWhiteSpace([string]$env:VSCODE_PID)
-	if ($isVsCodeEnvironment) {
-		return [ordered]@{ source = 'codex_vscode'; target_app = 'vscode'; target_executable = 'Code.exe'; flag = 'open_desktop_pet_vscode_codex_enabled.txt' }
 	}
 
 	return [ordered]@{ source = 'codex_cli'; target_app = 'terminal'; target_executable = 'WindowsTerminal.exe'; flag = 'open_desktop_pet_terminal_codex_enabled.txt' }

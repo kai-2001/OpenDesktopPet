@@ -47,6 +47,7 @@ var _agent_claude_vscode_enabled_toggle: Button
 var _agent_claude_app_enabled_toggle: Button
 var _agent_claude_terminal_enabled_toggle: Button
 var _agent_gemini_terminal_enabled_toggle: Button
+var _agent_agy_terminal_enabled_toggle: Button
 var _agent_port_spin_box: SpinBox
 var _agent_status_label: Label
 var _vscode_executable_line_edit: LineEdit
@@ -687,6 +688,9 @@ func _build_stats_window() -> void:
 	_stats_window_coordinator.gemini_terminal_enabled = (
 		_codex_controller != null and _codex_controller.gemini_terminal_enabled
 	)
+	_stats_window_coordinator.agy_terminal_enabled = (
+		_codex_controller != null and _codex_controller.agy_terminal_enabled
+	)
 	_stats_window_coordinator.codex_port = (
 		_codex_controller.port
 		if _codex_controller != null
@@ -769,6 +773,9 @@ func _build_stats_window() -> void:
 	)
 	_agent_gemini_terminal_enabled_toggle = (
 		agent_refs["gemini_terminal_enabled_toggle"] as Button
+	)
+	_agent_agy_terminal_enabled_toggle = (
+		agent_refs["agy_terminal_enabled_toggle"] as Button
 	)
 	_vscode_executable_line_edit = (
 		agent_refs["vscode_executable_line_edit"] as LineEdit
@@ -854,6 +861,9 @@ func _connect_details_window_signals() -> void:
 	)
 	_details_window_controller.agent_gemini_terminal_enabled_toggled.connect(
 		_on_gemini_terminal_enabled_toggled
+	)
+	_details_window_controller.agent_agy_terminal_enabled_toggled.connect(
+		_on_agy_terminal_enabled_toggled
 	)
 	_details_window_controller.agent_port_changed.connect(_on_agent_port_changed)
 	_details_window_controller.vscode_executable_path_changed.connect(
@@ -1288,6 +1298,11 @@ func _update_agent_enabled_toggles() -> void:
 			"set_enabled_state",
 			_codex_controller != null and _codex_controller.gemini_terminal_enabled
 		)
+	if is_instance_valid(_agent_agy_terminal_enabled_toggle):
+		_agent_agy_terminal_enabled_toggle.call(
+			"set_enabled_state",
+			_codex_controller != null and _codex_controller.agy_terminal_enabled
+		)
 
 
 func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
@@ -1369,6 +1384,7 @@ func _destroy_stats_window() -> void:
 	_agent_claude_app_enabled_toggle = null
 	_agent_claude_terminal_enabled_toggle = null
 	_agent_gemini_terminal_enabled_toggle = null
+	_agent_agy_terminal_enabled_toggle = null
 	_agent_port_spin_box = null
 	_agent_status_label = null
 	_vscode_executable_line_edit = null
@@ -1592,6 +1608,18 @@ func _on_gemini_terminal_enabled_toggled(enabled: bool) -> void:
 	if _codex_controller == null:
 		return
 	_codex_controller.set_gemini_terminal_enabled(enabled)
+	if enabled:
+		_codex_controller.refresh_executable_paths_if_invalid(
+			[CodexIntegrationControllerScript.TARGET_TERMINAL]
+		)
+	_apply_agent_control_state()
+	call_deferred("_apply_agent_control_state")
+
+
+func _on_agy_terminal_enabled_toggled(enabled: bool) -> void:
+	if _codex_controller == null:
+		return
+	_codex_controller.set_agy_terminal_enabled(enabled)
 	if enabled:
 		_codex_controller.refresh_executable_paths_if_invalid(
 			[CodexIntegrationControllerScript.TARGET_TERMINAL]

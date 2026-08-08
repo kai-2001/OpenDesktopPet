@@ -45,6 +45,14 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw 'Gemini CLI notification bridge checks failed.'
 }
+& (Join-Path $PSScriptRoot 'antigravity_cli_integration_installer_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Antigravity CLI integration installer checks failed.'
+}
+& (Join-Path $PSScriptRoot 'antigravity_cli_notify_bridge_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Antigravity CLI notification bridge checks failed.'
+}
 $isolatedAppData = Join-Path $env:TEMP (
     'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')
 )
