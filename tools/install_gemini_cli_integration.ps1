@@ -46,7 +46,11 @@ function Get-Settings {
 function Save-Settings($settings) {
     New-Item -ItemType Directory -Force -Path $geminiHome | Out-Null
     $tempPath = "$settingsPath.open-desktop-pet.tmp"
-    $settings | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $tempPath -Encoding UTF8
+    $json = $settings | ConvertTo-Json -Depth 20
+    # Windows PowerShell 5.1's `-Encoding UTF8` writes a BOM. Gemini CLI
+    # parses settings with JSON.parse, which rejects that leading marker.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($tempPath, $json, $utf8NoBom)
     Move-Item -LiteralPath $tempPath -Destination $settingsPath -Force
 }
 

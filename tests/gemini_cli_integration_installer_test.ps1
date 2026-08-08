@@ -33,6 +33,13 @@ try {
 
     & $installerPath | Out-Null
     $settings = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $settingsBytes = [System.IO.File]::ReadAllBytes($settingsPath)
+    Assert-Installer (-not (
+        $settingsBytes.Length -ge 3 -and
+        $settingsBytes[0] -eq 0xEF -and
+        $settingsBytes[1] -eq 0xBB -and
+        $settingsBytes[2] -eq 0xBF
+    )) 'Gemini installer wrote a UTF-8 BOM that Gemini CLI cannot parse.'
     $afterAgentCommands = @($settings.hooks.AfterAgent | ForEach-Object { $_.hooks.command })
     $notificationCommands = @($settings.hooks.Notification | ForEach-Object { $_.hooks.command })
     Assert-Installer ($afterAgentCommands.Count -eq 2) 'Gemini installer removed an existing AfterAgent hook.'
