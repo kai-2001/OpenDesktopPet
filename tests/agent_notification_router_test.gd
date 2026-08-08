@@ -10,12 +10,18 @@ func _init() -> void:
 func _run() -> void:
 	_assert_equal(RouterScript.normalize_agent("copilot_vscode"), "copilot")
 	_assert_equal(RouterScript.normalize_agent("opencode"), "opencode")
+	_assert_equal(RouterScript.normalize_agent("claude_code"), "claude")
+	_assert_equal(RouterScript.normalize_agent("gemini_cli"), "gemini")
 	_assert_equal(RouterScript.normalize_agent("codex_vscode"), "codex")
 	_assert_equal(
 		RouterScript.normalize_target_app("opencode-desktop"),
 		RouterScript.TARGET_OPENCODE_APP
 	)
 	_assert_equal(RouterScript.normalize_target_app("shell"), RouterScript.TARGET_TERMINAL)
+	_assert_equal(
+		RouterScript.normalize_target_app("claude-desktop"),
+		RouterScript.TARGET_CLAUDE_APP
+	)
 	_assert_equal(RouterScript.normalize_target_app("unknown"), RouterScript.TARGET_VSCODE)
 
 	var enabled_by_key := {
@@ -26,6 +32,10 @@ func _run() -> void:
 		"opencode_terminal": false,
 		"opencode_vscode": true,
 		"opencode_app": false,
+		"claude_terminal": false,
+		"claude_vscode": true,
+		"claude_app": false,
+		"gemini_terminal": true,
 	}
 	_assert_true(
 		RouterScript.is_notification_enabled(
@@ -46,10 +56,22 @@ func _run() -> void:
 		"OpenCode VS Code route is enabled"
 	)
 	_assert_true(
+		RouterScript.is_notification_enabled(
+			"claude_code", "claude", RouterScript.TARGET_VSCODE, enabled_by_key
+		),
+		"Claude Code VS Code route is enabled"
+	)
+	_assert_true(
 		not RouterScript.is_notification_enabled(
 			"opencode", "opencode", RouterScript.TARGET_TERMINAL, enabled_by_key
 		),
 		"OpenCode terminal route remains independently disabled"
+	)
+	_assert_true(
+		RouterScript.is_notification_enabled(
+			"gemini_cli", "gemini", RouterScript.TARGET_TERMINAL, enabled_by_key
+		),
+		"Gemini CLI terminal route is enabled"
 	)
 	print("AGENT_NOTIFICATION_ROUTER_TEST_OK")
 	quit(0)

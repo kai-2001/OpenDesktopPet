@@ -1,20 +1,23 @@
 # Agent 通知橋接器
 
-`codex_notify.ps1`、`vscode_agent_notify.ps1` 與 `opencode_notify.ps1` 是 Open Desktop Pet 的 Windows
-本機通知橋接器。Codex App、VS Code Codex、Codex CLI、VS Code Copilot 與終端機 OpenCode
+`codex_notify.ps1`、`vscode_agent_notify.ps1`、`opencode_notify.ps1`、
+`claude_code_notify.ps1` 與 `gemini_cli_notify.ps1` 是 Open Desktop Pet 的 Windows 本機通知橋接器。Codex App、VS Code Codex、Codex CLI、VS Code Copilot、終端機 OpenCode、Claude Code 與 Gemini CLI
 共用桌寵的一個 `127.0.0.1` UDP 通訊埠；橋接器會先判斷來源與目標屬地，
 桌寵再統一處理氣泡與視窗切換。
 
-桌寵內開啟「Agent 通知」後，它會將 Codex 的
-`agent-turn-complete` 轉成 UDP 訊息送到桌寵設定的本機通訊埠。關閉功能或
+桌寵內開啟「Agent 通知」後，橋接器會將 Agent 的完成、等待或錯誤狀態
+轉成 UDP 訊息送到桌寵設定的本機通訊埠。關閉功能或
 桌寵正常結束時，橋接器不會傳送 UDP。橋接器不依賴任何固定專案路徑，
-也不會轉送 Codex 回答、提示詞、程式碼或完整對話內容。
+也不會轉送 Agent 回答、提示詞、程式碼或完整對話內容。
 
 橋接器只記錄事件類型、工作目錄與處理結果，診斷檔位於：
 
 ```text
 %TEMP%\OpenDesktopPet-codex-notify.log
 ```
+
+Claude Code bridge 的診斷檔為 `%TEMP%\OpenDesktopPet-claude-code-notify.log`。
+Gemini CLI bridge 的診斷檔為 `%TEMP%\OpenDesktopPet-gemini-cli-notify.log`。
 
 ## 安裝 Codex 設定
 
@@ -89,7 +92,52 @@ OpenCode Desktop 的 Windows 下載檔目前叫做
 .\install_opencode_integration.ps1 -Uninstall
 ```
 
-安裝或解除安裝後請重新啟動 VS Code、Codex 或 OpenCode。
+## 安裝 Claude Code hooks
+
+桌寵會將 Claude Code 的 `Stop`、`Notification` 與 `StopFailure` hooks 安裝到：
+
+```text
+%USERPROFILE%\.claude\settings.json
+```
+
+CLI、VS Code Extension 與 Claude Desktop 的本機 Code session 共用這份設定；bridge
+會依執行環境分流到終端機、VS Code 或 Claude Desktop。安裝方式：
+
+```powershell
+.\install_claude_code_integration.ps1
+```
+
+解除安裝：
+
+```powershell
+.\install_claude_code_integration.ps1 -Uninstall
+```
+
+Claude Code bridge 只送出完成、等待或錯誤狀態，不會將最後回答或完整對話內容傳給桌寵。
+
+## 安裝 Gemini CLI hooks
+
+桌寵會將 Gemini CLI 的 `AfterAgent` 與 `Notification`（只匹配
+`ToolPermission`）hooks 安裝到：
+
+```text
+%USERPROFILE%\.gemini\settings.json
+```
+
+Gemini CLI 第一版只支援終端機。安裝器會保留原本的 Gemini 設定與其他 hooks，
+bridge 只送出完成或權限等待狀態，不會把回答或完整對話內容傳給桌寵：
+
+```powershell
+.\install_gemini_cli_integration.ps1
+```
+
+解除安裝：
+
+```powershell
+.\install_gemini_cli_integration.ps1 -Uninstall
+```
+
+安裝或解除安裝後請重新啟動 VS Code、Codex、OpenCode、Claude Code／Claude Desktop 或 Gemini CLI。
 
 ## 通知 payload
 
@@ -113,7 +161,13 @@ tools/
 ├─ vscode_agent_notify.ps1
 ├─ install_opencode_integration.ps1
 ├─ opencode_notify.ps1
-└─ opencode_notify_plugin.js
+├─ opencode_notify_plugin.js
+├─ Install-Claude-Code-Integration.cmd
+├─ install_claude_code_integration.ps1
+├─ claude_code_notify.ps1
+├─ Install-Gemini-CLI-Integration.cmd
+├─ install_gemini_cli_integration.ps1
+└─ gemini_cli_notify.ps1
 ```
 
 若已有建置好的 EXE，可以用以下指令準備發布資料夾：

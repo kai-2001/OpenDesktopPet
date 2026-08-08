@@ -537,6 +537,10 @@ func _init() -> void:
 		await process_frame
 	_assert_true(main.state.is_sleeping(), "sleep enters its persistent recovery state")
 	_assert_true(main.pet.is_busy(), "sleep animation keeps looping while asleep")
+	main._on_user_activity(Time.get_ticks_msec())
+	await process_frame
+	_assert_true(main.state.is_sleeping(), "mouse activity does not wake sleep state")
+	_assert_true(main.pet.is_busy(), "mouse activity does not cancel sleep animation")
 	_assert_true(
 		not main._can_act_autonomously(),
 		"autonomous actions cannot interrupt active sleep"

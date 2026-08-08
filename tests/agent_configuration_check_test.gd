@@ -21,10 +21,14 @@ func _init() -> void:
 func _run() -> void:
 	var codex_home := _test_root.path_join(".codex")
 	var integration_home := _test_root.path_join(".open-desktop-pet")
+	var claude_home := _test_root.path_join(".claude")
+	var gemini_home := _test_root.path_join(".gemini")
 	var controller = ControllerScript.new()
 	_assert_true(not controller.is_codex_configured(), "Codex starts invalid")
 	_assert_true(not controller.is_copilot_configured(), "Copilot starts invalid")
 	_assert_true(not controller.is_opencode_configured(), "OpenCode starts invalid")
+	_assert_true(not controller.is_claude_code_configured(), "Claude Code starts invalid")
+	_assert_true(not controller.is_gemini_cli_configured(), "Gemini CLI starts invalid")
 
 	_make_directory(codex_home)
 	_make_directory(integration_home)
@@ -61,6 +65,28 @@ func _run() -> void:
 	_assert_true(controller.is_opencode_configured(), "OpenCode plugin is detected")
 	_write(_test_root.path_join(".config/opencode/plugins/open-desktop-pet.js"), "// replaced")
 	_assert_true(not controller.is_opencode_configured(), "OpenCode plugin drift is detected")
+
+	_write(integration_home.path_join("open_desktop_pet_claude_code_installed.txt"), "OpenDesktopPet Claude Code notification hook")
+	_write(integration_home.path_join("claude_code_notify.ps1"), "# bridge")
+	_make_directory(claude_home)
+	_write(
+		claude_home.path_join("settings.json"),
+		"{\"hooks\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"claude_code_notify.ps1\"}]}]}}"
+	)
+	_assert_true(controller.is_claude_code_configured(), "Claude Code hook is detected")
+	_write(claude_home.path_join("settings.json"), "{\"hooks\":{}}")
+	_assert_true(not controller.is_claude_code_configured(), "Claude Code hook drift is detected")
+
+	_write(integration_home.path_join("open_desktop_pet_gemini_cli_installed.txt"), "OpenDesktopPet Gemini CLI notification hooks")
+	_write(integration_home.path_join("gemini_cli_notify.ps1"), "# bridge")
+	_make_directory(gemini_home)
+	_write(
+		gemini_home.path_join("settings.json"),
+		"{\"hooks\":{\"AfterAgent\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"gemini_cli_notify.ps1\"}]}],\"Notification\":[{\"matcher\":\"ToolPermission\",\"hooks\":[{\"type\":\"command\",\"command\":\"gemini_cli_notify.ps1\"}]}]}}"
+	)
+	_assert_true(controller.is_gemini_cli_configured(), "Gemini CLI hooks are detected")
+	_write(gemini_home.path_join("settings.json"), "{\"hooks\":{\"AfterAgent\":[]}}")
+	_assert_true(not controller.is_gemini_cli_configured(), "Gemini CLI hook drift is detected")
 
 	_cleanup()
 	print("AGENT_CONFIGURATION_CHECK_TEST_OK")

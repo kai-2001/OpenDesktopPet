@@ -95,10 +95,26 @@ Assert-Architecture ($codexController -match 'TARGET_TERMINAL') `
 	'Codex integration must define a separate terminal target.'
 Assert-Architecture ($codexController -match 'TARGET_OPENCODE_APP') `
 	'Codex integration must define a separate OpenCode Desktop target.'
+Assert-Architecture ($codexController -match 'TARGET_CLAUDE_APP') `
+	'Codex integration must define a separate Claude Desktop target.'
+Assert-Architecture ($codexController -match '_detect_claude_app_from_appx') `
+	'Claude Desktop detection must support Microsoft Store Appx installations.'
 Assert-Architecture ($codexController -match 'terminal_opencode_enabled') `
 	'Codex integration must keep OpenCode terminal state separate from Codex.'
 Assert-Architecture ($codexController -match '_run_opencode_configuration_tool') `
 	'Codex integration must configure OpenCode through its installer.'
+Assert-Architecture ($codexController -match '_run_claude_code_configuration_tool') `
+	'Codex integration must configure Claude Code through its installer.'
+Assert-Architecture ($codexController -match 'claude_vscode_enabled') `
+	'Codex integration must keep Claude Code VS Code state separate.'
+Assert-Architecture ($codexController -match 'claude_terminal_enabled') `
+	'Codex integration must keep Claude Code terminal state separate.'
+Assert-Architecture ($codexController -match 'gemini_terminal_enabled') `
+	'Codex integration must keep Gemini CLI terminal state separate.'
+Assert-Architecture ($codexController -match '_run_gemini_cli_configuration_tool') `
+	'Codex integration must configure Gemini CLI through its installer.'
+Assert-Architecture ($agentRouter -match 'gemini_terminal') `
+	'Agent notification routing must define a Gemini CLI terminal target.'
 Assert-Architecture ($codexController -match 'AgentNotificationRouterScript\.is_notification_enabled') `
 	'Codex notifications must be filtered by source target and enabled state.'
 Assert-Architecture ($agentRouter -match 'class_name AgentNotificationRouter') `

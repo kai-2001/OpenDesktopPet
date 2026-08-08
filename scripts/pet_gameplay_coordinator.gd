@@ -27,6 +27,11 @@ func can_begin_drag() -> bool:
 
 
 func cancel_autonomous_action() -> bool:
+	# Sleep is a persistent state action, not an autonomous animation. Mouse
+	# activity should stop idle rolls and moves, but must not leave the state
+	# sleeping while the visual has already been restored to idle.
+	if _state.is_sleeping():
+		return true
 	_cancel_move_tween()
 	return _pet.cancel_autonomous_action()
 

@@ -9,6 +9,7 @@ const TARGET_VSCODE := "vscode"
 const TARGET_CODEX_APP := "codex_app"
 const TARGET_TERMINAL := "terminal"
 const TARGET_OPENCODE_APP := "opencode_app"
+const TARGET_CLAUDE_APP := "claude_app"
 
 
 static func normalize_agent(value: String) -> String:
@@ -17,6 +18,10 @@ static func normalize_agent(value: String) -> String:
 		return "copilot"
 	if candidate.contains("opencode"):
 		return "opencode"
+	if candidate.contains("claude"):
+		return "claude"
+	if candidate.contains("gemini"):
+		return "gemini"
 	return "codex"
 
 
@@ -26,6 +31,8 @@ static func normalize_target_app(value: String) -> String:
 			return TARGET_CODEX_APP
 		TARGET_OPENCODE_APP, "opencode-desktop":
 			return TARGET_OPENCODE_APP
+		TARGET_CLAUDE_APP, "claude-desktop":
+			return TARGET_CLAUDE_APP
 		TARGET_TERMINAL, "shell", "powershell", "cmd":
 			return TARGET_TERMINAL
 		_:
@@ -37,6 +44,10 @@ static func display_name(source: String, agent: String) -> String:
 		return "Copilot"
 	if source == "opencode" or agent == "opencode":
 		return "OpenCode"
+	if source == "claude" or agent == "claude":
+		return "Claude Code"
+	if source == "gemini" or agent == "gemini":
+		return "Gemini CLI"
 	return "Codex"
 
 
@@ -46,6 +57,8 @@ static func target_display_name(target_app: String) -> String:
 			return "ChatGPT"
 		TARGET_OPENCODE_APP:
 			return "OpenCode"
+		TARGET_CLAUDE_APP:
+			return "Claude Desktop"
 		TARGET_TERMINAL:
 			return "終端機"
 		_:
@@ -63,6 +76,16 @@ static func notification_key(source: String, agent: String, target_app: String) 
 				return "opencode_vscode"
 			_:
 				return "opencode_terminal"
+	if source == "claude" or agent == "claude":
+		match target_app:
+			TARGET_CLAUDE_APP:
+				return "claude_app"
+			TARGET_VSCODE:
+				return "claude_vscode"
+			_:
+				return "claude_terminal"
+	if source == "gemini" or agent == "gemini":
+		return "gemini_terminal"
 	match target_app:
 		TARGET_CODEX_APP:
 			return "codex_app"

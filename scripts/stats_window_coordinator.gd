@@ -18,11 +18,16 @@ var terminal_opencode_enabled := false
 var vscode_opencode_enabled := false
 var opencode_app_enabled := false
 var copilot_enabled := false
+var claude_vscode_enabled := false
+var claude_app_enabled := false
+var claude_terminal_enabled := false
+var gemini_terminal_enabled := false
 var codex_port := CodexIntegrationControllerScript.DEFAULT_PORT
 var codex_executable_path := ""
 var codex_app_executable_path := ""
 var terminal_executable_path := ""
 var opencode_app_executable_path := ""
+var claude_app_executable_path := ""
 var autostart_supported := false
 var interaction_label: Callable
 var interaction_icon: Callable
@@ -100,11 +105,16 @@ func build(owner: Node) -> Dictionary:
 	details_controller.vscode_opencode_enabled = vscode_opencode_enabled
 	details_controller.opencode_app_enabled = opencode_app_enabled
 	details_controller.copilot_enabled = copilot_enabled
+	details_controller.claude_vscode_enabled = claude_vscode_enabled
+	details_controller.claude_app_enabled = claude_app_enabled
+	details_controller.claude_terminal_enabled = claude_terminal_enabled
+	details_controller.gemini_terminal_enabled = gemini_terminal_enabled
 	details_controller.agent_port = codex_port
 	details_controller.vscode_executable_path = codex_executable_path
 	details_controller.codex_app_executable_path = codex_app_executable_path
 	details_controller.terminal_executable_path = terminal_executable_path
 	details_controller.opencode_app_executable_path = opencode_app_executable_path
+	details_controller.claude_app_executable_path = claude_app_executable_path
 	details_controller.autostart_supported = autostart_supported
 	details_controller.interaction_label = interaction_label
 	details_controller.interaction_icon = interaction_icon

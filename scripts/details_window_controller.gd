@@ -16,11 +16,16 @@ signal agent_terminal_opencode_enabled_toggled(enabled: bool)
 signal agent_vscode_opencode_enabled_toggled(enabled: bool)
 signal agent_opencode_app_enabled_toggled(enabled: bool)
 signal agent_copilot_enabled_toggled(enabled: bool)
+signal agent_claude_vscode_enabled_toggled(enabled: bool)
+signal agent_claude_app_enabled_toggled(enabled: bool)
+signal agent_claude_terminal_enabled_toggled(enabled: bool)
+signal agent_gemini_terminal_enabled_toggled(enabled: bool)
 signal agent_port_changed(value: float)
 signal vscode_executable_path_changed(path: String)
 signal codex_app_executable_path_changed(path: String)
 signal terminal_executable_path_changed(path: String)
 signal opencode_app_executable_path_changed(path: String)
+signal claude_app_executable_path_changed(path: String)
 signal autostart_toggled(enabled: bool)
 signal character_selected(index: int)
 signal character_use_requested
@@ -40,11 +45,16 @@ var terminal_opencode_enabled := false
 var vscode_opencode_enabled := false
 var opencode_app_enabled := false
 var copilot_enabled := false
+var claude_vscode_enabled := false
+var claude_app_enabled := false
+var claude_terminal_enabled := false
+var gemini_terminal_enabled := false
 var agent_port := CodexIntegrationControllerScript.DEFAULT_PORT
 var vscode_executable_path := ""
 var codex_app_executable_path := ""
 var terminal_executable_path := ""
 var opencode_app_executable_path := ""
+var claude_app_executable_path := ""
 var autostart_supported := false
 var interaction_label: Callable
 var interaction_icon: Callable
@@ -372,6 +382,15 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Codex", codex_toggle))
 
+	var claude_vscode_toggle := CodexToggleSwitchScript.new()
+	claude_vscode_toggle.name = "ClaudeCodeVscodeEnabledToggle"
+	claude_vscode_toggle.tooltip_text = "開啟或關閉 VS Code 中的 Claude Code 通知"
+	claude_vscode_toggle.configure(theme_mode, claude_vscode_enabled)
+	claude_vscode_toggle.toggled.connect(
+		func(value: bool) -> void: agent_claude_vscode_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Claude Code", claude_vscode_toggle))
+
 	var copilot_toggle := CodexToggleSwitchScript.new()
 	copilot_toggle.name = "CopilotEnabledToggle"
 	copilot_toggle.tooltip_text = "開啟或關閉 Copilot Agent 通知"
@@ -439,6 +458,30 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	content.add_child(_build_agent_row("OpenCode", opencode_app_toggle))
 
 	content.add_child(HSeparator.new())
+	var claude_app_controls := _build_executable_path_controls(
+		content,
+		agent_scroll,
+		claude_app_executable_path,
+		"ClaudeAppExecutablePath",
+		"ClaudeAppExecutableBrowseButton",
+		"ClaudeAppExecutableHint",
+		"Claude",
+		"選擇 Claude.exe",
+		"選擇 Claude Code 執行檔",
+		"Claude",
+		false,
+		func(path: String) -> void: claude_app_executable_path_changed.emit(path)
+	)
+	var claude_app_toggle := CodexToggleSwitchScript.new()
+	claude_app_toggle.name = "ClaudeDesktopEnabledToggle"
+	claude_app_toggle.tooltip_text = "開啟或關閉 Claude Desktop Code 通知"
+	claude_app_toggle.configure(theme_mode, claude_app_enabled)
+	claude_app_toggle.toggled.connect(
+		func(value: bool) -> void: agent_claude_app_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Claude Code", claude_app_toggle))
+
+	content.add_child(HSeparator.new())
 	var terminal_controls := _build_executable_path_controls(
 		content,
 		agent_scroll,
@@ -470,6 +513,24 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		func(value: bool) -> void: agent_terminal_opencode_enabled_toggled.emit(value)
 	)
 	content.add_child(_build_agent_row("OpenCode", opencode_toggle))
+
+	var gemini_terminal_toggle := CodexToggleSwitchScript.new()
+	gemini_terminal_toggle.name = "GeminiCliTerminalEnabledToggle"
+	gemini_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Gemini CLI 通知"
+	gemini_terminal_toggle.configure(theme_mode, gemini_terminal_enabled)
+	gemini_terminal_toggle.toggled.connect(
+		func(value: bool) -> void: agent_gemini_terminal_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Gemini CLI", gemini_terminal_toggle))
+
+	var claude_terminal_toggle := CodexToggleSwitchScript.new()
+	claude_terminal_toggle.name = "ClaudeCodeTerminalEnabledToggle"
+	claude_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Claude Code 通知"
+	claude_terminal_toggle.configure(theme_mode, claude_terminal_enabled)
+	claude_terminal_toggle.toggled.connect(
+		func(value: bool) -> void: agent_claude_terminal_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Claude Code", claude_terminal_toggle))
 	_agent_executable_path_summaries = {
 		CodexIntegrationControllerScript.TARGET_VSCODE:
 			vscode_controls["summary"] as Label,
@@ -477,6 +538,8 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 			codex_app_controls["summary"] as Label,
 		CodexIntegrationControllerScript.TARGET_OPENCODE_APP:
 			opencode_app_controls["summary"] as Label,
+		CodexIntegrationControllerScript.TARGET_CLAUDE_APP:
+			claude_app_controls["summary"] as Label,
 		CodexIntegrationControllerScript.TARGET_TERMINAL:
 			terminal_controls["summary"] as Label,
 	}
@@ -497,6 +560,10 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		"opencode_app_enabled_toggle": opencode_app_toggle,
 		"terminal_codex_enabled_toggle": terminal_toggle,
 		"terminal_opencode_enabled_toggle": opencode_toggle,
+		"gemini_terminal_enabled_toggle": gemini_terminal_toggle,
+		"claude_vscode_enabled_toggle": claude_vscode_toggle,
+		"claude_app_enabled_toggle": claude_app_toggle,
+		"claude_terminal_enabled_toggle": claude_terminal_toggle,
 		"vscode_executable_line_edit": vscode_path_line_edit,
 		"vscode_executable_hint": vscode_controls["hint"] as Label,
 		"vscode_executable_summary": vscode_controls["summary"] as Label,
@@ -506,6 +573,9 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		"opencode_app_executable_line_edit": opencode_app_controls["line_edit"] as LineEdit,
 		"opencode_app_executable_hint": opencode_app_controls["hint"] as Label,
 		"opencode_app_executable_summary": opencode_app_controls["summary"] as Label,
+		"claude_app_executable_line_edit": claude_app_controls["line_edit"] as LineEdit,
+		"claude_app_executable_hint": claude_app_controls["hint"] as Label,
+		"claude_app_executable_summary": claude_app_controls["summary"] as Label,
 		"terminal_executable_line_edit": terminal_controls["line_edit"] as LineEdit,
 		"terminal_executable_hint": terminal_controls["hint"] as Label,
 		"terminal_executable_summary": terminal_controls["summary"] as Label,

@@ -18,23 +18,39 @@ const OPENCODE_VSCODE_ENABLED_FILE_NAME := "open_desktop_pet_opencode_vscode_ena
 const OPENCODE_APP_ENABLED_FILE_NAME := "open_desktop_pet_opencode_app_enabled.txt"
 const OPENCODE_TERMINAL_ENABLED_FILE_NAME := "open_desktop_pet_opencode_terminal_enabled.txt"
 const OPENCODE_APP_EXECUTABLE_PATH_FILE_NAME := "open_desktop_pet_opencode_app_executable_path.txt"
+const CLAUDE_CODE_ENABLED_FILE_NAME := "open_desktop_pet_claude_enabled.txt"
+const CLAUDE_CODE_VSCODE_ENABLED_FILE_NAME := "open_desktop_pet_claude_vscode_enabled.txt"
+const CLAUDE_CODE_APP_ENABLED_FILE_NAME := "open_desktop_pet_claude_app_enabled.txt"
+const CLAUDE_CODE_TERMINAL_ENABLED_FILE_NAME := "open_desktop_pet_claude_terminal_enabled.txt"
+const CLAUDE_CODE_APP_EXECUTABLE_PATH_FILE_NAME := "open_desktop_pet_claude_app_executable_path.txt"
+const GEMINI_CLI_ENABLED_FILE_NAME := "open_desktop_pet_gemini_enabled.txt"
 const LEGACY_ENABLED_FILE_NAME := "open_desktop_pet_notify_enabled.txt"
 const CODEX_INSTALL_MARKER := "open_desktop_pet_codex_installed.txt"
 const COPILOT_INSTALL_MARKER := "open_desktop_pet_copilot_installed.txt"
 const OPENCODE_INSTALL_MARKER := "open_desktop_pet_opencode_installed.txt"
+const CLAUDE_CODE_INSTALL_MARKER := "open_desktop_pet_claude_code_installed.txt"
+const GEMINI_CLI_INSTALL_MARKER := "open_desktop_pet_gemini_cli_installed.txt"
 const CODEX_CONFIG_FILE_NAME := "config.toml"
 const CODEX_NOTIFY_SCRIPT_FILE_NAME := "open_desktop_pet_notify.ps1"
 const COPILOT_HOOK_CONFIG_FILE_NAME := "open-desktop-pet.json"
 const COPILOT_NOTIFY_SCRIPT_FILE_NAME := "vscode_copilot_notify.ps1"
 const OPENCODE_PLUGIN_FILE_NAME := "open-desktop-pet.js"
 const OPENCODE_NOTIFY_SCRIPT_FILE_NAME := "opencode_notify.ps1"
+const CLAUDE_CODE_NOTIFY_SCRIPT_FILE_NAME := "claude_code_notify.ps1"
+const CLAUDE_CODE_SETTINGS_FILE_NAME := "settings.json"
+const GEMINI_CLI_NOTIFY_SCRIPT_FILE_NAME := "gemini_cli_notify.ps1"
+const GEMINI_CLI_SETTINGS_FILE_NAME := "settings.json"
 const CODEX_URI := "vscode://command/chatgpt.openSidebar"
+const CLAUDE_CODE_VSCODE_URI := "vscode://anthropic.claude-code/open"
 const TARGET_VSCODE := AgentNotificationRouterScript.TARGET_VSCODE
 const TARGET_CODEX_APP := AgentNotificationRouterScript.TARGET_CODEX_APP
 const TARGET_TERMINAL := AgentNotificationRouterScript.TARGET_TERMINAL
 const TARGET_OPENCODE_APP := AgentNotificationRouterScript.TARGET_OPENCODE_APP
+const TARGET_CLAUDE_APP := AgentNotificationRouterScript.TARGET_CLAUDE_APP
 
-signal notification_received(message: String, reaction_action: String, target_app: String)
+signal notification_received(
+	message: String, reaction_action: String, target_app: String, agent: String
+)
 signal state_changed
 signal configuration_failed(target_name: String)
 signal executable_path_detection_started(targets: Array)
@@ -49,14 +65,20 @@ var terminal_opencode_enabled := false
 var vscode_opencode_enabled := false
 var opencode_app_enabled := false
 var copilot_enabled := false
+var claude_vscode_enabled := false
+var claude_app_enabled := false
+var claude_terminal_enabled := false
+var gemini_terminal_enabled := false
 var port := DEFAULT_PORT
 var executable_path := ""
 var codex_app_executable_path := ""
 var terminal_executable_path := ""
 var opencode_app_executable_path := ""
+var claude_app_executable_path := ""
 var _receiver
 var _last_event_id := ""
 var _active_target_app := TARGET_VSCODE
+var _active_agent := "codex"
 var _window_activator
 var _executable_path_detection_thread: Thread
 var _active_executable_path_detection_targets: Array[String] = []
@@ -88,6 +110,18 @@ func load_settings() -> void:
 			config.get_value("opencode_app", "enabled", false)
 		)
 		copilot_enabled = bool(config.get_value("copilot", "enabled", false))
+		claude_vscode_enabled = bool(
+			config.get_value("claude_code_vscode", "enabled", false)
+		)
+		claude_app_enabled = bool(
+			config.get_value("claude_code_app", "enabled", false)
+		)
+		claude_terminal_enabled = bool(
+			config.get_value("claude_code_terminal", "enabled", false)
+		)
+		gemini_terminal_enabled = bool(
+			config.get_value("gemini_terminal", "enabled", false)
+		)
 		port = normalize_port(int(config.get_value("codex", "port", DEFAULT_PORT)))
 		executable_path = _normalize_executable_path(String(config.get_value(
 			"codex", "vscode_executable_path", config.get_value("codex", "executable_path", "")
@@ -100,6 +134,9 @@ func load_settings() -> void:
 		))
 		opencode_app_executable_path = _normalize_executable_path(String(
 			config.get_value("opencode_app", "executable_path", "")
+		))
+		claude_app_executable_path = _normalize_executable_path(String(
+			config.get_value("claude_code_app", "executable_path", "")
 		))
 	# Older builds stored the internal Codex.exe path for the desktop app.
 	# The visible ChatGPT/Codex desktop window is ChatGPT.exe, so migrate it
@@ -213,6 +250,46 @@ func set_opencode_app_enabled(value: bool) -> void:
 	_persist_agent_state()
 
 
+func set_claude_vscode_enabled(value: bool) -> void:
+	if value and DisplayServer.get_name() != "headless" \
+			and not _ensure_claude_code_configuration("Claude Code"):
+		claude_vscode_enabled = false
+		_persist_agent_state()
+		return
+	claude_vscode_enabled = value
+	_persist_agent_state()
+
+
+func set_claude_app_enabled(value: bool) -> void:
+	if value and DisplayServer.get_name() != "headless" \
+			and not _ensure_claude_code_configuration("Claude Desktop"):
+		claude_app_enabled = false
+		_persist_agent_state()
+		return
+	claude_app_enabled = value
+	_persist_agent_state()
+
+
+func set_claude_terminal_enabled(value: bool) -> void:
+	if value and DisplayServer.get_name() != "headless" \
+			and not _ensure_claude_code_configuration("Claude 終端機"):
+		claude_terminal_enabled = false
+		_persist_agent_state()
+		return
+	claude_terminal_enabled = value
+	_persist_agent_state()
+
+
+func set_gemini_terminal_enabled(value: bool) -> void:
+	if value and DisplayServer.get_name() != "headless" \
+			and not _ensure_gemini_cli_configuration():
+		gemini_terminal_enabled = false
+		_persist_agent_state()
+		return
+	gemini_terminal_enabled = value
+	_persist_agent_state()
+
+
 func set_codex_app_executable_path(value: String) -> void:
 	codex_app_executable_path = _normalize_executable_path(value)
 	_save_settings()
@@ -232,18 +309,31 @@ func set_opencode_app_executable_path(value: String) -> void:
 	state_changed.emit()
 
 
+func set_claude_app_executable_path(value: String) -> void:
+	claude_app_executable_path = _normalize_executable_path(value)
+	_save_settings()
+	_write_bridge_files()
+	state_changed.emit()
+
+
 func refresh_enabled_executable_paths_if_invalid() -> void:
 	var targets: Array[String] = []
 	if codex_enabled or copilot_enabled:
 		targets.append(TARGET_VSCODE)
 	if codex_app_enabled:
 		targets.append(TARGET_CODEX_APP)
-	if terminal_codex_enabled or terminal_opencode_enabled:
+	if terminal_codex_enabled or terminal_opencode_enabled or gemini_terminal_enabled:
 		targets.append(TARGET_TERMINAL)
 	if vscode_opencode_enabled:
 		targets.append(TARGET_VSCODE)
 	if opencode_app_enabled:
 		targets.append(TARGET_OPENCODE_APP)
+	if claude_vscode_enabled:
+		targets.append(TARGET_VSCODE)
+	if claude_app_enabled:
+		targets.append(TARGET_CLAUDE_APP)
+	if claude_terminal_enabled:
+		targets.append(TARGET_TERMINAL)
 	refresh_executable_paths_if_invalid(targets)
 
 
@@ -297,6 +387,8 @@ func _detect_invalid_executable_paths(path_snapshot: Dictionary) -> Dictionary:
 			detected_paths[target] = detect_terminal_executable()
 		elif target == TARGET_OPENCODE_APP:
 			detected_paths[target] = detect_opencode_app_executable()
+		elif target == TARGET_CLAUDE_APP:
+			detected_paths[target] = detect_claude_app_executable()
 	return detected_paths
 
 
@@ -347,7 +439,9 @@ func _stop_executable_path_detection() -> void:
 func is_any_enabled() -> bool:
 	return codex_enabled or codex_app_enabled or terminal_codex_enabled \
 		or terminal_opencode_enabled or vscode_opencode_enabled \
-		or opencode_app_enabled or copilot_enabled
+		or opencode_app_enabled or copilot_enabled \
+		or claude_vscode_enabled or claude_app_enabled or claude_terminal_enabled \
+		or gemini_terminal_enabled
 
 
 func is_running() -> bool:
@@ -406,6 +500,41 @@ func is_opencode_configured() -> bool:
 		and plugin_text.contains("session.idle")
 
 
+func is_claude_code_configured() -> bool:
+	var integration_home := _integration_home_path()
+	if integration_home.is_empty():
+		return false
+	if not FileAccess.file_exists(integration_home.path_join(CLAUDE_CODE_INSTALL_MARKER)):
+		return false
+	if not FileAccess.file_exists(
+		integration_home.path_join(CLAUDE_CODE_NOTIFY_SCRIPT_FILE_NAME)
+	):
+		return false
+	var settings_text := _read_text_file(
+		_claude_home_path().path_join(CLAUDE_CODE_SETTINGS_FILE_NAME)
+	)
+	return settings_text.contains(CLAUDE_CODE_NOTIFY_SCRIPT_FILE_NAME) \
+		and settings_text.contains('"Stop"')
+
+
+func is_gemini_cli_configured() -> bool:
+	var integration_home := _integration_home_path()
+	if integration_home.is_empty():
+		return false
+	if not FileAccess.file_exists(integration_home.path_join(GEMINI_CLI_INSTALL_MARKER)):
+		return false
+	if not FileAccess.file_exists(
+		integration_home.path_join(GEMINI_CLI_NOTIFY_SCRIPT_FILE_NAME)
+	):
+		return false
+	var settings_text := _read_text_file(
+		_gemini_home_path().path_join(GEMINI_CLI_SETTINGS_FILE_NAME)
+	)
+	return settings_text.contains(GEMINI_CLI_NOTIFY_SCRIPT_FILE_NAME) \
+		and settings_text.contains('"AfterAgent"') \
+		and settings_text.contains('"Notification"')
+
+
 func _ensure_codex_configuration(target_name: String) -> bool:
 	if is_codex_configured():
 		return true
@@ -430,6 +559,24 @@ func _ensure_opencode_configuration() -> bool:
 	if _run_opencode_configuration_tool() and is_opencode_configured():
 		return true
 	configuration_failed.emit("終端機 OpenCode")
+	return false
+
+
+func _ensure_claude_code_configuration(target_name: String) -> bool:
+	if is_claude_code_configured():
+		return true
+	if _run_claude_code_configuration_tool() and is_claude_code_configured():
+		return true
+	configuration_failed.emit(target_name)
+	return false
+
+
+func _ensure_gemini_cli_configuration() -> bool:
+	if is_gemini_cli_configured():
+		return true
+	if _run_gemini_cli_configuration_tool() and is_gemini_cli_configured():
+		return true
+	configuration_failed.emit("Gemini CLI 終端機")
 	return false
 
 
@@ -463,6 +610,15 @@ func _ensure_enabled_configurations() -> void:
 			vscode_opencode_enabled = false
 			opencode_app_enabled = false
 			changed = true
+	if claude_vscode_enabled or claude_app_enabled or claude_terminal_enabled:
+		if not _ensure_claude_code_configuration("Claude Code"):
+			claude_vscode_enabled = false
+			claude_app_enabled = false
+			claude_terminal_enabled = false
+			changed = true
+	if gemini_terminal_enabled and not _ensure_gemini_cli_configuration():
+		gemini_terminal_enabled = false
+		changed = true
 	if changed:
 		_save_settings()
 
@@ -472,19 +628,21 @@ func focus_vscode_interface() -> bool:
 
 
 func focus_codex_interface() -> bool:
-	return _focus_target(_active_target_app)
+	return _focus_target(_active_target_app, _active_agent)
 
 
 func focus_current_target() -> bool:
-	return _focus_target(_active_target_app)
+	return _focus_target(_active_target_app, _active_agent)
 
 
-func focus_target(target_app: String) -> bool:
+func focus_target(target_app: String, agent := "") -> bool:
 	var normalized_target := AgentNotificationRouterScript.normalize_target_app(
 		target_app.to_lower()
 	)
 	_active_target_app = normalized_target
-	return _focus_target(normalized_target)
+	if not String(agent).is_empty():
+		_active_agent = AgentNotificationRouterScript.normalize_agent(agent)
+	return _focus_target(normalized_target, _active_agent)
 
 
 func has_native_window_focus_support() -> bool:
@@ -606,6 +764,53 @@ func detect_opencode_app_executable() -> String:
 	return ""
 
 
+func detect_claude_app_executable() -> String:
+	var candidates: Array[String] = []
+	var local_app_data := OS.get_environment("LOCALAPPDATA")
+	var app_data := OS.get_environment("APPDATA")
+	var program_files := OS.get_environment("ProgramFiles")
+	var program_files_x86 := OS.get_environment("ProgramFiles(x86)")
+	for base_path: String in [local_app_data, app_data, program_files, program_files_x86]:
+		if base_path.is_empty():
+			continue
+		candidates.append(base_path.path_join("Claude/Claude.exe"))
+		candidates.append(base_path.path_join("Anthropic/Claude/Claude.exe"))
+		candidates.append(base_path.path_join("Programs/Claude/Claude.exe"))
+	for path_entry: String in OS.get_environment("PATH").split(";", false):
+		var directory := path_entry.strip_edges().trim_prefix('"').trim_suffix('"')
+		if not directory.is_empty():
+			candidates.append(directory.path_join("Claude.exe"))
+	for candidate: String in candidates:
+		if FileAccess.file_exists(candidate):
+			return candidate.simplify_path()
+	var appx_detected := _detect_claude_app_from_appx()
+	if not appx_detected.is_empty():
+		return appx_detected
+	return ""
+
+
+func _detect_claude_app_from_appx() -> String:
+	if OS.get_name() != "Windows":
+		return ""
+	var output: Array = []
+	var command := "Get-AppxPackage -Name '*Claude*' -ErrorAction SilentlyContinue | ForEach-Object { if ([string]$_.InstallLocation) { Join-Path ([string]$_.InstallLocation) 'app\\Claude.exe'; Join-Path ([string]$_.InstallLocation) 'Claude.exe' } }"
+	var exit_code := OS.execute(
+		"powershell.exe",
+		PackedStringArray(["-NoProfile", "-Command", command]),
+		output,
+		true,
+		false
+	)
+	if exit_code != 0:
+		return ""
+	for value: Variant in output:
+		for line: String in String(value).split("\n", false):
+			var candidate := line.strip_edges().trim_prefix('"').trim_suffix('"')
+			if FileAccess.file_exists(candidate):
+				return candidate.simplify_path()
+	return ""
+
+
 func _detect_opencode_app_from_uninstall_registry() -> String:
 	if OS.get_name() != "Windows":
 		return ""
@@ -673,12 +878,17 @@ func _handle_notification(notification: Dictionary) -> void:
 		"opencode_terminal": terminal_opencode_enabled,
 		"opencode_vscode": vscode_opencode_enabled,
 		"opencode_app": opencode_app_enabled,
+		"claude_terminal": claude_terminal_enabled,
+		"claude_vscode": claude_vscode_enabled,
+		"claude_app": claude_app_enabled,
+		"gemini_terminal": gemini_terminal_enabled,
 	}
 	if not AgentNotificationRouterScript.is_notification_enabled(
 			source, agent, target_app, enabled_by_key
 	):
 		return
 	_active_target_app = target_app
+	_active_agent = agent
 	var thread_id := String(notification.get("thread_id", notification.get("thread-id", "")))
 	var turn_id := String(notification.get("turn_id", notification.get("turn-id", "")))
 	var session_id := String(notification.get("session_id", notification.get("session-id", "")))
@@ -697,17 +907,17 @@ func _handle_notification(notification: Dictionary) -> void:
 		"agent-turn-complete", "codex_done", "completed", "done":
 			notification_received.emit(
 				"%s 已完成這一輪，可以切回 %s 查看結果。" % [display_name, target_name],
-				"pet", target_app
+				"pet", target_app, agent
 			)
 		"codex_waiting", "waiting", "approval-requested":
 			notification_received.emit(
 				"%s 正在等待你回到 %s 處理下一步。" % [display_name, target_name],
-				"idle", target_app
+				"idle", target_app, agent
 			)
 		"codex_error", "failed", "error":
 			notification_received.emit(
 				"%s 發生錯誤，請回到 %s 查看。" % [display_name, target_name],
-				"idle", target_app
+				"idle", target_app, agent
 			)
 
 func _save_settings() -> void:
@@ -727,6 +937,11 @@ func _save_settings() -> void:
 	config.set_value("opencode_app", "enabled", opencode_app_enabled)
 	config.set_value("opencode_app", "executable_path", opencode_app_executable_path)
 	config.set_value("copilot", "enabled", copilot_enabled)
+	config.set_value("claude_code_vscode", "enabled", claude_vscode_enabled)
+	config.set_value("claude_code_app", "enabled", claude_app_enabled)
+	config.set_value("claude_code_app", "executable_path", claude_app_executable_path)
+	config.set_value("claude_code_terminal", "enabled", claude_terminal_enabled)
+	config.set_value("gemini_terminal", "enabled", gemini_terminal_enabled)
 	config.save(UI_SETTINGS_PATH)
 
 
@@ -781,6 +996,20 @@ func _codex_home_path() -> String:
 	return user_profile.path_join(".codex")
 
 
+func _claude_home_path() -> String:
+	var user_profile := _user_profile_path()
+	if user_profile.is_empty():
+		return ""
+	return user_profile.path_join(".claude")
+
+
+func _gemini_home_path() -> String:
+	var user_profile := _user_profile_path()
+	if user_profile.is_empty():
+		return ""
+	return user_profile.path_join(".gemini")
+
+
 func _integration_home_path() -> String:
 	var user_profile := _user_profile_path()
 	if user_profile.is_empty():
@@ -831,6 +1060,32 @@ func _write_agent_bridge_files(
 		directory.path_join(OPENCODE_TERMINAL_ENABLED_FILE_NAME),
 		terminal_opencode_enabled and not disable_all
 	)
+	_write_flag(
+		directory.path_join(CLAUDE_CODE_VSCODE_ENABLED_FILE_NAME),
+		claude_vscode_enabled and not disable_all
+	)
+	_write_flag(
+		directory.path_join(CLAUDE_CODE_APP_ENABLED_FILE_NAME),
+		claude_app_enabled and not disable_all
+	)
+	_write_flag(
+		directory.path_join(CLAUDE_CODE_TERMINAL_ENABLED_FILE_NAME),
+		claude_terminal_enabled and not disable_all
+	)
+	_write_flag(
+		directory.path_join(CLAUDE_CODE_ENABLED_FILE_NAME),
+		(
+			claude_vscode_enabled or claude_app_enabled or claude_terminal_enabled
+		) and not disable_all
+	)
+	_write_flag(
+		directory.path_join(GEMINI_CLI_ENABLED_FILE_NAME),
+		gemini_terminal_enabled and not disable_all
+	)
+	_write_text_file(
+		directory.path_join(CLAUDE_CODE_APP_EXECUTABLE_PATH_FILE_NAME),
+		claude_app_executable_path
+	)
 	_write_text_file(
 		directory.path_join(OPENCODE_APP_EXECUTABLE_PATH_FILE_NAME),
 		opencode_app_executable_path
@@ -878,15 +1133,16 @@ func _write_text_file(path: String, value: String) -> void:
 		file.close()
 
 
-func _focus_target(target_app: String) -> bool:
+func _focus_target(target_app: String, agent := "") -> bool:
 	var target_path := _target_executable_path(target_app)
 	if not _has_valid_executable_path(target_path) or _window_activator == null:
 		return false
 	if target_app == TARGET_VSCODE:
+		var uri := CLAUDE_CODE_VSCODE_URI if agent == "claude" else CODEX_URI
 		var process_id := OS.create_process(target_path, [
 			"--reuse-window",
 			"--open-url",
-			CODEX_URI,
+			uri,
 		])
 		if process_id == -1:
 			return false
@@ -918,6 +1174,8 @@ func _executable_path_for_target(target_app: String) -> String:
 			return codex_app_executable_path
 		TARGET_OPENCODE_APP:
 			return opencode_app_executable_path
+		TARGET_CLAUDE_APP:
+			return claude_app_executable_path
 		TARGET_TERMINAL:
 			return terminal_executable_path
 		_:
@@ -930,6 +1188,8 @@ func _set_executable_path_for_target(target_app: String, path: String) -> void:
 			codex_app_executable_path = path
 		TARGET_OPENCODE_APP:
 			opencode_app_executable_path = path
+		TARGET_CLAUDE_APP:
+			claude_app_executable_path = path
 		TARGET_TERMINAL:
 			terminal_executable_path = path
 		_:
@@ -1000,6 +1260,40 @@ func _run_copilot_configuration_tool() -> bool:
 
 func _run_opencode_configuration_tool() -> bool:
 	var installer_path := _tool_path("install_opencode_integration.ps1")
+	if not FileAccess.file_exists(installer_path):
+		return false
+	var output: Array = []
+	var exit_code := OS.execute("powershell.exe", [
+		"-NoProfile",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-WindowStyle",
+		"Hidden",
+		"-File",
+		installer_path,
+	], output, true, false)
+	return exit_code == 0
+
+
+func _run_claude_code_configuration_tool() -> bool:
+	var installer_path := _tool_path("install_claude_code_integration.ps1")
+	if not FileAccess.file_exists(installer_path):
+		return false
+	var output: Array = []
+	var exit_code := OS.execute("powershell.exe", [
+		"-NoProfile",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-WindowStyle",
+		"Hidden",
+		"-File",
+		installer_path,
+	], output, true, false)
+	return exit_code == 0
+
+
+func _run_gemini_cli_configuration_tool() -> bool:
+	var installer_path := _tool_path("install_gemini_cli_integration.ps1")
 	if not FileAccess.file_exists(installer_path):
 		return false
 	var output: Array = []

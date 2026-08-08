@@ -43,6 +43,12 @@ foreach ($fileName in @(
     'install_opencode_integration.ps1',
     'opencode_notify.ps1',
     'opencode_notify_plugin.js',
+    'Install-Claude-Code-Integration.cmd',
+    'install_claude_code_integration.ps1',
+    'claude_code_notify.ps1',
+    'Install-Gemini-CLI-Integration.cmd',
+    'install_gemini_cli_integration.ps1',
+    'gemini_cli_notify.ps1',
     'README.md'
 )) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $fileName) -Destination (Join-Path $toolsOutput $fileName) -Force

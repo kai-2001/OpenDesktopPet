@@ -29,6 +29,22 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw 'OpenCode notification bridge checks failed.'
 }
+& (Join-Path $PSScriptRoot 'claude_code_integration_installer_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Claude Code integration installer checks failed.'
+}
+& (Join-Path $PSScriptRoot 'claude_code_notify_bridge_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+	throw 'Claude Code notification bridge checks failed.'
+}
+& (Join-Path $PSScriptRoot 'gemini_cli_integration_installer_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Gemini CLI integration installer checks failed.'
+}
+& (Join-Path $PSScriptRoot 'gemini_cli_notify_bridge_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Gemini CLI notification bridge checks failed.'
+}
 $isolatedAppData = Join-Path $env:TEMP (
     'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')
 )
