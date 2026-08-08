@@ -26,6 +26,10 @@ try {
     $pluginText = Get-Content -LiteralPath $pluginPath -Raw -Encoding UTF8
     Assert-Installer ($pluginText.Contains('session.idle')) 'Plugin does not listen for session.idle.'
     Assert-Installer ($pluginText.Contains('agent-turn-complete')) 'Plugin does not send completion events.'
+    Assert-Installer ($pluginText.Contains('node:child_process')) `
+        'OpenCode plugin must use the Node-compatible child process API.'
+    Assert-Installer (-not $pluginText.Contains('Bun.spawn')) `
+        'OpenCode Desktop plugin must not depend on Bun.spawn.'
     $bridgeText = Get-Content -LiteralPath $bridgePath -Raw -Encoding UTF8
     Assert-Installer ($bridgeText.Contains('schema_version = 1')) `
         'The OpenCode bridge must emit the normalized payload schema.'
