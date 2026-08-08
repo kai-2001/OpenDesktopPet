@@ -21,6 +21,14 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw 'Copilot integration installer checks failed.'
 }
+& (Join-Path $PSScriptRoot 'opencode_integration_installer_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'OpenCode integration installer checks failed.'
+}
+& (Join-Path $PSScriptRoot 'opencode_notify_bridge_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'OpenCode notification bridge checks failed.'
+}
 $isolatedAppData = Join-Path $env:TEMP (
     'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')
 )
@@ -39,6 +47,22 @@ try {
     $env:APPDATA = $isolatedAppData
     $env:CODEX_HOME = $isolatedCodexHome
     $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $agentConfigurationOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/agent_configuration_check_test.gd' 2>&1
+    $agentConfigurationExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+    $agentConfigurationOutput | Write-Output
+    if ($agentConfigurationExitCode -ne 0 -or -not ($agentConfigurationOutput -match 'AGENT_CONFIGURATION_CHECK_TEST_OK')) {
+        throw 'Agent configuration check validation failed.'
+    }
+
+    $agentRouterOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/agent_notification_router_test.gd' 2>&1
+    $agentRouterExitCode = $LASTEXITCODE
+    $agentRouterOutput | Write-Output
+    if ($agentRouterExitCode -ne 0 -or -not ($agentRouterOutput -match 'AGENT_NOTIFICATION_ROUTER_TEST_OK')) {
+        throw 'Agent notification router validation failed.'
+    }
+
     $ErrorActionPreference = 'Continue'
     $gameplayOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/gameplay_state_test.gd' 2>&1
     $gameplayExitCode = $LASTEXITCODE

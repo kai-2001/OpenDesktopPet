@@ -26,6 +26,7 @@ $statsCoordinator = Read-Source 'scripts/stats_window_coordinator.gd'
 $inputController = Read-Source 'scripts/pet_input_controller.gd'
 $characterCoordinator = Read-Source 'scripts/character_pack_coordinator.gd'
 $codexController = Read-Source 'scripts/codex_integration_controller.gd'
+$agentRouter = Read-Source 'scripts/agent_notification_router.gd'
 $windowsActivator = Read-Source 'native/windows/src/windows_window_activator.cpp'
 $windowsExtension = Read-Source 'native/windows/windows_window_activator.gdextension'
 $releasePreparation = Read-Source 'tools/prepare_windows_release.ps1'
@@ -92,8 +93,20 @@ Assert-Architecture ($codexController -match 'TARGET_CODEX_APP') `
 	'Codex integration must define a separate Codex App target.'
 Assert-Architecture ($codexController -match 'TARGET_TERMINAL') `
 	'Codex integration must define a separate terminal target.'
-Assert-Architecture ($codexController -match '_is_notification_enabled') `
+Assert-Architecture ($codexController -match 'TARGET_OPENCODE_APP') `
+	'Codex integration must define a separate OpenCode Desktop target.'
+Assert-Architecture ($codexController -match 'terminal_opencode_enabled') `
+	'Codex integration must keep OpenCode terminal state separate from Codex.'
+Assert-Architecture ($codexController -match '_run_opencode_configuration_tool') `
+	'Codex integration must configure OpenCode through its installer.'
+Assert-Architecture ($codexController -match 'AgentNotificationRouterScript\.is_notification_enabled') `
 	'Codex notifications must be filtered by source target and enabled state.'
+Assert-Architecture ($agentRouter -match 'class_name AgentNotificationRouter') `
+	'Agent notification routing rules must have their own cohesive module.'
+Assert-Architecture ($codexController -match 'AgentNotificationRouterScript') `
+	'Codex integration must delegate Agent routing rules to the shared router.'
+Assert-Architecture ($codexController -notmatch 'func _normalize_agent|func _target_display_name') `
+	'Codex integration must not own cross-Agent display and normalization rules.'
 Assert-Architecture ($codexController -match 'ClassDB\.instantiate\("WindowsWindowActivator"\)') `
 	'Codex focus must use the in-process Windows GDExtension.'
 Assert-Architecture ($codexController -match 'focus_executable') `

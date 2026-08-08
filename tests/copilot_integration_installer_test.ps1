@@ -42,6 +42,13 @@ try {
 		'The installer must add exactly one OpenDesktopPet hook.'
 	Assert-Installer (Test-Path -LiteralPath (Join-Path $testRoot '.open-desktop-pet\open_desktop_pet_copilot_installed.txt')) `
 		'The installer did not write the Copilot install marker.'
+	$bridgeText = Get-Content -LiteralPath (Join-Path $testRoot '.open-desktop-pet\vscode_copilot_notify.ps1') -Raw -Encoding UTF8
+	Assert-Installer ($bridgeText -match 'schema_version = 1') `
+		'The Copilot bridge must emit the normalized payload schema.'
+	Assert-Installer ($bridgeText -match "source = 'copilot_vscode'") `
+		'The Copilot bridge must identify its VS Code source.'
+	Assert-Installer ($bridgeText -match "target_executable = 'Code.exe'") `
+		'The Copilot bridge must identify the VS Code executable target.'
 
 	& $installerPath | Write-Output
 	$reinstalledConfig = Get-Content -LiteralPath $hookConfigPath -Raw | ConvertFrom-Json

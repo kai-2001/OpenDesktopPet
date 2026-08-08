@@ -11,6 +11,7 @@ $oldCodexHome = $env:CODEX_HOME
 $oldTermProgram = $env:TERM_PROGRAM
 $oldVscodePid = $env:VSCODE_PID
 $oldSkipProcessTree = $env:OPEN_DESKTOP_PET_SKIP_PROCESS_TREE
+$oldPreviousNotifyLog = $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG
 
 function Assert-Router([bool]$condition, [string]$message) {
     if (-not $condition) {
@@ -58,10 +59,26 @@ try {
     $env:TERM_PROGRAM = 'vscode'
     $env:VSCODE_PID = '1234'
 
+    $previousNotifyScript = Join-Path $testRoot 'previous-notify.ps1'
+    $previousNotifyLog = Join-Path $testRoot 'previous-notify-event.json'
+    @'
+param([string]$eventJson)
+Set-Content -LiteralPath $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG -Value $eventJson -Encoding UTF8
+'@ | Set-Content -LiteralPath $previousNotifyScript -Encoding UTF8
+    $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG = $previousNotifyLog
+    [pscustomobject]@{
+        command = @('powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $previousNotifyScript)
+    } | ConvertTo-Json -Compress | Set-Content -LiteralPath (
+        Join-Path $codexHome 'open_desktop_pet_previous_notify.json'
+    ) -Encoding UTF8
+
     $vscodeEvent = '{"type":"agent-turn-complete","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","thread-id":"vscode","turn-id":"1"}'
     $payload = Receive-Notification $vscodeEvent $true
     Assert-Router ($payload.source -eq 'codex_vscode') 'VS Code Codex source was not classified.'
     Assert-Router ($payload.target_app -eq 'vscode') 'VS Code Codex target was not classified.'
+    Assert-Router ($payload.agent -eq 'codex') 'Codex agent was not normalized.'
+    Assert-Router ($payload.target_executable -eq 'Code.exe') 'VS Code executable target was not normalized.'
+    Assert-Router (Test-Path -LiteralPath $previousNotifyLog) 'Previous Codex notify was not invoked.'
 
     $env:TERM_PROGRAM = ''
     $env:VSCODE_PID = ''
@@ -86,6 +103,7 @@ try {
     $env:TERM_PROGRAM = $oldTermProgram
     $env:VSCODE_PID = $oldVscodePid
     $env:OPEN_DESKTOP_PET_SKIP_PROCESS_TREE = $oldSkipProcessTree
+    $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG = $oldPreviousNotifyLog
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force
     }

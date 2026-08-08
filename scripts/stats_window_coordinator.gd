@@ -14,11 +14,15 @@ var last_state_message := "尚無紀錄"
 var codex_enabled := false
 var codex_app_enabled := false
 var terminal_codex_enabled := false
+var terminal_opencode_enabled := false
+var vscode_opencode_enabled := false
+var opencode_app_enabled := false
 var copilot_enabled := false
 var codex_port := CodexIntegrationControllerScript.DEFAULT_PORT
 var codex_executable_path := ""
 var codex_app_executable_path := ""
 var terminal_executable_path := ""
+var opencode_app_executable_path := ""
 var autostart_supported := false
 var interaction_label: Callable
 var interaction_icon: Callable
@@ -92,11 +96,15 @@ func build(owner: Node) -> Dictionary:
 	details_controller.codex_enabled = codex_enabled
 	details_controller.codex_app_enabled = codex_app_enabled
 	details_controller.terminal_codex_enabled = terminal_codex_enabled
+	details_controller.terminal_opencode_enabled = terminal_opencode_enabled
+	details_controller.vscode_opencode_enabled = vscode_opencode_enabled
+	details_controller.opencode_app_enabled = opencode_app_enabled
 	details_controller.copilot_enabled = copilot_enabled
 	details_controller.agent_port = codex_port
 	details_controller.vscode_executable_path = codex_executable_path
 	details_controller.codex_app_executable_path = codex_app_executable_path
 	details_controller.terminal_executable_path = terminal_executable_path
+	details_controller.opencode_app_executable_path = opencode_app_executable_path
 	details_controller.autostart_supported = autostart_supported
 	details_controller.interaction_label = interaction_label
 	details_controller.interaction_icon = interaction_icon

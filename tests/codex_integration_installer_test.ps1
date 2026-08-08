@@ -76,6 +76,41 @@ sandbox = "elevated"
     Assert-Installer ($wrappedConfig -match 'open_desktop_pet_notify\.ps1') `
         'The existing previous-notify desktop-pet bridge must be preserved.'
 
+    $genericConfig = @"
+model = "gpt-5.6-luna"
+
+notify = [
+  "powershell.exe",
+  "-NoProfile",
+  "-File",
+  "C:\\Tools\\other-notify.ps1"
+]
+
+[windows]
+sandbox = "elevated"
+"@
+    Set-Content -LiteralPath $configPath -Value $genericConfig -Encoding UTF8
+    & $installerPath | Out-Null
+    $chainedConfig = Get-Content -LiteralPath $configPath -Encoding UTF8 -Raw
+    $previousNotifyPath = Join-Path $testCodexHome 'open_desktop_pet_previous_notify.json'
+    Assert-Installer (Test-Path -LiteralPath $previousNotifyPath) `
+        'The installer must save an unrelated existing notify command.'
+    $previousDocument = Get-Content -LiteralPath $previousNotifyPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $previousNotify = @($previousDocument.command)
+    Assert-Installer ($previousNotify.Count -eq 4) `
+        'The saved previous notify command must keep every argument.'
+    Assert-Installer ($previousNotify[3] -eq 'C:\Tools\other-notify.ps1') `
+        'The saved previous notify path must be decoded from TOML.'
+    Assert-Installer ($chainedConfig -match 'open_desktop_pet_notify\.ps1') `
+        'The desktop-pet notify must be installed beside an unrelated notify command.'
+
+    & $installerPath -Uninstall | Out-Null
+    $restoredConfig = Get-Content -LiteralPath $configPath -Encoding UTF8 -Raw
+    Assert-Installer ($restoredConfig -match 'other-notify\.ps1') `
+        'Uninstall must restore the unrelated notify command.'
+    Assert-Installer (-not ($restoredConfig -match 'open_desktop_pet_notify\.ps1')) `
+        'Uninstall must remove the desktop-pet notify after restoring the previous command.'
+
     Write-Output 'CODEX_INTEGRATION_INSTALLER_TEST_OK'
 }
 finally {

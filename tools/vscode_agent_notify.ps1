@@ -4,11 +4,6 @@ $ErrorActionPreference = 'SilentlyContinue'
 # The hook must never block or change the agent's behavior.
 $notifyHost = '127.0.0.1'
 $notifyPort = 38571
-$codexHome = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
-    Join-Path $env:USERPROFILE '.codex'
-} else {
-    $env:CODEX_HOME
-}
 $integrationHome = Join-Path $env:USERPROFILE '.open-desktop-pet'
 $portFile = Join-Path $integrationHome 'open_desktop_pet_notify_port.txt'
 $enabledFile = Join-Path $integrationHome 'open_desktop_pet_copilot_enabled.txt'
@@ -72,10 +67,16 @@ try {
 
     $sessionId = [string]$event.session_id
     $payload = [ordered]@{
+        schema_version = 1
         type = 'agent-turn-complete'
-        source = 'vscode'
+        source = 'copilot_vscode'
         agent = 'copilot'
         target_app = 'vscode'
+        target_platform = 'vscode'
+        target_executable = 'Code.exe'
+        event_id = "copilot:vscode:{0}" -f $sessionId
+        thread_id = ''
+        turn_id = ''
         session_id = $sessionId
         cwd = [string]$event.cwd
         hook_event = 'Stop'
@@ -87,7 +88,7 @@ try {
     $udp.Dispose()
     Write-HookLog ("sent type=agent-turn-complete port={0}" -f $notifyPort)
 } catch {
-    Write-HookLog ("failed error-type={0}" -f $_.Exception.GetType().Name)
+    Write-HookLog ("failed error-type={0} message={1}" -f $_.Exception.GetType().Name, $_.Exception.Message)
 }
 
 Complete-Hook

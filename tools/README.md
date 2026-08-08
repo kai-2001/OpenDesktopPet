@@ -1,7 +1,7 @@
 # Agent 通知橋接器
 
-`codex_notify.ps1` 與 `vscode_agent_notify.ps1` 是 Open Desktop Pet 的 Windows
-本機通知橋接器。Codex App、VS Code Codex、Codex CLI 與 VS Code Copilot
+`codex_notify.ps1`、`vscode_agent_notify.ps1` 與 `opencode_notify.ps1` 是 Open Desktop Pet 的 Windows
+本機通知橋接器。Codex App、VS Code Codex、Codex CLI、VS Code Copilot 與終端機 OpenCode
 共用桌寵的一個 `127.0.0.1` UDP 通訊埠；橋接器會先判斷來源與目標屬地，
 桌寵再統一處理氣泡與視窗切換。
 
@@ -30,14 +30,16 @@
 Install-Codex-Integration.cmd
 ```
 
-第一次在桌寵內開啟任一個 Codex 通知來源時，程式會自動執行安裝器。安裝器會把橋接器複製到
+桌寵會先在本機檢查橋接器、安裝標記與 Codex `config.toml`，不會為了檢查而啟動 PowerShell。
+只有檢查到檔案缺失或 `notify` 指向失效時，才會自動執行安裝器。安裝器會把橋接器複製到
 使用者的 `%USERPROFILE%\.codex`，並更新該使用者的 Codex `config.toml`。
-若原本已有不同的 `notify` 設定，會先建立可還原的備份；重複啟用相同設定
-不會反覆建立備份。第一次安裝後仍須重新啟動 VS Code 或 Codex。
+若原本已有不同的 `notify` 設定，會先保存到
+`%USERPROFILE%\.codex\open_desktop_pet_previous_notify.json`，桌寵通知完成後仍會轉發給原本的
+notify 命令；解除安裝時會恢復原本設定。第一次安裝或修復後仍須重新啟動 VS Code 或 Codex。
 
 ## 安裝 VS Code Copilot user hook
 
-第一次在桌寵內開啟 Copilot 通知時，程式會自動執行
+桌寵會先在本機檢查 Copilot hook 與橋接器；只有缺失或內容失效時，才會執行
 `install_copilot_integration.ps1`。它會把 hook 設定放在使用者層級的：
 
 ```text
@@ -60,7 +62,41 @@ Install-Codex-Integration.cmd
 .\install_copilot_integration.ps1 -Uninstall
 ```
 
-安裝或解除安裝後請重新啟動 VS Code/Codex。
+## 安裝終端機 OpenCode Plugin
+
+桌寵會先在本機檢查 OpenCode plugin 與橋接器；只有缺失或內容失效時，才會執行
+`install_opencode_integration.ps1`。它會安裝：
+
+```text
+%USERPROFILE%\.config\opencode\plugins\open-desktop-pet.js
+%USERPROFILE%\.open-desktop-pet\opencode_notify.ps1
+```
+
+Plugin 監聽 OpenCode 的 `session.idle` 與 `session.error` 事件，並將
+`source = opencode` 的狀態送到桌寵共用 Port。橋接器會依 VS Code 環境、已驗證的
+Desktop 程序或一般終端機決定 `target_app`；Desktop 路徑空白時只跳過 Desktop
+判斷，不會阻擋其他 OpenCode 通知。
+安裝後重新啟動 OpenCode 才會載入 Plugin。
+
+OpenCode Desktop 的 Windows 下載檔目前叫做
+`opencode-desktop-windows-x64.exe`；它是安裝器。桌寵會另外偵測安裝後的
+`OpenCode.exe`，並查詢常用安裝路徑與 Windows 卸載登錄資訊，不會把 CLI 的
+`opencode.exe` 當成 Desktop。
+
+解除安裝 OpenCode Plugin：
+
+```powershell
+.\install_opencode_integration.ps1 -Uninstall
+```
+
+安裝或解除安裝後請重新啟動 VS Code、Codex 或 OpenCode。
+
+## 通知 payload
+
+所有橋接器都送出同一組基本欄位：`schema_version`、`type`、`agent`、`source`、
+`target_app`、`target_platform`、`target_executable`、`event_id`、`thread_id`、
+`turn_id`、`session_id` 與 `cwd`。桌寵使用 `agent` 判斷顯示名稱，使用 `target_app`
+判斷點擊氣泡後要切回的執行檔平台。
 
 ## 發布 EXE 時
 
@@ -74,7 +110,10 @@ tools/
 ├─ install_codex_integration.ps1
 ├─ codex_notify.ps1
 ├─ install_copilot_integration.ps1
-└─ vscode_agent_notify.ps1
+├─ vscode_agent_notify.ps1
+├─ install_opencode_integration.ps1
+├─ opencode_notify.ps1
+└─ opencode_notify_plugin.js
 ```
 
 若已有建置好的 EXE，可以用以下指令準備發布資料夾：

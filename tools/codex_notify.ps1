@@ -16,6 +16,7 @@ $legacyEnabledFile = Join-Path $integrationHome 'open_desktop_pet_codex_enabled.
 if (-not (Test-Path -LiteralPath $legacyEnabledFile)) {
     $legacyEnabledFile = Join-Path $codexHome 'open_desktop_pet_notify_enabled.txt'
 }
+$previousNotifyFile = Join-Path $codexHome 'open_desktop_pet_previous_notify.json'
 $logPath = Join-Path $env:TEMP 'OpenDesktopPet-codex-notify.log'
 
 function Write-NotifyLog([string]$message) {
@@ -60,21 +61,49 @@ function Get-ProcessTreeContainsCodexApp {
     return $false
 }
 
+function Invoke-PreviousNotify([string]$eventJson) {
+    if (-not (Test-Path -LiteralPath $previousNotifyFile)) {
+        return
+    }
+    try {
+        $storedDocument = Get-Content -LiteralPath $previousNotifyFile -Raw -Encoding UTF8 | ConvertFrom-Json
+        $storedCommand = @($storedDocument.command)
+        if ($storedCommand.Count -lt 1) {
+            return
+        }
+        $commandLine = ($storedCommand -join ' ')
+        if ($commandLine -match '(?i)open_desktop_pet_notify\.ps1') {
+            Write-NotifyLog 'previous-notify skipped reason=desktop-pet-recursion'
+            return
+        }
+        $commandPath = [string]$storedCommand[0]
+        $commandArguments = @()
+        if ($storedCommand.Count -gt 1) {
+            $commandArguments = @($storedCommand[1..($storedCommand.Count - 1)])
+        }
+        $commandArguments += $eventJson
+        & $commandPath @commandArguments *> $null
+        Write-NotifyLog ("previous-notify invoked command={0}" -f $commandPath)
+    } catch {
+        Write-NotifyLog ("previous-notify failed error-type={0}" -f $_.Exception.GetType().Name)
+    }
+}
+
 function Get-CodexTarget([object]$event) {
 	$cwd = [string]$event.cwd
 	if ($cwd -match '(?i)\\WindowsApps\\OpenAI\.Codex_[^\\]+\\' -or
 		(Get-ProcessTreeContainsCodexApp)) {
-		return [ordered]@{ source = 'codex_app'; target_app = 'codex_app'; flag = 'open_desktop_pet_codex_app_enabled.txt' }
+		return [ordered]@{ source = 'codex_app'; target_app = 'codex_app'; target_executable = 'ChatGPT.exe'; flag = 'open_desktop_pet_codex_app_enabled.txt' }
 	}
 
 	$isVsCodeEnvironment =
 		([string]$env:TERM_PROGRAM).ToLowerInvariant() -eq 'vscode' -or
 		-not [string]::IsNullOrWhiteSpace([string]$env:VSCODE_PID)
 	if ($isVsCodeEnvironment) {
-		return [ordered]@{ source = 'codex_vscode'; target_app = 'vscode'; flag = 'open_desktop_pet_vscode_codex_enabled.txt' }
+		return [ordered]@{ source = 'codex_vscode'; target_app = 'vscode'; target_executable = 'Code.exe'; flag = 'open_desktop_pet_vscode_codex_enabled.txt' }
 	}
 
-	return [ordered]@{ source = 'codex_cli'; target_app = 'terminal'; flag = 'open_desktop_pet_terminal_codex_enabled.txt' }
+	return [ordered]@{ source = 'codex_cli'; target_app = 'terminal'; target_executable = 'WindowsTerminal.exe'; flag = 'open_desktop_pet_terminal_codex_enabled.txt' }
 }
 
 function Read-BridgeFlag([string]$flagName, [bool]$allowLegacyFallback = $false) {
@@ -111,6 +140,10 @@ try {
         exit 0
     }
 
+    # Preserve an existing Codex notify integration when the installer stored it.
+    # It runs independently of the desktop-pet toggle.
+    Invoke-PreviousNotify ([string]$args[0])
+
     $target = Get-CodexTarget $event
     $isEnabled = Read-BridgeFlag $target.flag ($target.target_app -eq 'vscode')
     Write-NotifyLog (
@@ -134,12 +167,17 @@ try {
 
     # Forward only a fixed status payload, never transcript or source content.
     $payload = [ordered]@{
+        schema_version = 1
         type = 'agent-turn-complete'
         source = $target.source
         agent = 'codex'
         target_app = $target.target_app
+        target_platform = $target.target_app
+        target_executable = $target.target_executable
+        event_id = "codex:{0}:{1}:{2}" -f $target.target_app, [string]$event.'thread-id', [string]$event.'turn-id'
         thread_id = [string]$event.'thread-id'
         turn_id = [string]$event.'turn-id'
+        session_id = ''
         cwd = [string]$event.cwd
     } | ConvertTo-Json -Compress
 

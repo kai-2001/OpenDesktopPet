@@ -12,11 +12,15 @@ signal details_theme_selected(index: int)
 signal agent_codex_enabled_toggled(enabled: bool)
 signal agent_codex_app_enabled_toggled(enabled: bool)
 signal agent_terminal_codex_enabled_toggled(enabled: bool)
+signal agent_terminal_opencode_enabled_toggled(enabled: bool)
+signal agent_vscode_opencode_enabled_toggled(enabled: bool)
+signal agent_opencode_app_enabled_toggled(enabled: bool)
 signal agent_copilot_enabled_toggled(enabled: bool)
 signal agent_port_changed(value: float)
 signal vscode_executable_path_changed(path: String)
 signal codex_app_executable_path_changed(path: String)
 signal terminal_executable_path_changed(path: String)
+signal opencode_app_executable_path_changed(path: String)
 signal autostart_toggled(enabled: bool)
 signal character_selected(index: int)
 signal character_use_requested
@@ -32,16 +36,20 @@ var last_state_message := "尚無紀錄"
 var codex_enabled := false
 var codex_app_enabled := false
 var terminal_codex_enabled := false
+var terminal_opencode_enabled := false
+var vscode_opencode_enabled := false
+var opencode_app_enabled := false
 var copilot_enabled := false
 var agent_port := CodexIntegrationControllerScript.DEFAULT_PORT
 var vscode_executable_path := ""
 var codex_app_executable_path := ""
 var terminal_executable_path := ""
+var opencode_app_executable_path := ""
 var autostart_supported := false
 var interaction_label: Callable
 var interaction_icon: Callable
 var stats_bars: Dictionary = {}
-var _agent_executable_path_summaries: Array[Label] = []
+var _agent_executable_path_summaries: Dictionary = {}
 
 
 func build_status_tab(tabs: TabContainer) -> Dictionary:
@@ -373,6 +381,15 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Copilot", copilot_toggle))
 
+	var vscode_opencode_toggle := CodexToggleSwitchScript.new()
+	vscode_opencode_toggle.name = "VscodeOpenCodeEnabledToggle"
+	vscode_opencode_toggle.tooltip_text = "開啟或關閉 VS Code 中的 OpenCode 通知"
+	vscode_opencode_toggle.configure(theme_mode, vscode_opencode_enabled)
+	vscode_opencode_toggle.toggled.connect(
+		func(value: bool) -> void: agent_vscode_opencode_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("OpenCode", vscode_opencode_toggle))
+
 	content.add_child(HSeparator.new())
 	var codex_app_controls := _build_executable_path_controls(
 		content,
@@ -398,6 +415,30 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	content.add_child(_build_agent_row("Codex", codex_app_toggle))
 
 	content.add_child(HSeparator.new())
+	var opencode_app_controls := _build_executable_path_controls(
+		content,
+		agent_scroll,
+		opencode_app_executable_path,
+		"OpenCodeAppExecutablePath",
+		"OpenCodeAppExecutableBrowseButton",
+		"OpenCodeAppExecutableHint",
+		"OpenCode",
+		"選擇 OpenCode Desktop.exe",
+		"選擇 OpenCode Desktop 執行檔",
+		"OpenCode",
+		false,
+		func(path: String) -> void: opencode_app_executable_path_changed.emit(path)
+	)
+	var opencode_app_toggle := CodexToggleSwitchScript.new()
+	opencode_app_toggle.name = "OpenCodeAppEnabledToggle"
+	opencode_app_toggle.tooltip_text = "開啟或關閉 OpenCode Desktop 通知"
+	opencode_app_toggle.configure(theme_mode, opencode_app_enabled)
+	opencode_app_toggle.toggled.connect(
+		func(value: bool) -> void: agent_opencode_app_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("OpenCode", opencode_app_toggle))
+
+	content.add_child(HSeparator.new())
 	var terminal_controls := _build_executable_path_controls(
 		content,
 		agent_scroll,
@@ -420,11 +461,25 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		func(value: bool) -> void: agent_terminal_codex_enabled_toggled.emit(value)
 	)
 	content.add_child(_build_agent_row("Codex", terminal_toggle))
-	_agent_executable_path_summaries = [
-		vscode_controls["summary"] as Label,
-		codex_app_controls["summary"] as Label,
-		terminal_controls["summary"] as Label,
-	]
+
+	var opencode_toggle := CodexToggleSwitchScript.new()
+	opencode_toggle.name = "TerminalOpenCodeEnabledToggle"
+	opencode_toggle.tooltip_text = "開啟或關閉終端機中的 OpenCode 通知"
+	opencode_toggle.configure(theme_mode, terminal_opencode_enabled)
+	opencode_toggle.toggled.connect(
+		func(value: bool) -> void: agent_terminal_opencode_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("OpenCode", opencode_toggle))
+	_agent_executable_path_summaries = {
+		CodexIntegrationControllerScript.TARGET_VSCODE:
+			vscode_controls["summary"] as Label,
+		CodexIntegrationControllerScript.TARGET_CODEX_APP:
+			codex_app_controls["summary"] as Label,
+		CodexIntegrationControllerScript.TARGET_OPENCODE_APP:
+			opencode_app_controls["summary"] as Label,
+		CodexIntegrationControllerScript.TARGET_TERMINAL:
+			terminal_controls["summary"] as Label,
+	}
 
 	var vscode_close_button := Button.new()
 	vscode_close_button.text = "關閉詳細面板"
@@ -437,14 +492,20 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		"agent_status_label": status_label,
 		"codex_enabled_toggle": codex_toggle,
 		"copilot_enabled_toggle": copilot_toggle,
+		"vscode_opencode_enabled_toggle": vscode_opencode_toggle,
 		"codex_app_enabled_toggle": codex_app_toggle,
+		"opencode_app_enabled_toggle": opencode_app_toggle,
 		"terminal_codex_enabled_toggle": terminal_toggle,
+		"terminal_opencode_enabled_toggle": opencode_toggle,
 		"vscode_executable_line_edit": vscode_path_line_edit,
 		"vscode_executable_hint": vscode_controls["hint"] as Label,
 		"vscode_executable_summary": vscode_controls["summary"] as Label,
 		"codex_app_executable_line_edit": codex_app_controls["line_edit"] as LineEdit,
 		"codex_app_executable_hint": codex_app_controls["hint"] as Label,
 		"codex_app_executable_summary": codex_app_controls["summary"] as Label,
+		"opencode_app_executable_line_edit": opencode_app_controls["line_edit"] as LineEdit,
+		"opencode_app_executable_hint": opencode_app_controls["hint"] as Label,
+		"opencode_app_executable_summary": opencode_app_controls["summary"] as Label,
 		"terminal_executable_line_edit": terminal_controls["line_edit"] as LineEdit,
 		"terminal_executable_hint": terminal_controls["hint"] as Label,
 		"terminal_executable_summary": terminal_controls["summary"] as Label,
@@ -574,12 +635,15 @@ func refresh_executable_path_control(
 		_update_executable_summary(path, path_summary)
 
 
-func set_agent_executable_path_detection_state(detecting: bool) -> void:
-	for path_summary: Label in _agent_executable_path_summaries:
+func set_agent_executable_path_detection_state(
+	targets: Array, detecting: bool
+) -> void:
+	for target: String in targets:
+		var path_summary := _agent_executable_path_summaries.get(target) as Label
 		if not is_instance_valid(path_summary):
 			continue
 		if detecting:
-			path_summary.text = "通知氣泡會切回：偵測中…"
+			path_summary.text = "點擊通知氣泡會切回：偵測中…"
 			path_summary.tooltip_text = "正在偵測可用的執行檔位置"
 			path_summary.add_theme_color_override(
 				"font_color", _details_color("#68747a", "#9da1a6")
@@ -592,7 +656,7 @@ func _executable_display_name(path: String) -> String:
 
 
 func _executable_summary_text(path: String) -> String:
-	return "通知氣泡會切回：%s" % _executable_display_name(path)
+	return "點擊通知氣泡會切回：%s" % _executable_display_name(path)
 
 
 func _update_executable_summary(path: String, summary: Label) -> void:

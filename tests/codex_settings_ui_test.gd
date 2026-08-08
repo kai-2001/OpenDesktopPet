@@ -25,6 +25,10 @@ func _init() -> void:
 	test_config.set_value("codex_app", "executable_path", "")
 	test_config.set_value("codex_terminal", "enabled", false)
 	test_config.set_value("codex_terminal", "executable_path", "")
+	test_config.set_value("opencode_terminal", "enabled", false)
+	test_config.set_value("opencode_vscode", "enabled", false)
+	test_config.set_value("opencode_app", "enabled", false)
+	test_config.set_value("opencode_app", "executable_path", "")
 	test_config.set_value("copilot", "enabled", false)
 	test_config.save("user://ui_settings.cfg")
 	_main = load("res://scenes/main.tscn").instantiate()
@@ -58,6 +62,15 @@ func _run_test() -> void:
 	var terminal_toggle := _main.find_child(
 		"TerminalCodexEnabledToggle", true, false
 	) as Button
+	var opencode_toggle := _main.find_child(
+		"TerminalOpenCodeEnabledToggle", true, false
+	) as Button
+	var vscode_opencode_toggle := _main.find_child(
+		"VscodeOpenCodeEnabledToggle", true, false
+	) as Button
+	var opencode_app_toggle := _main.find_child(
+		"OpenCodeAppEnabledToggle", true, false
+	) as Button
 	var port_spin_box := _main.find_child(
 		"AgentPortSpinBox", true, false
 	) as SpinBox
@@ -79,10 +92,16 @@ func _run_test() -> void:
 	var terminal_path := _main.find_child(
 		"TerminalExecutablePath", true, false
 	) as LineEdit
+	var opencode_app_path := _main.find_child(
+		"OpenCodeAppExecutablePath", true, false
+	) as LineEdit
 	_assert_true(codex_toggle != null, "Codex enabled toggle exists")
 	_assert_true(copilot_toggle != null, "Copilot enabled toggle exists")
 	_assert_true(codex_app_toggle != null, "Codex App enabled toggle exists")
 	_assert_true(terminal_toggle != null, "Terminal Codex enabled toggle exists")
+	_assert_true(opencode_toggle != null, "Terminal OpenCode enabled toggle exists")
+	_assert_true(vscode_opencode_toggle != null, "VS Code OpenCode enabled toggle exists")
+	_assert_true(opencode_app_toggle != null, "OpenCode App enabled toggle exists")
 	_assert_true(port_spin_box != null, "Codex port input exists")
 	_assert_true(status_label != null, "Codex status label exists")
 	_assert_true(executable_path != null, "VS Code executable path input exists")
@@ -90,6 +109,7 @@ func _run_test() -> void:
 	_assert_true(executable_hint != null, "VS Code executable validation hint exists")
 	_assert_true(codex_app_path != null, "Codex App executable path input exists")
 	_assert_true(terminal_path != null, "Terminal executable path input exists")
+	_assert_true(opencode_app_path != null, "OpenCode App executable path input exists")
 	_assert_true(executable_browse.text == "📁", "browse control uses a folder icon")
 	_assert_true(
 		executable_path.text.is_empty(),
@@ -122,6 +142,9 @@ func _run_test() -> void:
 	_assert_true(not copilot_toggle.button_pressed, "Copilot defaults to closed")
 	_assert_true(not codex_app_toggle.button_pressed, "Codex App defaults to closed")
 	_assert_true(not terminal_toggle.button_pressed, "Terminal Codex defaults to closed")
+	_assert_true(not opencode_toggle.button_pressed, "Terminal OpenCode defaults to closed")
+	_assert_true(not vscode_opencode_toggle.button_pressed, "VS Code OpenCode defaults to closed")
+	_assert_true(not opencode_app_toggle.button_pressed, "OpenCode App defaults to closed")
 	_assert_true(codex_toggle.text == "關", "closed toggle shows 關")
 	_assert_true(
 		(port_spin_box.get_parent().get_child(0) as Label).text == "Agent 通知",

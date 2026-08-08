@@ -1,0 +1,94 @@
+$ErrorActionPreference = 'Stop'
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$bridgePath = Join-Path $projectRoot 'tools\opencode_notify.ps1'
+$testRoot = Join-Path $env:TEMP (
+    'OpenDesktopPet-OpenCode-Bridge-Test-' + [guid]::NewGuid().ToString('N')
+)
+$integrationHome = Join-Path $testRoot '.open-desktop-pet'
+$oldUserProfile = $env:USERPROFILE
+$oldTermProgram = $env:TERM_PROGRAM
+$oldVscodePid = $env:VSCODE_PID
+
+function Assert-Bridge([bool]$condition, [string]$message) {
+    if (-not $condition) {
+        throw $message
+    }
+}
+
+function Set-Enabled([bool]$enabled) {
+	$value = if ($enabled) { '1' } else { '0' }
+    Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_opencode_enabled.txt') `
+        -Value $value -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_opencode_terminal_enabled.txt') `
+        -Value $value -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_opencode_vscode_enabled.txt') `
+        -Value $value -Encoding ASCII
+}
+
+function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
+    $udp = [System.Net.Sockets.UdpClient]::new(0)
+    try {
+        $port = $udp.Client.LocalEndPoint.Port
+        Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_notify_port.txt') `
+            -Value $port -Encoding ASCII
+        & $bridgePath $eventJson | Out-Null
+        $udp.Client.ReceiveTimeout = 3000
+        $remote = [System.Net.IPEndPoint]::new([System.Net.IPAddress]::Any, 0)
+        try {
+            $bytes = $udp.Receive([ref]$remote)
+            $payload = [System.Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
+            Assert-Bridge $shouldReceive 'The OpenCode bridge sent an unexpected notification.'
+            return $payload
+        } catch [System.Net.Sockets.SocketException] {
+            Assert-Bridge (-not $shouldReceive) 'The OpenCode bridge dropped an expected notification.'
+            return $null
+        }
+    } finally {
+        $udp.Dispose()
+    }
+}
+
+try {
+    New-Item -ItemType Directory -Force -Path $integrationHome | Out-Null
+    $env:USERPROFILE = $testRoot
+    $env:TERM_PROGRAM = ''
+    $env:VSCODE_PID = ''
+    # The desktop target may be enabled in the UI before its executable path
+    # is configured. The bridge must still classify VS Code/terminal events.
+    Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_opencode_app_executable_path.txt') `
+        -Value '' -Encoding ASCII
+    Set-Enabled $false
+    $event = '{"type":"agent-turn-complete","session_id":"session-1","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet"}'
+    Receive-Notification $event $false | Out-Null
+    Set-Enabled $true
+    $payload = Receive-Notification $event $true
+    Assert-Bridge ($payload.source -eq 'opencode') 'OpenCode source was not classified.'
+    Assert-Bridge ($payload.agent -eq 'opencode') 'OpenCode agent was not classified.'
+    Assert-Bridge ($payload.target_app -eq 'terminal') 'OpenCode target was not classified as terminal.'
+    Assert-Bridge ($payload.schema_version -eq 1) 'OpenCode payload schema was not normalized.'
+    Assert-Bridge ($payload.target_executable -eq 'WindowsTerminal.exe') `
+        'OpenCode terminal executable target was not normalized.'
+
+    # A stale generic CLI path must not turn a terminal event into the
+    # OpenCode Desktop target.
+    Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_opencode_app_executable_path.txt') `
+        -Value (Join-Path $testRoot 'OpenCode\opencode.exe') -Encoding ASCII
+    $payload = Receive-Notification $event $true
+    Assert-Bridge ($payload.target_app -eq 'terminal') `
+        'A generic OpenCode CLI path must not steal terminal routing.'
+
+    $env:TERM_PROGRAM = 'vscode'
+    $env:VSCODE_PID = '1234'
+    $payload = Receive-Notification $event $true
+    Assert-Bridge ($payload.target_app -eq 'vscode') 'VS Code OpenCode target was not classified.'
+    Assert-Bridge ($payload.target_platform -eq 'vscode') `
+        'VS Code OpenCode platform was not normalized.'
+    Write-Output 'OPENCODE_NOTIFY_BRIDGE_TEST_OK'
+} finally {
+    $env:USERPROFILE = $oldUserProfile
+    $env:TERM_PROGRAM = $oldTermProgram
+    $env:VSCODE_PID = $oldVscodePid
+    if (Test-Path -LiteralPath $testRoot) {
+        Remove-Item -LiteralPath $testRoot -Recurse -Force
+    }
+}

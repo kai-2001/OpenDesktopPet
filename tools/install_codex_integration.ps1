@@ -11,9 +11,11 @@ $codexHome = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
 }
 $configPath = Join-Path $codexHome 'config.toml'
 $installedNotifyScript = Join-Path $codexHome 'open_desktop_pet_notify.ps1'
+$previousNotifyPath = Join-Path $codexHome 'open_desktop_pet_previous_notify.json'
 $sourceNotifyScript = Join-Path $PSScriptRoot 'codex_notify.ps1'
 $installMarker = Join-Path $codexHome 'open_desktop_pet_codex_installed.txt'
 $escapedScriptPath = $installedNotifyScript.Replace('\', '\\')
+$doubleEscapedScriptPath = $escapedScriptPath.Replace('\\', '\\\\')
 $notifyBridgeFileName = [IO.Path]::GetFileName($installedNotifyScript)
 
 function Get-NotifyAssignments([string]$text) {
@@ -83,6 +85,69 @@ function Get-NotifyAssignments([string]$text) {
     return $assignments
 }
 
+function ConvertFrom-TomlStringArray([string]$text) {
+    $matches = [regex]::Matches($text, '"((?:\\.|[^"\\])*)"')
+    $values = @()
+    foreach ($match in $matches) {
+        $value = $match.Groups[1].Value
+        $value = $value.Replace('\\', '\')
+        $value = $value.Replace('\"', '"')
+        $value = $value.Replace('\n', "`n")
+        $value = $value.Replace('\r', "`r")
+        $value = $value.Replace('\t', "`t")
+        $values += $value
+    }
+    return $values
+}
+
+function ConvertTo-TomlBasicString([string]$value) {
+    return $value.Replace('\', '\\').Replace('"', '\"').Replace("`r", '\r').Replace("`n", '\n').Replace("`t", '\t')
+}
+
+function New-NotifyBlock([object[]]$command) {
+    $lines = @('notify = [')
+    for ($index = 0; $index -lt $command.Count; $index++) {
+        $comma = if ($index -lt $command.Count - 1) { ',' } else { '' }
+        $lines += ('  "{0}"{1}' -f (ConvertTo-TomlBasicString ([string]$command[$index])), $comma)
+    }
+    $lines += ']'
+    return $lines -join [Environment]::NewLine
+}
+
+function Insert-RootNotifyBlock([string]$text, [string]$notifyBlock) {
+    $firstTable = [regex]::Match($text, '(?m)^[ \t]*\[')
+    $lineBreak = [Environment]::NewLine
+    if ($firstTable.Success) {
+        $rootSettings = $text.Substring(0, $firstTable.Index).TrimEnd()
+        $tableSettings = $text.Substring($firstTable.Index).Trim("`r", "`n")
+        if ([string]::IsNullOrWhiteSpace($rootSettings)) {
+            return $notifyBlock + $lineBreak + $lineBreak + $tableSettings
+        }
+        return $rootSettings + $lineBreak + $lineBreak + $notifyBlock + $lineBreak + $lineBreak + $tableSettings
+    }
+    $rootSettings = $text.TrimEnd()
+    if ([string]::IsNullOrWhiteSpace($rootSettings)) {
+        return $notifyBlock
+    }
+    return $rootSettings + $lineBreak + $lineBreak + $notifyBlock
+}
+
+function Save-PreviousNotifyCommand([string]$notifyText) {
+    $command = @(ConvertFrom-TomlStringArray $notifyText)
+    if ($command.Count -eq 0) {
+        throw 'Existing Codex notify configuration could not be parsed.'
+    }
+    [pscustomobject]@{ command = $command } |
+        ConvertTo-Json -Compress |
+        Set-Content -LiteralPath $previousNotifyPath -Encoding UTF8
+}
+
+function Test-IsDesktopNotifyAssignment($assignment) {
+    return $assignment.Text -match [regex]::Escape($escapedScriptPath) -or
+        $assignment.Text -match [regex]::Escape($doubleEscapedScriptPath) -or
+        $assignment.Text -match [regex]::Escape($installedNotifyScript)
+}
+
 function Remove-NotifyAssignments(
     [string]$text,
     [object[]]$assignments,
@@ -104,14 +169,40 @@ if ($Uninstall) {
     if (Test-Path -LiteralPath $configPath) {
         $configText = Get-Content -LiteralPath $configPath -Encoding UTF8 -Raw
         $assignments = @(Get-NotifyAssignments $configText)
-        $updatedText = Remove-NotifyAssignments $configText $assignments $null
-        Set-Content -LiteralPath $configPath -Value $updatedText -Encoding UTF8
+        $desktopNotify = $assignments |
+            Where-Object { Test-IsDesktopNotifyAssignment $_ } |
+            Select-Object -First 1
+        if ($null -ne $desktopNotify) {
+            $restoredCommand = @()
+            if (Test-Path -LiteralPath $previousNotifyPath) {
+                try {
+                    $restoredDocument = Get-Content -LiteralPath $previousNotifyPath -Raw -Encoding UTF8 |
+                        ConvertFrom-Json
+                    $restoredCommand = @($restoredDocument.command)
+                } catch {
+                    $restoredCommand = @()
+                }
+            }
+            if ($restoredCommand.Count -gt 0) {
+                $updatedText = Remove-NotifyAssignments $configText $assignments $null
+                $updatedText = Insert-RootNotifyBlock $updatedText (New-NotifyBlock $restoredCommand)
+                Set-Content -LiteralPath $configPath -Value $updatedText -Encoding UTF8
+            } elseif ($desktopNotify.Text -notmatch '(?i)--previous-notify') {
+                $updatedText = Remove-NotifyAssignments $configText $assignments $null
+                Set-Content -LiteralPath $configPath -Value $updatedText -Encoding UTF8
+            }
+            # A pre-existing Computer Use wrapper may already contain its own
+            # --previous-notify chain. Leave it intact when no sidecar exists.
+        }
     }
     if (Test-Path -LiteralPath $installedNotifyScript) {
         Remove-Item -LiteralPath $installedNotifyScript -Force
     }
     if (Test-Path -LiteralPath $installMarker) {
         Remove-Item -LiteralPath $installMarker -Force
+    }
+    if (Test-Path -LiteralPath $previousNotifyPath) {
+        Remove-Item -LiteralPath $previousNotifyPath -Force
     }
     Write-Output "Removed Codex notification configuration: $configPath"
     exit 0
@@ -122,14 +213,12 @@ if (-not (Test-Path -LiteralPath $sourceNotifyScript)) {
 }
 
 Copy-Item -LiteralPath $sourceNotifyScript -Destination $installedNotifyScript -Force
-$notifyBlock = @(
-    'notify = ['
-    '  "powershell.exe",'
-    '  "-NoProfile",'
-    '  "-File",'
-    "  `"$escapedScriptPath`""
-    ']'
-) -join [Environment]::NewLine
+$notifyBlock = New-NotifyBlock @(
+    'powershell.exe',
+    '-NoProfile',
+    '-File',
+    $installedNotifyScript
+)
 
 $configText = if (Test-Path -LiteralPath $configPath) {
     Get-Content -LiteralPath $configPath -Encoding UTF8 -Raw
@@ -139,56 +228,23 @@ $configText = if (Test-Path -LiteralPath $configPath) {
 
 $assignments = @(Get-NotifyAssignments $configText)
 $existingNotify = $assignments |
-    Where-Object { $_.Text -match [regex]::Escape($notifyBridgeFileName) } |
+    Where-Object { Test-IsDesktopNotifyAssignment $_ } |
     Select-Object -First 1
 if ($null -ne $existingNotify) {
     # Codex's Computer Use wrapper already calls the desktop-pet bridge through
     # --previous-notify. Keep that complete chain and remove duplicate entries.
     $keptNotifyBlock = $existingNotify.Text.Trim()
     $configText = Remove-NotifyAssignments $configText $assignments $null
-
-    # Normalize the kept notify key back to the TOML root. This also repairs
-    # older installations that placed notify after a table declaration.
-    $firstTable = [regex]::Match($configText, '(?m)^[ \t]*\[')
-    $lineBreak = [Environment]::NewLine
-    if ($firstTable.Success) {
-        $rootSettings = $configText.Substring(0, $firstTable.Index).TrimEnd()
-        $tableSettings = $configText.Substring($firstTable.Index).Trim("`r", "`n")
-        $configText = if ([string]::IsNullOrWhiteSpace($rootSettings)) {
-            $keptNotifyBlock + $lineBreak + $lineBreak + $tableSettings
-        } else {
-            $rootSettings + $lineBreak + $lineBreak + $keptNotifyBlock + $lineBreak + $lineBreak + $tableSettings
-        }
-    } else {
-        $configText = $configText.TrimEnd() + $lineBreak + $lineBreak + $keptNotifyBlock
-    }
+	$configText = Insert-RootNotifyBlock $configText $keptNotifyBlock
 } else {
     $backupPath = "$configPath.open-desktop-pet-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
     if ($assignments.Count -gt 0) {
         Copy-Item -LiteralPath $configPath -Destination $backupPath
         Write-Output "Backed up the previous Codex configuration to: $backupPath"
+		Save-PreviousNotifyCommand $assignments[0].Text
         $configText = Remove-NotifyAssignments $configText $assignments $null
     }
-
-    # Insert the desktop-pet notify at the TOML root, before the first table.
-    $firstTable = [regex]::Match($configText, '(?m)^[ \t]*\[')
-    $lineBreak = [Environment]::NewLine
-    if ($firstTable.Success) {
-        $rootSettings = $configText.Substring(0, $firstTable.Index).TrimEnd()
-        $tableSettings = $configText.Substring($firstTable.Index).Trim("`r", "`n")
-        $configText = if ([string]::IsNullOrWhiteSpace($rootSettings)) {
-            $notifyBlock + $lineBreak + $lineBreak + $tableSettings
-        } else {
-            $rootSettings + $lineBreak + $lineBreak + $notifyBlock + $lineBreak + $lineBreak + $tableSettings
-        }
-    } else {
-        $rootSettings = $configText.TrimEnd()
-        $configText = if ([string]::IsNullOrWhiteSpace($rootSettings)) {
-            $notifyBlock
-        } else {
-            $rootSettings + $lineBreak + $lineBreak + $notifyBlock
-        }
-    }
+	$configText = Insert-RootNotifyBlock $configText $notifyBlock
 }
 
 Set-Content -LiteralPath $configPath -Value $configText -Encoding UTF8

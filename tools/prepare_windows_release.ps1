@@ -40,6 +40,9 @@ foreach ($fileName in @(
     'codex_notify.ps1',
     'install_copilot_integration.ps1',
     'vscode_agent_notify.ps1',
+    'install_opencode_integration.ps1',
+    'opencode_notify.ps1',
+    'opencode_notify_plugin.js',
     'README.md'
 )) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $fileName) -Destination (Join-Path $toolsOutput $fileName) -Force
