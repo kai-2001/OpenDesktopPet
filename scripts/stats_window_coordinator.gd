@@ -72,7 +72,7 @@ func build(owner: Node) -> Dictionary:
 	var tab_buttons: Array[Button] = []
 	for tab_index: int in 4:
 		var navigation_button := Button.new()
-		navigation_button.text = ["狀態", "設定", "Agent 通知", "角色"][tab_index]
+		navigation_button.text = ["狀態", "設定", "Agent", "角色"][tab_index]
 		navigation_button.custom_minimum_size.y = 40
 		navigation_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		navigation_button.focus_mode = Control.FOCUS_NONE

@@ -47,19 +47,35 @@ func _init() -> void:
 	if DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR):
 		_assert_true(
 			is_instance_valid(main._status_indicator)
-				and is_instance_valid(main._tray_exit_menu)
+				and is_instance_valid(main._tray_menu)
 				and main._status_indicator.menu != NodePath(),
-			"status indicator uses a dedicated native exit menu"
+			"status indicator uses a dedicated native action menu"
 		)
 		_assert_equal(
-			main._tray_exit_menu.item_count,
-			1,
-			"status indicator menu contains only the exit command"
+			main._tray_menu.item_count,
+			main.context_menu.item_count,
+			"status indicator menu contains the same actions as the pet context menu"
+		)
+		for index in main.context_menu.item_count:
+			_assert_equal(
+				main._tray_menu.get_item_id(index),
+				main.context_menu.get_item_id(index),
+				"status indicator action %d uses the same command ID" % index
+			)
+			_assert_equal(
+				main._tray_menu.get_item_text(index),
+				main.context_menu.get_item_text(index),
+				"status indicator action %d uses the same label" % index
+			)
+		_assert_equal(
+			main._tray_menu.get_item_id(11),
+			22,
+			"status indicator menu contains the recover-pet action"
 		)
 		_assert_equal(
-			main._tray_exit_menu.get_item_id(0),
+			main._tray_menu.get_item_id(13),
 			7,
-			"status indicator exit command uses the shutdown action"
+			"status indicator menu keeps the save-and-exit action"
 		)
 	_assert_equal(
 		main.pet.get_interaction_label("feed", "__fallback__"),

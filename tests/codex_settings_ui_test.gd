@@ -48,6 +48,7 @@ func _run_test() -> void:
 	_assert_true(stats_window != null, "details window exists")
 	_assert_true(tabs != null, "details tabs exist")
 	_assert_true(tabs.get_tab_count() == 4, "details window has four tabs")
+	_assert_true(_main._stats_tab_buttons[2].text == "Agent", "Agent tab uses the short label")
 	_assert_true(character_list != null, "character list exists")
 
 	var codex_toggle := _main.find_child(

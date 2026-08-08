@@ -5,6 +5,7 @@ const CodexIntegrationControllerScript = preload("res://scripts/codex_integratio
 const DesktopWindowServiceScript = preload("res://scripts/desktop_window_service.gd")
 const PetGameplayCoordinatorScript = preload("res://scripts/pet_gameplay_coordinator.gd")
 const PetInputControllerScript = preload("res://scripts/pet_input_controller.gd")
+const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
 const StatsWindowCoordinatorScript = preload("res://scripts/stats_window_coordinator.gd")
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
@@ -84,7 +85,7 @@ var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
 var _pet_interaction_polygon := PackedVector2Array()
 var _status_indicator: StatusIndicator
-var _tray_exit_menu: PopupMenu
+var _tray_menu: PopupMenu
 var _details_theme_mode := "light"
 var _codex_controller: CodexIntegrationController
 var _details_window_controller
@@ -496,31 +497,11 @@ func _show_wish_notice(action: String) -> void:
 
 
 func _setup_context_menu() -> void:
-	context_menu.add_item("Lv.1  ·  20 金幣", 100)
-	context_menu.set_item_disabled(0, true)
-	context_menu.add_separator()
-	context_menu.add_item("%s  %s（2 金幣）" % [
-		_interaction_icon("feed"), _interaction_label("feed")
-	], 1)
-	context_menu.add_item("%s  %s（1 金幣）" % [
-		_interaction_icon("water"), _interaction_label("water")
-	], 2)
-	context_menu.add_item("%s  %s" % [
-		_interaction_icon("pet"), _interaction_label("pet")
-	], 3)
-	context_menu.add_item("%s  %s（賺取金幣）" % [
-		_interaction_icon("work"), _interaction_label("work")
-	], 4)
-	context_menu.add_item("%s  %s" % [
-		_interaction_icon("sleep"), _interaction_label("sleep")
-	], 5)
-	context_menu.add_separator()
-	context_menu.add_item("📊  開啟詳細面板", 6)
-	context_menu.add_item("🔎  角色縮小", 20)
-	context_menu.add_item("🔍  角色放大", 21)
-	context_menu.add_item("🏠  找回桌寵", 22)
-	context_menu.add_separator()
-	context_menu.add_item("❌  儲存並離開", 7)
+	PetMenuBuilderScript.populate(
+		context_menu,
+		Callable(self, "_interaction_icon"),
+		Callable(self, "_interaction_label")
+	)
 	context_menu.id_pressed.connect(_on_context_action)
 	_refresh_ui(state.get_snapshot())
 
@@ -533,15 +514,20 @@ func _show_context_menu(at: Vector2i) -> void:
 func _setup_status_indicator() -> void:
 	if not _window_service.has_status_indicator():
 		return
-	_tray_exit_menu = PopupMenu.new()
-	_tray_exit_menu.add_item("❌  儲存並離開", 7)
-	_tray_exit_menu.id_pressed.connect(_on_context_action)
-	add_child(_tray_exit_menu)
+	_tray_menu = PopupMenu.new()
+	PetMenuBuilderScript.populate(
+		_tray_menu,
+		Callable(self, "_interaction_icon"),
+		Callable(self, "_interaction_label")
+	)
+	_set_action_menu_level(_tray_menu)
+	_tray_menu.id_pressed.connect(_on_context_action)
+	add_child(_tray_menu)
 	_status_indicator = StatusIndicator.new()
 	_status_indicator.icon = STATUS_ICON
 	_status_indicator.tooltip = "Open Desktop Pet"
 	add_child(_status_indicator)
-	_status_indicator.menu = _status_indicator.get_path_to(_tray_exit_menu)
+	_status_indicator.menu = _status_indicator.get_path_to(_tray_menu)
 	_status_indicator.pressed.connect(_on_status_indicator_pressed)
 
 
@@ -554,9 +540,9 @@ func _remove_status_indicator() -> void:
 	if is_instance_valid(_status_indicator):
 		_status_indicator.queue_free()
 	_status_indicator = null
-	if is_instance_valid(_tray_exit_menu):
-		_tray_exit_menu.queue_free()
-	_tray_exit_menu = null
+	if is_instance_valid(_tray_menu):
+		_tray_menu.queue_free()
+		_tray_menu = null
 
 
 func _on_context_action(id: int) -> void:
@@ -577,6 +563,15 @@ func _on_context_action(id: int) -> void:
 			_say_dialogue("size_larger", "放大一點點。", 2.0)
 		22:
 			_recover_pet()
+
+
+func _set_action_menu_level(menu: PopupMenu) -> void:
+	if not is_instance_valid(menu) or menu.item_count == 0:
+		return
+	var snapshot: Dictionary = state.get_snapshot()
+	menu.set_item_text(0, "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
+		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20
+	])
 
 
 func _single_click_reaction() -> void:
@@ -1665,6 +1660,8 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 			(_stats_bars[key] as ProgressBar).value = float(snapshot[key])
 	if context_menu.item_count > 0:
 		context_menu.set_item_text(0, level_text)
+	if is_instance_valid(_tray_menu) and _tray_menu.item_count > 0:
+		_tray_menu.set_item_text(0, level_text)
 
 
 func _wish_icon(action: String) -> String:
