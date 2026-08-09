@@ -13,15 +13,25 @@ function Assert-Bridge([bool]$condition, [string]$message) {
     }
 }
 
+function Save-Runtime([int]$port) {
+    [pscustomobject]@{
+        schema_version = 1
+        instance_id = 'antigravity-bridge-test'
+        pid = $PID
+        port = $port
+        enabled_targets = [pscustomobject]@{ agy_terminal = $true }
+        executable_paths = [pscustomobject]@{}
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (
+        Join-Path $integrationHome 'open_desktop_pet_runtime.json'
+    ) -Encoding UTF8
+}
+
 function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
     $udp = New-Object System.Net.Sockets.UdpClient(0)
     $process = $null
     try {
         $port = $udp.Client.LocalEndPoint.Port
-        Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_notify_port.txt') `
-            -Value $port -Encoding ASCII
-        Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_agy_enabled.txt') `
-            -Value '1' -Encoding ASCII
+		Save-Runtime $port
 
         $startInfo = New-Object System.Diagnostics.ProcessStartInfo
         $startInfo.FileName = (Get-Command powershell.exe).Source

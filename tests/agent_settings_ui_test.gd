@@ -230,64 +230,11 @@ func _run_test() -> void:
 		codex_toggle.mouse_default_cursor_shape == Control.CURSOR_POINTING_HAND,
 		"toggle keeps the pointing-hand cursor"
 	)
-	var enabled_file := _test_codex_home.path_join(
-		"open_desktop_pet_notify_enabled.txt"
-	)
-	var port_file := _test_codex_home.path_join(
-		"open_desktop_pet_notify_port.txt"
-	)
 	_assert_true(
-		FileAccess.get_file_as_string(enabled_file).strip_edges() == "0",
-		"closed state disables the Codex sender"
-	)
-	var vscode_enabled_file := _test_codex_home.path_join(
-		"open_desktop_pet_vscode_codex_enabled.txt"
-	)
-	var codex_app_enabled_file := _test_codex_home.path_join(
-		"open_desktop_pet_codex_app_enabled.txt"
-	)
-	var claude_vscode_enabled_file := _test_codex_home.path_join(
-		"open_desktop_pet_claude_vscode_enabled.txt"
-	)
-	var claude_app_enabled_file := _test_codex_home.path_join(
-		"open_desktop_pet_claude_app_enabled.txt"
-	)
-	var claude_terminal_enabled_file := _test_codex_home.path_join(
-		"open_desktop_pet_claude_terminal_enabled.txt"
-	)
-	var gemini_terminal_enabled_file := _test_codex_home.path_join(
-		"open_desktop_pet_gemini_enabled.txt"
-	)
-	var agy_terminal_enabled_file := _test_codex_home.path_join(
-		"open_desktop_pet_agy_enabled.txt"
-	)
-	_assert_true(
-		FileAccess.get_file_as_string(vscode_enabled_file).strip_edges() == "0",
-		"closed state disables VS Code Codex sender"
-	)
-	_assert_true(
-		FileAccess.get_file_as_string(codex_app_enabled_file).strip_edges() == "0",
-		"closed state disables Codex App sender"
-	)
-	_assert_true(
-		FileAccess.get_file_as_string(claude_vscode_enabled_file).strip_edges() == "0",
-		"closed state disables VS Code Claude Code sender"
-	)
-	_assert_true(
-		FileAccess.get_file_as_string(claude_app_enabled_file).strip_edges() == "0",
-		"closed state disables Claude Desktop sender"
-	)
-	_assert_true(
-		FileAccess.get_file_as_string(claude_terminal_enabled_file).strip_edges() == "0",
-		"closed state disables terminal Claude Code sender"
-	)
-	_assert_true(
-		FileAccess.get_file_as_string(gemini_terminal_enabled_file).strip_edges() == "0",
-		"closed state disables Gemini CLI sender"
-	)
-	_assert_true(
-		FileAccess.get_file_as_string(agy_terminal_enabled_file).strip_edges() == "0",
-		"closed state disables Antigravity CLI sender"
+		not FileAccess.file_exists(_test_codex_home.path_join(
+			"open_desktop_pet_codex_app_enabled.txt"
+		)),
+		"runtime migration no longer writes Codex enable files"
 	)
 
 	codex_toggle.set_pressed_no_signal(false)
@@ -296,8 +243,8 @@ func _run_test() -> void:
 	port_spin_box.set_value_no_signal(TEST_PORT)
 	port_spin_box.value_changed.emit(float(TEST_PORT))
 	_assert_true(
-		FileAccess.get_file_as_string(port_file).strip_edges() == str(TEST_PORT),
-		"port changes are applied without a configure button"
+		int(port_spin_box.value) == TEST_PORT,
+		"port changes are retained without a configure button"
 	)
 
 	codex_toggle.set_pressed_no_signal(true)
@@ -316,17 +263,10 @@ func _run_test() -> void:
 		not port_spin_box.editable,
 		"open state locks the active port"
 	)
+	_assert_true(_main._agent_controller.codex_enabled, "open state enables VS Code Codex")
 	_assert_true(
-		FileAccess.get_file_as_string(enabled_file).strip_edges() == "1",
-		"open state enables the Codex sender"
-	)
-	_assert_true(
-		FileAccess.get_file_as_string(vscode_enabled_file).strip_edges() == "1",
-		"open state enables only the VS Code Codex sender"
-	)
-	_assert_true(
-		FileAccess.get_file_as_string(codex_app_enabled_file).strip_edges() == "0",
-		"VS Code Codex does not enable Codex App sender"
+		not _main._agent_controller.codex_app_enabled,
+		"VS Code Codex does not enable Codex App"
 	)
 	_assert_true(
 		status_label.text.contains("127.0.0.1:%d" % TEST_PORT),
@@ -367,11 +307,12 @@ func _run_test() -> void:
 
 	_main.call("_prepare_shutdown")
 	_assert_true(
-		FileAccess.get_file_as_string(enabled_file).strip_edges() == "0",
-		"shutdown disables the Codex sender"
+		not FileAccess.file_exists(_test_codex_home.path_join(
+			"open_desktop_pet_codex_enabled.txt"
+		)),
+		"shutdown does not restore legacy Codex enable files"
 	)
-	# Free the scene while CODEX_HOME still points at the test directory. The
-	# shutdown callback writes the disabled marker again during tree exit.
+	# Free the scene while CODEX_HOME still points at the test directory.
 	_main.free()
 	_main = null
 	OS.set_environment("CODEX_HOME", _previous_codex_home)

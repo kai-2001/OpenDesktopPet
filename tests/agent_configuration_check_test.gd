@@ -33,8 +33,9 @@ func _run() -> void:
 
 	_make_directory(codex_home)
 	_make_directory(integration_home)
+	_write(integration_home.path_join("open_desktop_pet_runtime.ps1"), "# OpenDesktopPet runtime schema v1")
 	_write(codex_home.path_join("open_desktop_pet_codex_installed.txt"), "1")
-	_write(codex_home.path_join("open_desktop_pet_notify.ps1"), "# bridge")
+	_write(codex_home.path_join("open_desktop_pet_notify.ps1"), "# OpenDesktopPet runtime schema v1")
 	_write(
 		codex_home.path_join("config.toml"),
 		"notify = [\"powershell.exe\", \"open_desktop_pet_notify.ps1\"]"
@@ -44,7 +45,7 @@ func _run() -> void:
 	_assert_true(not controller.is_codex_configured(), "Codex notify drift is detected")
 
 	_write(integration_home.path_join("open_desktop_pet_copilot_installed.txt"), "1")
-	_write(integration_home.path_join("vscode_copilot_notify.ps1"), "# bridge")
+	_write(integration_home.path_join("vscode_copilot_notify.ps1"), "# OpenDesktopPet runtime schema v1")
 	_make_directory(_test_root.path_join(".copilot/hooks"))
 	_write(
 		_test_root.path_join(".copilot/hooks/open-desktop-pet.json"),
@@ -55,7 +56,7 @@ func _run() -> void:
 	_assert_true(not controller.is_copilot_configured(), "Copilot hook drift is detected")
 
 	_write(integration_home.path_join("open_desktop_pet_opencode_installed.txt"), "1")
-	_write(integration_home.path_join("opencode_notify.ps1"), "# bridge")
+	_write(integration_home.path_join("opencode_notify.ps1"), "# OpenDesktopPet runtime schema v1")
 	_make_directory(_test_root.path_join(".config/opencode/plugins"))
 	_write(
 		_test_root.path_join(".config/opencode/plugins/open-desktop-pet.js"),
@@ -68,7 +69,7 @@ func _run() -> void:
 	_assert_true(not controller.is_opencode_configured(), "OpenCode plugin drift is detected")
 
 	_write(integration_home.path_join("open_desktop_pet_claude_code_installed.txt"), "OpenDesktopPet Claude Code notification hook")
-	_write(integration_home.path_join("claude_code_notify.ps1"), "# bridge")
+	_write(integration_home.path_join("claude_code_notify.ps1"), "# OpenDesktopPet runtime schema v1")
 	_make_directory(claude_home)
 	_write(
 		claude_home.path_join("settings.json"),
@@ -79,7 +80,7 @@ func _run() -> void:
 	_assert_true(not controller.is_claude_code_configured(), "Claude Code hook drift is detected")
 
 	_write(integration_home.path_join("open_desktop_pet_gemini_cli_installed.txt"), "OpenDesktopPet Gemini CLI notification hooks")
-	_write(integration_home.path_join("gemini_cli_notify.ps1"), "# bridge")
+	_write(integration_home.path_join("gemini_cli_notify.ps1"), "# OpenDesktopPet runtime schema v1")
 	_make_directory(gemini_home)
 	_write(
 		gemini_home.path_join("settings.json"),
@@ -90,13 +91,25 @@ func _run() -> void:
 	_assert_true(not controller.is_gemini_cli_configured(), "Gemini CLI hook drift is detected")
 
 	_write(integration_home.path_join("open_desktop_pet_antigravity_cli_installed.txt"), "OpenDesktopPet Antigravity CLI notification hook")
-	_write(integration_home.path_join("antigravity_cli_notify.ps1"), "# bridge")
+	_write(integration_home.path_join("antigravity_cli_notify.ps1"), "# OpenDesktopPet runtime schema v1")
 	_make_directory(gemini_home.path_join("config"))
 	_write(
 		gemini_home.path_join("config/hooks.json"),
 		"{\"open-desktop-pet\":{\"Stop\":[{\"type\":\"command\",\"command\":\"antigravity_cli_notify.ps1\",\"timeout\":5}]}}"
 	)
-	_assert_true(controller.is_antigravity_cli_configured(), "Antigravity CLI hook is detected")
+	_assert_true(
+		not controller.is_antigravity_cli_configured(),
+		"Antigravity CLI legacy hook requires migration"
+	)
+	var agy_bridge_path := integration_home.path_join("antigravity_cli_notify.ps1").replace("/", "\\")
+	var agy_invocation := "& '%s'" % agy_bridge_path.replace("'", "''")
+	var agy_command := "powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand " \
+		+ Marshalls.raw_to_base64(agy_invocation.to_utf16_buffer())
+	_write(
+		gemini_home.path_join("config/hooks.json"),
+		"{\"open-desktop-pet\":{\"Stop\":[{\"type\":\"command\",\"command\":\"%s\",\"timeout\":5}]}}" % agy_command
+	)
+	_assert_true(controller.is_antigravity_cli_configured(), "Antigravity CLI encoded hook is detected")
 	_write(
 		gemini_home.path_join("config/hooks.json"),
 		"{\"open-desktop-pet\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"antigravity_cli_notify.ps1\"}]}]}}"

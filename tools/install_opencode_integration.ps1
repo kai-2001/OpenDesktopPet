@@ -8,16 +8,36 @@ $integrationHome = Join-Path $env:USERPROFILE '.open-desktop-pet'
 $pluginsHome = Join-Path $env:USERPROFILE '.config\opencode\plugins'
 $pluginPath = Join-Path $pluginsHome 'open-desktop-pet.js'
 $installedBridgePath = Join-Path $integrationHome 'opencode_notify.ps1'
+$installedRuntimeHelper = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
 $sourcePluginPath = Join-Path $PSScriptRoot 'opencode_notify_plugin.js'
 $sourceBridgePath = Join-Path $PSScriptRoot 'opencode_notify.ps1'
+$sourceRuntimeHelper = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
 $installMarker = Join-Path $integrationHome 'open_desktop_pet_opencode_installed.txt'
 $markerText = 'OpenDesktopPet OpenCode notification plugin'
+$backupSearchPattern = 'open-desktop-pet.js.open-desktop-pet-backup-*.js'
+
+function Get-OpenDesktopPetPluginBackups {
+    if (-not (Test-Path -LiteralPath $pluginsHome -PathType Container)) {
+        return @()
+    }
+    return @(Get-ChildItem -LiteralPath $pluginsHome -Filter $backupSearchPattern -File |
+        Sort-Object LastWriteTimeUtc -Descending)
+}
 
 if ($Uninstall) {
+    $removedDesktopPetPlugin = $false
     if (Test-Path -LiteralPath $pluginPath) {
         $pluginText = Get-Content -LiteralPath $pluginPath -Raw -Encoding UTF8
         if ($pluginText.Contains($markerText)) {
             Remove-Item -LiteralPath $pluginPath -Force
+            $removedDesktopPetPlugin = $true
+        }
+    }
+    if ($removedDesktopPetPlugin) {
+        $backups = @(Get-OpenDesktopPetPluginBackups)
+        if ($backups.Count -gt 0) {
+            Move-Item -LiteralPath $backups[0].FullName -Destination $pluginPath -Force
+            Write-Output "Restored the previous OpenCode plugin: $pluginPath"
         }
     }
     if (Test-Path -LiteralPath $installedBridgePath) {
@@ -33,7 +53,8 @@ if ($Uninstall) {
 if (-not (Test-Path -LiteralPath $sourcePluginPath -PathType Leaf)) {
     throw "OpenCode plugin source not found: $sourcePluginPath"
 }
-if (-not (Test-Path -LiteralPath $sourceBridgePath -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $sourceBridgePath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $sourceRuntimeHelper -PathType Leaf)) {
     throw "OpenCode bridge source not found: $sourceBridgePath"
 }
 
@@ -51,6 +72,7 @@ if (Test-Path -LiteralPath $pluginPath) {
 
 Copy-Item -LiteralPath $sourcePluginPath -Destination $pluginPath -Force
 Copy-Item -LiteralPath $sourceBridgePath -Destination $installedBridgePath -Force
+Copy-Item -LiteralPath $sourceRuntimeHelper -Destination $installedRuntimeHelper -Force
 Set-Content -LiteralPath $installMarker -Value '1' -Encoding ASCII
 
 Write-Output "OpenCode notification plugin installed: $pluginPath"

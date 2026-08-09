@@ -9,6 +9,8 @@ $geminiHome = Join-Path $env:USERPROFILE '.gemini'
 $settingsPath = Join-Path $geminiHome 'settings.json'
 $installedBridgePath = Join-Path $integrationHome 'gemini_cli_notify.ps1'
 $sourceBridgePath = Join-Path $PSScriptRoot 'gemini_cli_notify.ps1'
+$installedRuntimeHelper = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
+$sourceRuntimeHelper = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
 $installMarker = Join-Path $integrationHome 'open_desktop_pet_gemini_cli_installed.txt'
 $markerText = 'OpenDesktopPet Gemini CLI notification hooks'
 $hookEvents = @('AfterAgent', 'Notification')
@@ -118,13 +120,15 @@ if ($Uninstall) {
     exit 0
 }
 
-if (-not (Test-Path -LiteralPath $sourceBridgePath -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $sourceBridgePath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $sourceRuntimeHelper -PathType Leaf)) {
     throw "Gemini CLI bridge source not found: $sourceBridgePath"
 }
 
 New-Item -ItemType Directory -Force -Path $integrationHome | Out-Null
 New-Item -ItemType Directory -Force -Path $geminiHome | Out-Null
 Copy-Item -LiteralPath $sourceBridgePath -Destination $installedBridgePath -Force
+Copy-Item -LiteralPath $sourceRuntimeHelper -Destination $installedRuntimeHelper -Force
 Set-Content -LiteralPath $installMarker -Value $markerText -Encoding ASCII
 
 $command = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' +

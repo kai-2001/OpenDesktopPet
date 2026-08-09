@@ -38,6 +38,7 @@ foreach ($fileName in @(
     'Install-Codex-Integration.cmd',
     'install_codex_integration.ps1',
     'codex_notify.ps1',
+	'open_desktop_pet_runtime.ps1',
     'install_copilot_integration.ps1',
     'vscode_agent_notify.ps1',
     'install_opencode_integration.ps1',

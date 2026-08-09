@@ -9,6 +9,8 @@ $claudeHome = Join-Path $env:USERPROFILE '.claude'
 $settingsPath = Join-Path $claudeHome 'settings.json'
 $installedBridgePath = Join-Path $integrationHome 'claude_code_notify.ps1'
 $sourceBridgePath = Join-Path $PSScriptRoot 'claude_code_notify.ps1'
+$installedRuntimeHelper = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
+$sourceRuntimeHelper = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
 $installMarker = Join-Path $integrationHome 'open_desktop_pet_claude_code_installed.txt'
 $markerText = 'OpenDesktopPet Claude Code notification hook'
 $hookEvents = @('Stop', 'Notification', 'StopFailure')
@@ -113,13 +115,15 @@ if ($Uninstall) {
     exit 0
 }
 
-if (-not (Test-Path -LiteralPath $sourceBridgePath -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $sourceBridgePath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $sourceRuntimeHelper -PathType Leaf)) {
     throw "Claude Code bridge source not found: $sourceBridgePath"
 }
 
 New-Item -ItemType Directory -Force -Path $integrationHome | Out-Null
 New-Item -ItemType Directory -Force -Path $claudeHome | Out-Null
 Copy-Item -LiteralPath $sourceBridgePath -Destination $installedBridgePath -Force
+Copy-Item -LiteralPath $sourceRuntimeHelper -Destination $installedRuntimeHelper -Force
 Set-Content -LiteralPath $installMarker -Value $markerText -Encoding ASCII
 
 $command = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' +

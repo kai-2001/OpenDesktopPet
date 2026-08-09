@@ -10,6 +10,16 @@
 桌寵正常結束時，橋接器不會傳送 UDP。橋接器不依賴任何固定專案路徑，
 也不會轉送 Agent 回答、提示詞、程式碼或完整對話內容。
 
+永久開關只儲存在 Godot 的 `ui_settings.cfg`。桌寵執行時才會在下列位置
+建立唯一的執行期註冊；其中包含實例 ID、PID、UDP 埠與各來源的啟用狀態：
+
+```text
+%USERPROFILE%\.open-desktop-pet\open_desktop_pet_runtime.json
+```
+
+所有橋接器只讀這一份 runtime 檔。桌寵結束時只會刪除屬於自己的註冊，
+不再將全域 `*_enabled.txt` 寫成 `0`；`.codex` 也不再保存桌寵的啟用旗標。
+
 橋接器只記錄事件類型、工作目錄與處理結果，診斷檔位於：
 
 ```text

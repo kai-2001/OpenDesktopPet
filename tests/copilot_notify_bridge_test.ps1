@@ -1,8 +1,8 @@
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$bridgePath = Join-Path $projectRoot 'tools\gemini_cli_notify.ps1'
+$bridgePath = Join-Path $projectRoot 'tools\vscode_agent_notify.ps1'
 $testRoot = Join-Path $env:TEMP (
-    'OpenDesktopPet-Gemini-CLI-Bridge-Test-' + [guid]::NewGuid().ToString('N')
+    'OpenDesktopPet-Copilot-Bridge-Test-' + [guid]::NewGuid().ToString('N')
 )
 $integrationHome = Join-Path $testRoot '.open-desktop-pet'
 $oldUserProfile = $env:USERPROFILE
@@ -13,26 +13,24 @@ function Assert-Bridge([bool]$condition, [string]$message) {
     }
 }
 
-function Save-Runtime([int]$port) {
+function Save-Runtime([int]$port, [bool]$enabled) {
     [pscustomobject]@{
         schema_version = 1
-        instance_id = 'gemini-bridge-test'
+        instance_id = 'copilot-bridge-test'
         pid = $PID
         port = $port
-        enabled_targets = [pscustomobject]@{ gemini_terminal = $true }
+        enabled_targets = [pscustomobject]@{ copilot = $enabled }
         executable_paths = [pscustomobject]@{}
     } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (
         Join-Path $integrationHome 'open_desktop_pet_runtime.json'
     ) -Encoding UTF8
 }
 
-function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
+function Receive-Notification([string]$eventJson, [bool]$enabled, [bool]$shouldReceive) {
     $udp = [System.Net.Sockets.UdpClient]::new(0)
     $process = $null
     try {
-        $port = $udp.Client.LocalEndPoint.Port
-		Save-Runtime $port
-
+        Save-Runtime $udp.Client.LocalEndPoint.Port $enabled
         $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
         $startInfo.FileName = (Get-Command powershell.exe).Source
         $startInfo.Arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $bridgePath + '"'
@@ -42,7 +40,6 @@ function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
         $startInfo.RedirectStandardOutput = $true
         $startInfo.RedirectStandardError = $true
         $startInfo.EnvironmentVariables['USERPROFILE'] = $testRoot
-
         $process = [System.Diagnostics.Process]::new()
         $process.StartInfo = $startInfo
         [void]$process.Start()
@@ -52,17 +49,17 @@ function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
         $stdout = $process.StandardOutput.ReadToEnd()
         $process.StandardError.ReadToEnd() | Out-Null
         $process.WaitForExit()
-        Assert-Bridge ($stdout.Trim() -eq '{}') 'Gemini bridge did not return a valid empty JSON object.'
+        Assert-Bridge ($stdout.Trim() -eq '{"continue":true}') 'Copilot bridge did not return a continue response.'
 
         $udp.Client.ReceiveTimeout = 1500
         $remote = [System.Net.IPEndPoint]::new([System.Net.IPAddress]::Any, 0)
         try {
             $bytes = $udp.Receive([ref]$remote)
             $payload = [System.Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
-            Assert-Bridge $shouldReceive 'Gemini bridge sent an unexpected notification.'
+            Assert-Bridge $shouldReceive 'Copilot bridge sent an unexpected notification.'
             return $payload
         } catch [System.Net.Sockets.SocketException] {
-            Assert-Bridge (-not $shouldReceive) 'Gemini bridge dropped an expected notification.'
+            Assert-Bridge (-not $shouldReceive) 'Copilot bridge dropped an expected notification.'
             return $null
         }
     } finally {
@@ -76,28 +73,14 @@ function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
 try {
     New-Item -ItemType Directory -Force -Path $integrationHome | Out-Null
     $env:USERPROFILE = $testRoot
-
-    $unicodeResponse = ([char]0x5b8c).ToString() + ([char]0x6210).ToString() +
-        ([char]0x901a).ToString() + ([char]0x77e5).ToString()
-    $afterAgentEvent = '{"hook_event_name":"AfterAgent","session_id":"session-after","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","prompt_response":"' +
-        $unicodeResponse + '"}'
-    $payload = Receive-Notification $afterAgentEvent $true
-    Assert-Bridge ($payload.source -eq 'gemini_cli') 'Gemini source was not classified.'
-    Assert-Bridge ($payload.agent -eq 'gemini') 'Gemini agent was not normalized.'
-    Assert-Bridge ($payload.target_app -eq 'terminal') 'Gemini target was not classified as terminal.'
-    Assert-Bridge ($payload.type -eq 'agent-turn-complete') 'Gemini AfterAgent event was not normalized.'
-    Assert-Bridge ($payload.target_executable -eq 'WindowsTerminal.exe') 'Gemini terminal executable was not normalized.'
-
-    $permissionEvent = '{"hook_event_name":"Notification","notification_type":"ToolPermission","session_id":"session-permission","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","message":"Allow tool?"}'
-    $payload = Receive-Notification $permissionEvent $true
-    Assert-Bridge ($payload.type -eq 'approval-requested') 'Gemini ToolPermission was not normalized.'
-
-    $otherNotification = '{"hook_event_name":"Notification","notification_type":"SystemInfo","session_id":"session-ignored","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","message":"info"}'
-    $null = Receive-Notification $otherNotification $false
-
-    Write-Output 'GEMINI_CLI_NOTIFY_BRIDGE_TEST_OK'
-}
-finally {
+    $stopEvent = '{"hook_event_name":"Stop","session_id":"copilot-stop","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet"}'
+    $payload = Receive-Notification $stopEvent $true $true
+    Assert-Bridge ($payload.source -eq 'copilot_vscode') 'Copilot source was not classified.'
+    Assert-Bridge ($payload.target_app -eq 'vscode') 'Copilot target was not classified.'
+    Assert-Bridge ($payload.agent -eq 'copilot') 'Copilot agent was not classified.'
+    Receive-Notification $stopEvent $false $false | Out-Null
+    Write-Output 'COPILOT_NOTIFY_BRIDGE_TEST_OK'
+} finally {
     $env:USERPROFILE = $oldUserProfile
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force

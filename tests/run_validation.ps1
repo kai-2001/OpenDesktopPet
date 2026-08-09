@@ -21,6 +21,10 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw 'Copilot integration installer checks failed.'
 }
+& (Join-Path $PSScriptRoot 'copilot_notify_bridge_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Copilot notification bridge checks failed.'
+}
 & (Join-Path $PSScriptRoot 'opencode_integration_installer_test.ps1')
 if ($LASTEXITCODE -ne 0) {
     throw 'OpenCode integration installer checks failed.'
@@ -78,6 +82,13 @@ try {
     $agentConfigurationOutput | Write-Output
     if ($agentConfigurationExitCode -ne 0 -or -not ($agentConfigurationOutput -match 'AGENT_CONFIGURATION_CHECK_TEST_OK')) {
         throw 'Agent configuration check validation failed.'
+    }
+
+    $agentRuntimeOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/agent_runtime_state_test.gd' 2>&1
+    $agentRuntimeExitCode = $LASTEXITCODE
+    $agentRuntimeOutput | Write-Output
+    if ($agentRuntimeExitCode -ne 0 -or -not ($agentRuntimeOutput -match 'AGENT_RUNTIME_STATE_TEST_OK')) {
+        throw 'Agent runtime state validation failed.'
     }
 
     $agentRouterOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/agent_notification_router_test.gd' 2>&1

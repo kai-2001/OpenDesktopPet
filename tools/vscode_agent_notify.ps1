@@ -1,12 +1,14 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
+# OpenDesktopPet runtime schema v1
 # VS Code Agent Hook bridge for OpenDesktopPet.
 # The hook must never block or change the agent's behavior.
 $notifyHost = '127.0.0.1'
-$notifyPort = 38571
 $integrationHome = Join-Path $env:USERPROFILE '.open-desktop-pet'
-$portFile = Join-Path $integrationHome 'open_desktop_pet_notify_port.txt'
-$enabledFile = Join-Path $integrationHome 'open_desktop_pet_copilot_enabled.txt'
+$runtimeHelperPath = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
+if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+    $runtimeHelperPath = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
+}
 $logPath = Join-Path $env:TEMP 'OpenDesktopPet-vscode-hook.log'
 
 function Write-HookLog([string]$message) {
@@ -25,12 +27,32 @@ function Complete-Hook {
     exit 0
 }
 
+function Read-StandardInputUtf8 {
+    $inputStream = [Console]::OpenStandardInput()
+    $memoryStream = New-Object System.IO.MemoryStream
+    $buffer = New-Object -TypeName byte[] -ArgumentList 4096
+    try {
+        while (($readCount = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $memoryStream.Write($buffer, 0, $readCount)
+        }
+        return [System.Text.Encoding]::UTF8.GetString($memoryStream.ToArray())
+    } finally {
+        $memoryStream.Dispose()
+    }
+}
+
 try {
-    $rawInput = [Console]::In.ReadToEnd()
+	if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+		Write-HookLog 'ignored reason=runtime-helper-missing'
+		Complete-Hook
+	}
+	. $runtimeHelperPath
+    $rawInput = Read-StandardInputUtf8
     if ([string]::IsNullOrWhiteSpace($rawInput)) {
         Write-HookLog 'ignored reason=missing-input'
         Complete-Hook
     }
+	$rawInput = $rawInput.TrimStart([char]0xFEFF)
 
     $event = ConvertFrom-Json -InputObject $rawInput
     $eventName = [string]$event.hook_event_name
@@ -48,22 +70,16 @@ try {
         Complete-Hook
     }
 
-    if (-not (Test-Path -LiteralPath $enabledFile)) {
-        Write-HookLog 'ignored reason=desktop-pet-disabled-file-missing'
+    $runtime = Get-OpenDesktopPetRuntime -IntegrationHome $integrationHome
+    if ($null -eq $runtime) {
+        Write-HookLog 'ignored reason=runtime-unavailable'
         Complete-Hook
     }
-    $senderEnabled = (Get-Content -LiteralPath $enabledFile -Raw).Trim() -eq '1'
-    if (-not $senderEnabled) {
+    if (-not (Test-OpenDesktopPetRuntimeEnabled -Runtime $runtime -Target 'copilot')) {
         Write-HookLog 'ignored reason=desktop-pet-disabled'
         Complete-Hook
     }
-
-    if (Test-Path -LiteralPath $portFile) {
-        $configuredPort = [int](Get-Content -LiteralPath $portFile -Raw).Trim()
-        if ($configuredPort -ge 1024 -and $configuredPort -le 65535) {
-            $notifyPort = $configuredPort
-        }
-    }
+	$notifyPort = Get-OpenDesktopPetRuntimePort -Runtime $runtime
 
     $sessionId = [string]$event.session_id
     $payload = [ordered]@{

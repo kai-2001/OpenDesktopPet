@@ -9,6 +9,8 @@ $antigravityConfigHome = Join-Path $env:USERPROFILE '.gemini\config'
 $hooksPath = Join-Path $antigravityConfigHome 'hooks.json'
 $installedBridgePath = Join-Path $integrationHome 'antigravity_cli_notify.ps1'
 $sourceBridgePath = Join-Path $PSScriptRoot 'antigravity_cli_notify.ps1'
+$installedRuntimeHelper = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
+$sourceRuntimeHelper = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
 $installMarker = Join-Path $integrationHome 'open_desktop_pet_antigravity_cli_installed.txt'
 $markerText = 'OpenDesktopPet Antigravity CLI notification hook'
 $hookName = 'open-desktop-pet'
@@ -61,12 +63,33 @@ function Get-HookEntries($hookDefinition, [string]$eventName) {
     return @($hookDefinition.$eventName)
 }
 
+function Test-OpenDesktopPetHookCommand([string]$command) {
+    if ($command -like '*antigravity_cli_notify.ps1*') {
+        return $true
+    }
+    try {
+        $encodedCommandMatch = [regex]::Match(
+            $command,
+            '(?i)-EncodedCommand\s+([A-Za-z0-9+/=]+)'
+        )
+        if (-not $encodedCommandMatch.Success) {
+            return $false
+        }
+        $decodedInvocation = [Text.Encoding]::Unicode.GetString(
+            [Convert]::FromBase64String($encodedCommandMatch.Groups[1].Value)
+        )
+        return $decodedInvocation -like '*antigravity_cli_notify.ps1*'
+    } catch {
+        return $false
+    }
+}
+
 function Test-OpenDesktopPetHook($entry) {
-    if ([string]$entry.command -like '*antigravity_cli_notify.ps1*') {
+    if (Test-OpenDesktopPetHookCommand ([string]$entry.command)) {
         return $true
     }
     foreach ($hook in @($entry.hooks)) {
-        if ([string]$hook.command -like '*antigravity_cli_notify.ps1*') {
+        if (Test-OpenDesktopPetHookCommand ([string]$hook.command)) {
             return $true
         }
     }
@@ -122,23 +145,29 @@ if ($Uninstall) {
     exit 0
 }
 
-if (-not (Test-Path -LiteralPath $sourceBridgePath -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $sourceBridgePath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $sourceRuntimeHelper -PathType Leaf)) {
     throw "Antigravity CLI bridge source not found: $sourceBridgePath"
 }
 
 New-Item -ItemType Directory -Force -Path $integrationHome | Out-Null
 New-Item -ItemType Directory -Force -Path $antigravityConfigHome | Out-Null
 Copy-Item -LiteralPath $sourceBridgePath -Destination $installedBridgePath -Force
+Copy-Item -LiteralPath $sourceRuntimeHelper -Destination $installedRuntimeHelper -Force
 Set-Content -LiteralPath $installMarker -Value $markerText -Encoding ASCII
 
 # Antigravity's Windows hook runner evaluates this command through a shell
-# wrapper. Do not add another pair of quotes around the -File path: the
-# wrapper would pass those quote characters into PowerShell as part of the
-# filename. Also avoid -WindowStyle Hidden because the hook inherits the
-# active console and can hide/minimize the parent PowerShell window.
-# Windows user profile directories normally contain no spaces.
-$command = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File ' +
-    $installedBridgePath
+# wrapper. A quoted -File path is passed through with its quote characters,
+# while an unquoted path fails for Windows user profiles containing spaces.
+# Use PowerShell's UTF-16LE encoded command form so the hook command itself
+# contains no path or shell-sensitive quotes. The child PowerShell process
+# inherits Antigravity's JSON stdin and passes it to the bridge unchanged.
+$bridgeInvocation = "& '{0}'" -f $installedBridgePath.Replace("'", "''")
+$encodedBridgeInvocation = [Convert]::ToBase64String(
+    [Text.Encoding]::Unicode.GetBytes($bridgeInvocation)
+)
+$command = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' +
+    $encodedBridgeInvocation
 $settings = Get-Settings
 Remove-OpenDesktopPetHooks $settings
 $hookDefinition = Get-HookDefinition $settings

@@ -9,6 +9,8 @@ $hooksHome = Join-Path $env:USERPROFILE '.copilot\hooks'
 $hookConfigPath = Join-Path $hooksHome 'open-desktop-pet.json'
 $installedScriptPath = Join-Path $integrationHome 'vscode_copilot_notify.ps1'
 $sourceScriptPath = Join-Path $PSScriptRoot 'vscode_agent_notify.ps1'
+$installedRuntimeHelper = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
+$sourceRuntimeHelper = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
 $installMarker = Join-Path $integrationHome 'open_desktop_pet_copilot_installed.txt'
 
 New-Item -ItemType Directory -Force -Path $integrationHome | Out-Null
@@ -80,12 +82,14 @@ if ($Uninstall) {
     exit 0
 }
 
-if (-not (Test-Path -LiteralPath $sourceScriptPath)) {
+if (-not (Test-Path -LiteralPath $sourceScriptPath) -or
+    -not (Test-Path -LiteralPath $sourceRuntimeHelper)) {
     throw "VS Code notification bridge not found: $sourceScriptPath"
 }
 
 New-Item -ItemType Directory -Force -Path $hooksHome | Out-Null
 Copy-Item -LiteralPath $sourceScriptPath -Destination $installedScriptPath -Force
+Copy-Item -LiteralPath $sourceRuntimeHelper -Destination $installedRuntimeHelper -Force
 
 $windowsCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' +
 	$installedScriptPath + '"'

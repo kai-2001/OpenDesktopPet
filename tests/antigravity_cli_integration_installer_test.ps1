@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $installerPath = Join-Path $projectRoot 'tools\install_antigravity_cli_integration.ps1'
 $testRoot = Join-Path $env:TEMP (
-    'OpenDesktopPet-Antigravity-CLI-Installer-Test-' + [guid]::NewGuid().ToString('N')
+    'OpenDesktopPet Antigravity CLI Installer Test ' + [guid]::NewGuid().ToString('N')
 )
 $geminiConfigHome = Join-Path $testRoot '.gemini\config'
 $hooksPath = Join-Path $geminiConfigHome 'hooks.json'
@@ -46,11 +46,42 @@ try {
     )) 'Antigravity installer wrote a UTF-8 BOM.'
     $stopCommands = @($settings.'open-desktop-pet'.Stop | ForEach-Object { $_.command })
     Assert-Installer ($stopCommands.Count -eq 2) 'Antigravity installer removed an existing Stop hook.'
-    Assert-Installer (($stopCommands | Where-Object { $_ -like '*antigravity_cli_notify.ps1*' }).Count -eq 1) `
-        'Antigravity installer did not add exactly one Stop hook.'
-    Assert-Installer ($settings.'open-desktop-pet'.Stop[1].command -notmatch '-File\s+["'']') `
-        'Antigravity installer must not quote the -File path for its Windows hook runner.'
-    Assert-Installer ($settings.'open-desktop-pet'.Stop[1].command -notmatch 'WindowStyle') `
+    Assert-Installer (($stopCommands | Where-Object { $_ -match '(?i)-EncodedCommand\s+' }).Count -eq 1) `
+        'Antigravity installer did not add exactly one encoded Stop hook.'
+    $desktopPetCommand = [string]$settings.'open-desktop-pet'.Stop[1].command
+    $encodedCommandMatch = [regex]::Match($desktopPetCommand, '(?i)-EncodedCommand\s+([A-Za-z0-9+/=]+)$')
+    Assert-Installer ($encodedCommandMatch.Success) `
+        'Antigravity installer must use a PowerShell encoded command for paths with spaces.'
+    $decodedInvocation = [Text.Encoding]::Unicode.GetString(
+        [Convert]::FromBase64String($encodedCommandMatch.Groups[1].Value)
+    )
+    $expectedBridgePath = Join-Path $testRoot '.open-desktop-pet\antigravity_cli_notify.ps1'
+    Assert-Installer ($decodedInvocation -eq ("& '{0}'" -f $expectedBridgePath.Replace("'", "''"))) `
+        'Antigravity installer encoded an incorrect bridge invocation.'
+
+    # Antigravity evaluates hook commands through a Windows shell. Execute the
+    # generated command that way with a profile path containing spaces to prove
+    # the encoded invocation still reaches the bridge and preserves stdin.
+    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $processInfo.FileName = 'cmd.exe'
+    $processInfo.Arguments = '/d /s /c "' + $desktopPetCommand + '"'
+    $processInfo.UseShellExecute = $false
+    $processInfo.CreateNoWindow = $true
+    $processInfo.RedirectStandardInput = $true
+    $processInfo.RedirectStandardOutput = $true
+    $processInfo.RedirectStandardError = $true
+    $hookProcess = [System.Diagnostics.Process]::Start($processInfo)
+    $hookProcess.StandardInput.Write('{"fullyIdle":false}')
+    $hookProcess.StandardInput.Close()
+    $hookOutput = $hookProcess.StandardOutput.ReadToEnd()
+    $hookError = $hookProcess.StandardError.ReadToEnd()
+    $hookProcess.WaitForExit()
+    Assert-Installer ($hookProcess.ExitCode -eq 0) `
+        ("Antigravity encoded hook command failed: {0}" -f $hookError)
+    Assert-Installer ($hookOutput -match '\{"decision":"allow"\}') `
+        'Antigravity encoded hook command did not pass stdin to the bridge.'
+
+    Assert-Installer ($desktopPetCommand -notmatch 'WindowStyle') `
         'Antigravity installer must not hide the parent PowerShell console.'
     Assert-Installer ($settings.'open-desktop-pet'.Stop[1].timeout -eq 5) `
         'Antigravity installer must use a five-second hook timeout.'

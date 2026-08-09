@@ -13,19 +13,21 @@ function Assert-Bridge([bool]$condition, [string]$message) {
     }
 }
 
-function Set-Flags([string]$target) {
-    $targets = @('vscode', 'claude_app', 'terminal')
-    foreach ($candidate in $targets) {
-        $enabled = $candidate -eq $target
-        $value = if ($enabled) { '1' } else { '0' }
-        $fileName = switch ($candidate) {
-            'vscode' { 'open_desktop_pet_claude_vscode_enabled.txt' }
-            'claude_app' { 'open_desktop_pet_claude_app_enabled.txt' }
-            'terminal' { 'open_desktop_pet_claude_terminal_enabled.txt' }
+function Save-Runtime([int]$port, [string]$target) {
+    [pscustomobject]@{
+        schema_version = 1
+        instance_id = 'claude-bridge-test'
+        pid = $PID
+        port = $port
+        enabled_targets = [pscustomobject]@{
+            claude_vscode = $target -eq 'vscode'
+            claude_app = $target -eq 'claude_app'
+            claude_terminal = $target -eq 'terminal'
         }
-        Set-Content -LiteralPath (Join-Path $integrationHome $fileName) `
-            -Value $value -Encoding ASCII
-    }
+        executable_paths = [pscustomobject]@{ claude_app = '' }
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (
+        Join-Path $integrationHome 'open_desktop_pet_runtime.json'
+    ) -Encoding UTF8
 }
 
 function Receive-Notification([string]$eventJson, [string]$target, [bool]$shouldReceive) {
@@ -33,9 +35,7 @@ function Receive-Notification([string]$eventJson, [string]$target, [bool]$should
     $process = $null
     try {
         $port = $udp.Client.LocalEndPoint.Port
-        Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_notify_port.txt') `
-            -Value $port -Encoding ASCII
-        Set-Flags $target
+		Save-Runtime $port $target
 
         $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
         $startInfo.FileName = (Get-Command powershell.exe).Source

@@ -59,6 +59,19 @@ try {
     & $installerPath -Uninstall | Out-Null
     Assert-Installer (-not (Test-Path -LiteralPath $pluginPath)) 'OpenCode plugin was not removed.'
     Assert-Installer (-not (Test-Path -LiteralPath $markerPath)) 'OpenCode marker was not removed.'
+
+    Set-Content -LiteralPath $pluginPath -Value '// existing user plugin' -Encoding UTF8
+    & $installerPath | Out-Null
+    $backupFiles = @(Get-ChildItem -LiteralPath (Split-Path -Parent $pluginPath) `
+        -Filter 'open-desktop-pet.js.open-desktop-pet-backup-*.js' -File)
+    Assert-Installer ($backupFiles.Count -eq 1) 'OpenCode installer did not back up the existing plugin.'
+    & $installerPath -Uninstall | Out-Null
+    Assert-Installer (Test-Path -LiteralPath $pluginPath) 'OpenCode uninstall did not restore the existing plugin.'
+    Assert-Installer ((Get-Content -LiteralPath $pluginPath -Raw -Encoding UTF8).Contains(
+        '// existing user plugin'
+    )) 'OpenCode uninstall restored incorrect plugin content.'
+    Assert-Installer (-not (Test-Path -LiteralPath $backupFiles[0].FullName)) `
+        'OpenCode uninstall left the restored backup behind.'
     Write-Output 'OPENCODE_INTEGRATION_INSTALLER_TEST_OK'
 } finally {
     $env:USERPROFILE = $oldUserProfile

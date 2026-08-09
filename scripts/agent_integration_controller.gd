@@ -7,25 +7,10 @@ const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_PORT := 38571
 const MIN_PORT := 1024
 const MAX_PORT := 65535
-const PORT_FILE_NAME := "open_desktop_pet_notify_port.txt"
-const CODEX_ENABLED_FILE_NAME := "open_desktop_pet_codex_enabled.txt"
-const VSCODE_CODEX_ENABLED_FILE_NAME := "open_desktop_pet_vscode_codex_enabled.txt"
-const CODEX_APP_ENABLED_FILE_NAME := "open_desktop_pet_codex_app_enabled.txt"
-const TERMINAL_CODEX_ENABLED_FILE_NAME := "open_desktop_pet_terminal_codex_enabled.txt"
-const COPILOT_ENABLED_FILE_NAME := "open_desktop_pet_copilot_enabled.txt"
-const OPENCODE_ENABLED_FILE_NAME := "open_desktop_pet_opencode_enabled.txt"
-const OPENCODE_VSCODE_ENABLED_FILE_NAME := "open_desktop_pet_opencode_vscode_enabled.txt"
-const OPENCODE_APP_ENABLED_FILE_NAME := "open_desktop_pet_opencode_app_enabled.txt"
-const OPENCODE_TERMINAL_ENABLED_FILE_NAME := "open_desktop_pet_opencode_terminal_enabled.txt"
-const OPENCODE_APP_EXECUTABLE_PATH_FILE_NAME := "open_desktop_pet_opencode_app_executable_path.txt"
-const CLAUDE_CODE_ENABLED_FILE_NAME := "open_desktop_pet_claude_enabled.txt"
-const CLAUDE_CODE_VSCODE_ENABLED_FILE_NAME := "open_desktop_pet_claude_vscode_enabled.txt"
-const CLAUDE_CODE_APP_ENABLED_FILE_NAME := "open_desktop_pet_claude_app_enabled.txt"
-const CLAUDE_CODE_TERMINAL_ENABLED_FILE_NAME := "open_desktop_pet_claude_terminal_enabled.txt"
-const CLAUDE_CODE_APP_EXECUTABLE_PATH_FILE_NAME := "open_desktop_pet_claude_app_executable_path.txt"
-const GEMINI_CLI_ENABLED_FILE_NAME := "open_desktop_pet_gemini_enabled.txt"
-const AGY_ENABLED_FILE_NAME := "open_desktop_pet_agy_enabled.txt"
-const LEGACY_ENABLED_FILE_NAME := "open_desktop_pet_notify_enabled.txt"
+const RUNTIME_FILE_NAME := "open_desktop_pet_runtime.json"
+const RUNTIME_HELPER_FILE_NAME := "open_desktop_pet_runtime.ps1"
+const RUNTIME_SCHEMA_VERSION := 1
+const RUNTIME_BRIDGE_MARKER := "OpenDesktopPet runtime schema v1"
 const CODEX_INSTALL_MARKER := "open_desktop_pet_codex_installed.txt"
 const COPILOT_INSTALL_MARKER := "open_desktop_pet_copilot_installed.txt"
 const OPENCODE_INSTALL_MARKER := "open_desktop_pet_opencode_installed.txt"
@@ -86,12 +71,14 @@ var _last_event_id := ""
 var _active_target_app := TARGET_VSCODE
 var _active_agent := "codex"
 var _window_activator
+var _runtime_instance_id := ""
 var _executable_path_detection_thread: Thread
 var _active_executable_path_detection_targets: Array[String] = []
 var _pending_executable_path_detection_targets: Array[String] = []
 
 
 func _init() -> void:
+	_runtime_instance_id = "%d-%d" % [OS.get_process_id(), Time.get_ticks_msec()]
 	if ClassDB.class_exists("WindowsWindowActivator"):
 		_window_activator = ClassDB.instantiate("WindowsWindowActivator")
 
@@ -156,8 +143,7 @@ func load_settings() -> void:
 	enabled = codex_enabled
 	_save_settings()
 	_ensure_enabled_configurations()
-	_write_bridge_files()
-	_start_receiver()
+	_refresh_runtime_registration()
 
 
 func poll() -> void:
@@ -169,7 +155,7 @@ func poll() -> void:
 func shutdown() -> void:
 	_stop_executable_path_detection()
 	_stop_receiver()
-	_write_bridge_files(true)
+	_remove_runtime_if_owned()
 
 
 func set_enabled(value: bool) -> void:
@@ -312,26 +298,28 @@ func set_agy_terminal_enabled(value: bool) -> void:
 func set_codex_app_executable_path(value: String) -> void:
 	codex_app_executable_path = _normalize_executable_path(value)
 	_save_settings()
+	_publish_runtime_if_running()
 	state_changed.emit()
 
 
 func set_terminal_executable_path(value: String) -> void:
 	terminal_executable_path = _normalize_executable_path(value)
 	_save_settings()
+	_publish_runtime_if_running()
 	state_changed.emit()
 
 
 func set_opencode_app_executable_path(value: String) -> void:
 	opencode_app_executable_path = _normalize_executable_path(value)
 	_save_settings()
-	_write_bridge_files()
+	_publish_runtime_if_running()
 	state_changed.emit()
 
 
 func set_claude_app_executable_path(value: String) -> void:
 	claude_app_executable_path = _normalize_executable_path(value)
 	_save_settings()
-	_write_bridge_files()
+	_publish_runtime_if_running()
 	state_changed.emit()
 
 
@@ -470,11 +458,14 @@ func is_running() -> bool:
 
 func is_codex_configured() -> bool:
 	var codex_home := _codex_home_path()
-	if codex_home.is_empty():
+	var integration_home := _integration_home_path()
+	if codex_home.is_empty() or integration_home.is_empty():
 		return false
 	if not FileAccess.file_exists(codex_home.path_join(CODEX_INSTALL_MARKER)):
 		return false
-	if not FileAccess.file_exists(codex_home.path_join(CODEX_NOTIFY_SCRIPT_FILE_NAME)):
+	if not _has_runtime_bridge_support(
+		integration_home, codex_home.path_join(CODEX_NOTIFY_SCRIPT_FILE_NAME)
+	):
 		return false
 	var config_text := _read_text_file(codex_home.path_join(CODEX_CONFIG_FILE_NAME))
 	return config_text.contains("notify") and config_text.contains(
@@ -488,8 +479,8 @@ func is_copilot_configured() -> bool:
 		return false
 	if not FileAccess.file_exists(integration_home.path_join(COPILOT_INSTALL_MARKER)):
 		return false
-	if not FileAccess.file_exists(
-		integration_home.path_join(COPILOT_NOTIFY_SCRIPT_FILE_NAME)
+	if not _has_runtime_bridge_support(
+		integration_home, integration_home.path_join(COPILOT_NOTIFY_SCRIPT_FILE_NAME)
 	):
 		return false
 	var hook_config := _user_profile_path().path_join(
@@ -507,8 +498,8 @@ func is_opencode_configured() -> bool:
 		return false
 	if not FileAccess.file_exists(integration_home.path_join(OPENCODE_INSTALL_MARKER)):
 		return false
-	if not FileAccess.file_exists(
-		integration_home.path_join(OPENCODE_NOTIFY_SCRIPT_FILE_NAME)
+	if not _has_runtime_bridge_support(
+		integration_home, integration_home.path_join(OPENCODE_NOTIFY_SCRIPT_FILE_NAME)
 	):
 		return false
 	var plugin_path := _user_profile_path().path_join(
@@ -526,8 +517,8 @@ func is_claude_code_configured() -> bool:
 		return false
 	if not FileAccess.file_exists(integration_home.path_join(CLAUDE_CODE_INSTALL_MARKER)):
 		return false
-	if not FileAccess.file_exists(
-		integration_home.path_join(CLAUDE_CODE_NOTIFY_SCRIPT_FILE_NAME)
+	if not _has_runtime_bridge_support(
+		integration_home, integration_home.path_join(CLAUDE_CODE_NOTIFY_SCRIPT_FILE_NAME)
 	):
 		return false
 	var settings_text := _read_text_file(
@@ -543,8 +534,8 @@ func is_gemini_cli_configured() -> bool:
 		return false
 	if not FileAccess.file_exists(integration_home.path_join(GEMINI_CLI_INSTALL_MARKER)):
 		return false
-	if not FileAccess.file_exists(
-		integration_home.path_join(GEMINI_CLI_NOTIFY_SCRIPT_FILE_NAME)
+	if not _has_runtime_bridge_support(
+		integration_home, integration_home.path_join(GEMINI_CLI_NOTIFY_SCRIPT_FILE_NAME)
 	):
 		return false
 	var settings_text := _read_text_file(
@@ -561,8 +552,8 @@ func is_antigravity_cli_configured() -> bool:
 		return false
 	if not FileAccess.file_exists(integration_home.path_join(AGY_INSTALL_MARKER)):
 		return false
-	if not FileAccess.file_exists(
-		integration_home.path_join(AGY_NOTIFY_SCRIPT_FILE_NAME)
+	if not _has_runtime_bridge_support(
+		integration_home, integration_home.path_join(AGY_NOTIFY_SCRIPT_FILE_NAME)
 	):
 		return false
 	var hooks_text := _read_text_file(
@@ -577,12 +568,29 @@ func is_antigravity_cli_configured() -> bool:
 	var stop_handlers: Variant = hook_definition.get("Stop", [])
 	if not stop_handlers is Array:
 		return false
+	var expected_command := _expected_antigravity_cli_hook_command()
 	for handler in stop_handlers:
-		if handler is Dictionary and String(handler.get("command", "")).contains(
-			AGY_NOTIFY_SCRIPT_FILE_NAME
-		):
+		if handler is Dictionary and String(handler.get("command", "")) == expected_command:
 			return true
 	return false
+
+
+func _expected_antigravity_cli_hook_command() -> String:
+	var integration_home := _integration_home_path()
+	if integration_home.is_empty():
+		return ""
+	var bridge_path := integration_home.path_join(AGY_NOTIFY_SCRIPT_FILE_NAME).replace("/", "\\")
+	var bridge_invocation := "& '%s'" % bridge_path.replace("'", "''")
+	var encoded_invocation := Marshalls.raw_to_base64(bridge_invocation.to_utf16_buffer())
+	return "powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand %s" % encoded_invocation
+
+
+func _has_runtime_bridge_support(integration_home: String, bridge_path: String) -> bool:
+	var helper_text := _read_text_file(integration_home.path_join(RUNTIME_HELPER_FILE_NAME))
+	var bridge_text := _read_text_file(bridge_path)
+	return helper_text.contains(RUNTIME_BRIDGE_MARKER) and bridge_text.contains(
+		RUNTIME_BRIDGE_MARKER
+	)
 
 
 func _ensure_codex_configuration(target_name: String) -> bool:
@@ -641,11 +649,7 @@ func _ensure_antigravity_cli_configuration() -> bool:
 
 func _persist_agent_state() -> void:
 	_save_settings()
-	_write_bridge_files()
-	if is_any_enabled():
-		_start_receiver()
-	else:
-		_stop_receiver()
+	_refresh_runtime_registration()
 	state_changed.emit()
 
 
@@ -900,17 +904,6 @@ func normalize_port(value: int) -> int:
 	return clampi(value, MIN_PORT, MAX_PORT)
 
 
-func _start_receiver() -> void:
-	_stop_receiver()
-	if not is_any_enabled():
-		return
-	_receiver = LocalAgentNotificationReceiverScript.new()
-	_receiver.notification_received.connect(_handle_notification)
-	if not _receiver.start(port):
-		push_warning("Agent 通知接收器無法監聽通訊埠 %d。" % port)
-		_receiver = null
-
-
 func _stop_receiver() -> void:
 	if _receiver != null:
 		_receiver.stop()
@@ -1081,124 +1074,164 @@ func _integration_home_path() -> String:
 	return user_profile.path_join(".open-desktop-pet")
 
 
-func _write_bridge_files(disable_all := false) -> void:
+func _refresh_runtime_registration() -> void:
+	# Headless validation must never mutate the real user's notification state.
+	if DisplayServer.get_name() == "headless":
+		if is_any_enabled():
+			_start_receiver()
+		else:
+			_stop_receiver()
+		return
+	if not is_any_enabled():
+		_stop_receiver()
+		_remove_runtime_if_owned()
+		return
+	if _start_receiver():
+		_write_runtime_state()
+
+
+func _start_receiver() -> bool:
+	if not is_any_enabled():
+		return false
+	if is_running() and _receiver.get_port() == port:
+		return true
+	if DisplayServer.get_name() != "headless" and _has_live_runtime_owner():
+		push_warning("另一個 Open Desktop Pet 實例正在管理 Agent 通知。")
+		return false
+	_stop_receiver()
+	_receiver = LocalAgentNotificationReceiverScript.new()
+	_receiver.notification_received.connect(_handle_notification)
+	if not _receiver.start(port):
+		push_warning("Agent 通知接收器無法監聽通訊埠 %d。" % port)
+		_receiver = null
+		return false
+	return true
+
+
+func _has_live_runtime_owner() -> bool:
+	var runtime := _read_runtime_state()
+	if runtime.is_empty() or String(runtime.get("instance_id", "")) == _runtime_instance_id:
+		return false
+	var runtime_pid := int(runtime.get("pid", 0))
+	if runtime_pid <= 0 or OS.get_name() != "Windows":
+		return false
+	var output: Array = []
+	var command := "if (Get-Process -Id %d -ErrorAction SilentlyContinue) { exit 0 }; exit 1" % runtime_pid
+	return OS.execute(
+		"powershell.exe", PackedStringArray(["-NoProfile", "-Command", command]), output, true, false
+	) == 0
+
+
+func _write_runtime_state() -> bool:
+	if not is_running():
+		return false
 	var integration_home := _integration_home_path()
-	if not integration_home.is_empty():
-		_write_agent_bridge_files(integration_home, disable_all, false)
+	if integration_home.is_empty() or DirAccess.make_dir_recursive_absolute(integration_home) != OK:
+		return false
+	var runtime_path := integration_home.path_join(RUNTIME_FILE_NAME)
+	var temporary_path := "%s.%s.tmp" % [runtime_path, _runtime_instance_id]
+	var payload := {
+		"schema_version": RUNTIME_SCHEMA_VERSION,
+		"instance_id": _runtime_instance_id,
+		"pid": OS.get_process_id(),
+		"port": port,
+		"updated_unix_time": Time.get_unix_time_from_system(),
+		"enabled_targets": {
+			"codex_vscode": codex_enabled,
+			"codex_app": codex_app_enabled,
+			"codex_terminal": terminal_codex_enabled,
+			"copilot": copilot_enabled,
+			"opencode_terminal": terminal_opencode_enabled,
+			"opencode_vscode": vscode_opencode_enabled,
+			"opencode_app": opencode_app_enabled,
+			"claude_terminal": claude_terminal_enabled,
+			"claude_vscode": claude_vscode_enabled,
+			"claude_app": claude_app_enabled,
+			"gemini_terminal": gemini_terminal_enabled,
+			"agy_terminal": agy_terminal_enabled,
+		},
+		"executable_paths": {
+			"codex_app": codex_app_executable_path,
+			"terminal": terminal_executable_path,
+			"opencode_app": opencode_app_executable_path,
+			"claude_app": claude_app_executable_path,
+		},
+	}
+	var file := FileAccess.open(temporary_path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(payload))
+	file.close()
+	if FileAccess.file_exists(runtime_path) and DirAccess.remove_absolute(runtime_path) != OK:
+		DirAccess.remove_absolute(temporary_path)
+		return false
+	if DirAccess.rename_absolute(temporary_path, runtime_path) != OK:
+		DirAccess.remove_absolute(temporary_path)
+		return false
+	_remove_legacy_bridge_state()
+	return true
 
-	# Keep legacy Codex-home bridge files in sync for existing installations.
-	var codex_home := _codex_home_path()
-	if codex_home.is_empty():
+
+func _publish_runtime_if_running() -> void:
+	if DisplayServer.get_name() != "headless" and is_running():
+		_write_runtime_state()
+
+
+func _remove_runtime_if_owned() -> void:
+	var integration_home := _integration_home_path()
+	if integration_home.is_empty():
 		return
-	_write_agent_bridge_files(codex_home, disable_all, true)
-
-
-func _write_agent_bridge_files(
-	directory: String, disable_all: bool, write_legacy_codex_flag: bool
-) -> void:
-	if DirAccess.make_dir_recursive_absolute(directory) != OK:
+	var runtime := _read_runtime_state()
+	if String(runtime.get("instance_id", "")) != _runtime_instance_id:
 		return
-	_write_port_file(directory)
-	if write_legacy_codex_flag:
-		_write_flag(
-			directory.path_join(LEGACY_ENABLED_FILE_NAME),
-			(codex_enabled or codex_app_enabled or terminal_codex_enabled) and not disable_all
-		)
-	_write_flag(
-		directory.path_join(CODEX_ENABLED_FILE_NAME),
-		(codex_enabled or codex_app_enabled or terminal_codex_enabled) and not disable_all
-	)
-	_write_flag(
-		directory.path_join(COPILOT_ENABLED_FILE_NAME),
-		copilot_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(OPENCODE_VSCODE_ENABLED_FILE_NAME),
-		vscode_opencode_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(OPENCODE_APP_ENABLED_FILE_NAME),
-		opencode_app_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(OPENCODE_TERMINAL_ENABLED_FILE_NAME),
-		terminal_opencode_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(CLAUDE_CODE_VSCODE_ENABLED_FILE_NAME),
-		claude_vscode_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(CLAUDE_CODE_APP_ENABLED_FILE_NAME),
-		claude_app_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(CLAUDE_CODE_TERMINAL_ENABLED_FILE_NAME),
-		claude_terminal_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(CLAUDE_CODE_ENABLED_FILE_NAME),
-		(
-			claude_vscode_enabled or claude_app_enabled or claude_terminal_enabled
-		) and not disable_all
-	)
-	_write_flag(
-		directory.path_join(GEMINI_CLI_ENABLED_FILE_NAME),
-		gemini_terminal_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(AGY_ENABLED_FILE_NAME),
-		agy_terminal_enabled and not disable_all
-	)
-	_write_text_file(
-		directory.path_join(CLAUDE_CODE_APP_EXECUTABLE_PATH_FILE_NAME),
-		claude_app_executable_path
-	)
-	_write_text_file(
-		directory.path_join(OPENCODE_APP_EXECUTABLE_PATH_FILE_NAME),
-		opencode_app_executable_path
-	)
-	_write_codex_target_flags(directory, disable_all)
+	DirAccess.remove_absolute(integration_home.path_join(RUNTIME_FILE_NAME))
+	_remove_legacy_bridge_state()
 
 
-func _write_port_file(directory: String) -> void:
-	var file := FileAccess.open(directory.path_join(PORT_FILE_NAME), FileAccess.WRITE)
-	if file != null:
-		file.store_string(str(port))
-		file.close()
+func _read_runtime_state() -> Dictionary:
+	var integration_home := _integration_home_path()
+	if integration_home.is_empty():
+		return {}
+	var runtime_path := integration_home.path_join(RUNTIME_FILE_NAME)
+	if not FileAccess.file_exists(runtime_path):
+		return {}
+	var file := FileAccess.open(runtime_path, FileAccess.READ)
+	if file == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	return parsed if parsed is Dictionary else {}
 
 
-func _write_codex_target_flags(directory: String, disable_all: bool) -> void:
-	_write_flag(
-		directory.path_join(VSCODE_CODEX_ENABLED_FILE_NAME),
-		codex_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(CODEX_APP_ENABLED_FILE_NAME),
-		codex_app_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(TERMINAL_CODEX_ENABLED_FILE_NAME),
-		terminal_codex_enabled and not disable_all
-	)
-	_write_flag(
-		directory.path_join(OPENCODE_ENABLED_FILE_NAME),
-		terminal_opencode_enabled and not disable_all
-	)
-
-
-func _write_flag(path: String, enabled_value: bool) -> void:
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file != null:
-		file.store_string("1" if enabled_value else "0")
-		file.close()
-
-
-func _write_text_file(path: String, value: String) -> void:
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file != null:
-		file.store_string(value)
-		file.close()
+func _remove_legacy_bridge_state() -> void:
+	var file_names := PackedStringArray([
+		"open_desktop_pet_notify_port.txt",
+		"open_desktop_pet_notify_enabled.txt",
+		"open_desktop_pet_codex_enabled.txt",
+		"open_desktop_pet_vscode_codex_enabled.txt",
+		"open_desktop_pet_codex_app_enabled.txt",
+		"open_desktop_pet_terminal_codex_enabled.txt",
+		"open_desktop_pet_copilot_enabled.txt",
+		"open_desktop_pet_opencode_enabled.txt",
+		"open_desktop_pet_opencode_vscode_enabled.txt",
+		"open_desktop_pet_opencode_app_enabled.txt",
+		"open_desktop_pet_opencode_terminal_enabled.txt",
+		"open_desktop_pet_opencode_app_executable_path.txt",
+		"open_desktop_pet_claude_enabled.txt",
+		"open_desktop_pet_claude_vscode_enabled.txt",
+		"open_desktop_pet_claude_app_enabled.txt",
+		"open_desktop_pet_claude_terminal_enabled.txt",
+		"open_desktop_pet_claude_app_executable_path.txt",
+		"open_desktop_pet_gemini_enabled.txt",
+		"open_desktop_pet_agy_enabled.txt",
+	])
+	for directory in [_integration_home_path(), _codex_home_path()]:
+		if directory.is_empty():
+			continue
+		for file_name in file_names:
+			var path: String = String(directory).path_join(String(file_name))
+			if FileAccess.file_exists(path):
+				DirAccess.remove_absolute(path)
 
 
 func _focus_target(target_app: String, agent := "") -> bool:

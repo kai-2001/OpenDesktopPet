@@ -10,9 +10,12 @@ $codexHome = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
     $env:CODEX_HOME
 }
 $configPath = Join-Path $codexHome 'config.toml'
+$integrationHome = Join-Path $env:USERPROFILE '.open-desktop-pet'
 $installedNotifyScript = Join-Path $codexHome 'open_desktop_pet_notify.ps1'
+$installedRuntimeHelper = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
 $previousNotifyPath = Join-Path $codexHome 'open_desktop_pet_previous_notify.json'
 $sourceNotifyScript = Join-Path $PSScriptRoot 'codex_notify.ps1'
+$sourceRuntimeHelper = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
 $installMarker = Join-Path $codexHome 'open_desktop_pet_codex_installed.txt'
 $escapedScriptPath = $installedNotifyScript.Replace('\', '\\')
 $doubleEscapedScriptPath = $escapedScriptPath.Replace('\\', '\\\\')
@@ -164,6 +167,7 @@ function Remove-NotifyAssignments(
 }
 
 New-Item -ItemType Directory -Force -Path $codexHome | Out-Null
+New-Item -ItemType Directory -Force -Path $integrationHome | Out-Null
 
 if ($Uninstall) {
     if (Test-Path -LiteralPath $configPath) {
@@ -208,11 +212,13 @@ if ($Uninstall) {
     exit 0
 }
 
-if (-not (Test-Path -LiteralPath $sourceNotifyScript)) {
+if (-not (Test-Path -LiteralPath $sourceNotifyScript) -or
+    -not (Test-Path -LiteralPath $sourceRuntimeHelper)) {
     throw "Notification bridge not found: $sourceNotifyScript"
 }
 
 Copy-Item -LiteralPath $sourceNotifyScript -Destination $installedNotifyScript -Force
+Copy-Item -LiteralPath $sourceRuntimeHelper -Destination $installedRuntimeHelper -Force
 $notifyBlock = New-NotifyBlock @(
     'powershell.exe',
     '-NoProfile',

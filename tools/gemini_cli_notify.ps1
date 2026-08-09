@@ -1,13 +1,15 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
+# OpenDesktopPet runtime schema v1
 # Gemini CLI hook bridge for OpenDesktopPet.
 # Gemini CLI sends hook JSON on stdin. The bridge sends a small UDP status
 # payload and returns a valid empty JSON object so it never changes the agent.
 $notifyHost = '127.0.0.1'
-$notifyPort = 38571
 $integrationHome = Join-Path $env:USERPROFILE '.open-desktop-pet'
-$portFile = Join-Path $integrationHome 'open_desktop_pet_notify_port.txt'
-$enabledFile = Join-Path $integrationHome 'open_desktop_pet_gemini_enabled.txt'
+$runtimeHelperPath = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
+if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+    $runtimeHelperPath = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
+}
 $logPath = Join-Path $env:TEMP 'OpenDesktopPet-gemini-cli-notify.log'
 
 function Write-NotifyLog([string]$message) {
@@ -25,17 +27,6 @@ function Complete-GeminiHook {
     exit 0
 }
 
-function Test-GeminiEnabled {
-    if (-not (Test-Path -LiteralPath $enabledFile)) {
-        return $false
-    }
-    try {
-        return (Get-Content -LiteralPath $enabledFile -Raw).Trim() -eq '1'
-    } catch {
-        return $false
-    }
-}
-
 function Get-EventHash([string]$value) {
     try {
         $sha = [System.Security.Cryptography.SHA256]::Create()
@@ -43,20 +34,6 @@ function Get-EventHash([string]$value) {
         return ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
     } catch {
         return $value.GetHashCode().ToString()
-    }
-}
-
-function Read-ConfiguredPort {
-    if (-not (Test-Path -LiteralPath $portFile)) {
-        return
-    }
-    try {
-        $configuredPort = [int](Get-Content -LiteralPath $portFile -Raw).Trim()
-        if ($configuredPort -ge 1024 -and $configuredPort -le 65535) {
-            $script:notifyPort = $configuredPort
-        }
-    } catch {
-        # Keep the default port when the optional setting is invalid.
     }
 }
 
@@ -75,6 +52,11 @@ function Read-StandardInputUtf8 {
 }
 
 try {
+    if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+        Write-NotifyLog 'ignored reason=runtime-helper-missing'
+        Complete-GeminiHook
+    }
+    . $runtimeHelperPath
     $rawInput = Read-StandardInputUtf8
     if ([string]::IsNullOrWhiteSpace($rawInput)) {
         Write-NotifyLog 'ignored reason=missing-input'
@@ -108,11 +90,16 @@ try {
         }
     }
 
-    if (-not (Test-GeminiEnabled)) {
+    $runtime = Get-OpenDesktopPetRuntime -IntegrationHome $integrationHome
+    if ($null -eq $runtime) {
+        Write-NotifyLog 'ignored reason=runtime-unavailable'
+        Complete-GeminiHook
+    }
+    if (-not (Test-OpenDesktopPetRuntimeEnabled -Runtime $runtime -Target 'gemini_terminal')) {
         Write-NotifyLog 'ignored reason=desktop-pet-disabled'
         Complete-GeminiHook
     }
-    Read-ConfiguredPort
+    $notifyPort = Get-OpenDesktopPetRuntimePort -Runtime $runtime
 
     $sessionId = [string]$event.session_id
     $identityText = "{0}|{1}|{2}|{3}|{4}" -f `

@@ -1,20 +1,19 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
+# OpenDesktopPet runtime schema v1
 # Shared Codex bridge. Codex App, VS Code Codex, and Codex CLI all use this
-# file through the user's .codex/config.toml. The bridge classifies the host
-# before applying the corresponding desktop-pet flag.
+# file through the user's .codex/config.toml. The bridge reads the single
+# runtime registration that the active desktop-pet instance owns.
 $notifyHost = '127.0.0.1'
-$notifyPort = 38571
 $codexHome = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
     Join-Path $env:USERPROFILE '.codex'
 } else {
     $env:CODEX_HOME
 }
 $integrationHome = Join-Path $env:USERPROFILE '.open-desktop-pet'
-$portFile = Join-Path $integrationHome 'open_desktop_pet_notify_port.txt'
-$legacyEnabledFile = Join-Path $integrationHome 'open_desktop_pet_codex_enabled.txt'
-if (-not (Test-Path -LiteralPath $legacyEnabledFile)) {
-    $legacyEnabledFile = Join-Path $codexHome 'open_desktop_pet_notify_enabled.txt'
+$runtimeHelperPath = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
+if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+    $runtimeHelperPath = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
 }
 $previousNotifyFile = Join-Path $codexHome 'open_desktop_pet_previous_notify.json'
 $logPath = Join-Path $env:TEMP 'OpenDesktopPet-codex-notify.log'
@@ -122,39 +121,23 @@ function Get-CodexTarget([object]$event) {
 		-not [string]::IsNullOrWhiteSpace([string]$env:VSCODE_PID) -or
 		(Get-ProcessTreeContainsVsCode)
 	if ($isVsCodeEnvironment) {
-		return [ordered]@{ source = 'codex_vscode'; target_app = 'vscode'; target_executable = 'Code.exe'; flag = 'open_desktop_pet_vscode_codex_enabled.txt' }
+		return [ordered]@{ source = 'codex_vscode'; target_app = 'vscode'; target_executable = 'Code.exe'; runtime_target = 'codex_vscode' }
 	}
 
 	if ($cwd -match '(?i)\\WindowsApps\\OpenAI\.Codex_[^\\]+\\' -or
 		(Get-ProcessTreeContainsCodexApp)) {
-		return [ordered]@{ source = 'codex_app'; target_app = 'codex_app'; target_executable = 'ChatGPT.exe'; flag = 'open_desktop_pet_codex_app_enabled.txt' }
+		return [ordered]@{ source = 'codex_app'; target_app = 'codex_app'; target_executable = 'ChatGPT.exe'; runtime_target = 'codex_app' }
 	}
 
-	return [ordered]@{ source = 'codex_cli'; target_app = 'terminal'; target_executable = 'WindowsTerminal.exe'; flag = 'open_desktop_pet_terminal_codex_enabled.txt' }
-}
-
-function Read-BridgeFlag([string]$flagName, [bool]$allowLegacyFallback = $false) {
-    $candidates = @(
-        (Join-Path $integrationHome $flagName),
-        (Join-Path $codexHome $flagName)
-    )
-    if ($allowLegacyFallback) {
-        $candidates += $legacyEnabledFile
-    }
-    foreach ($candidate in $candidates) {
-        if (-not (Test-Path -LiteralPath $candidate)) {
-            continue
-        }
-        try {
-            return (Get-Content -LiteralPath $candidate -Raw).Trim() -eq '1'
-        } catch {
-            return $false
-        }
-    }
-    return $false
+	return [ordered]@{ source = 'codex_cli'; target_app = 'terminal'; target_executable = 'WindowsTerminal.exe'; runtime_target = 'codex_terminal' }
 }
 
 try {
+	if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+		Write-NotifyLog 'ignored reason=runtime-helper-missing'
+		exit 0
+	}
+	. $runtimeHelperPath
     Write-NotifyLog ("invoked args={0}" -f $args.Count)
     if ($args.Count -lt 1 -or [string]::IsNullOrWhiteSpace([string]$args[0])) {
         Write-NotifyLog 'ignored reason=missing-argument'
@@ -167,30 +150,25 @@ try {
         exit 0
     }
 
-    # Preserve an existing Codex notify integration when the installer stored it.
-    # It runs independently of the desktop-pet toggle.
-    Invoke-PreviousNotify ([string]$args[0])
+	# Preserve an existing Codex notify integration when the installer stored it.
+	# It runs independently of the desktop-pet toggle.
+	Invoke-PreviousNotify ([string]$args[0])
 
+	$runtime = Get-OpenDesktopPetRuntime -IntegrationHome $integrationHome
+	if ($null -eq $runtime) {
+		Write-NotifyLog 'ignored reason=runtime-unavailable'
+		exit 0
+	}
     $target = Get-CodexTarget $event
-    $isEnabled = Read-BridgeFlag $target.flag ($target.target_app -eq 'vscode')
-    Write-NotifyLog (
+	$isEnabled = Test-OpenDesktopPetRuntimeEnabled -Runtime $runtime -Target $target.runtime_target
+	Write-NotifyLog (
         "event type={0} cwd={1} source={2} target={3} enabled={4}" -f
         [string]$event.type, [string]$event.cwd, $target.source, $target.target_app, $isEnabled
     )
-    if (-not $isEnabled) {
-        exit 0
-    }
-
-    if (Test-Path -LiteralPath $portFile) {
-        try {
-            $configuredPort = [int](Get-Content -LiteralPath $portFile -Raw).Trim()
-            if ($configuredPort -ge 1024 -and $configuredPort -le 65535) {
-                $notifyPort = $configuredPort
-            }
-        } catch {
-            # Keep the default port when the optional setting is invalid.
-        }
-    }
+	if (-not $isEnabled) {
+		exit 0
+	}
+	$notifyPort = Get-OpenDesktopPetRuntimePort -Runtime $runtime
 
     # Forward only a fixed status payload, never transcript or source content.
     $payload = [ordered]@{

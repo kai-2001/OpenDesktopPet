@@ -1,14 +1,16 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
+# OpenDesktopPet runtime schema v1
 # Claude Code hook bridge for OpenDesktopPet.
 # Claude Code CLI, the VS Code extension, and Claude Desktop Code sessions
 # share the same user hook configuration. This bridge classifies the local
 # host, sends only a fixed status payload, and never blocks Claude Code.
 $notifyHost = '127.0.0.1'
-$notifyPort = 38571
 $integrationHome = Join-Path $env:USERPROFILE '.open-desktop-pet'
-$portFile = Join-Path $integrationHome 'open_desktop_pet_notify_port.txt'
-$claudeAppPathFile = Join-Path $integrationHome 'open_desktop_pet_claude_app_executable_path.txt'
+$runtimeHelperPath = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
+if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+    $runtimeHelperPath = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
+}
 $logPath = Join-Path $env:TEMP 'OpenDesktopPet-claude-code-notify.log'
 
 function Write-NotifyLog([string]$message) {
@@ -47,14 +49,8 @@ function Test-ClaudeDesktopPath([string]$path) {
         $normalizedPath -match '(?i)[\/]Claude([ _-]?Desktop)?[\/]'
 }
 
-function Test-ClaudeDesktopProcess {
-    $configuredPath = ''
-    if (Test-Path -LiteralPath $claudeAppPathFile) {
-        $rawConfiguredPath = Get-Content -LiteralPath $claudeAppPathFile -Raw
-        if ($null -ne $rawConfiguredPath) {
-            $configuredPath = Normalize-PathText $rawConfiguredPath
-        }
-    }
+function Test-ClaudeDesktopProcess([object]$runtime) {
+    $configuredPath = Normalize-PathText (Get-OpenDesktopPetRuntimeExecutablePath -Runtime $runtime -Target 'claude_app')
     try {
         $parentId = $PID
         for ($index = 0; $index -lt 10 -and $parentId -gt 0; $index++) {
@@ -114,27 +110,27 @@ function Test-VsCodeProcess {
     return $false
 }
 
-function Get-ClaudeTarget {
+function Get-ClaudeTarget([object]$runtime) {
     $forcedTarget = ([string]$env:OPEN_DESKTOP_PET_CLAUDE_TARGET).ToLowerInvariant()
     if ($forcedTarget -eq 'vscode') {
         return [ordered]@{
             target_app = 'vscode'
             target_executable = 'Code.exe'
-            enabled_file = 'open_desktop_pet_claude_vscode_enabled.txt'
+            runtime_target = 'claude_vscode'
         }
     }
     if ($forcedTarget -eq 'claude_app') {
         return [ordered]@{
             target_app = 'claude_app'
             target_executable = 'Claude.exe'
-            enabled_file = 'open_desktop_pet_claude_app_enabled.txt'
+            runtime_target = 'claude_app'
         }
     }
     if ($forcedTarget -eq 'terminal') {
         return [ordered]@{
             target_app = 'terminal'
             target_executable = 'WindowsTerminal.exe'
-            enabled_file = 'open_desktop_pet_claude_terminal_enabled.txt'
+            runtime_target = 'claude_terminal'
         }
     }
 
@@ -146,39 +142,21 @@ function Get-ClaudeTarget {
         return [ordered]@{
             target_app = 'vscode'
             target_executable = 'Code.exe'
-            enabled_file = 'open_desktop_pet_claude_vscode_enabled.txt'
+            runtime_target = 'claude_vscode'
         }
     }
-    if (Test-ClaudeDesktopProcess) {
+    if (Test-ClaudeDesktopProcess $runtime) {
         return [ordered]@{
             target_app = 'claude_app'
             target_executable = 'Claude.exe'
-            enabled_file = 'open_desktop_pet_claude_app_enabled.txt'
+            runtime_target = 'claude_app'
         }
     }
     return [ordered]@{
         target_app = 'terminal'
         target_executable = 'WindowsTerminal.exe'
-        enabled_file = 'open_desktop_pet_claude_terminal_enabled.txt'
+        runtime_target = 'claude_terminal'
     }
-}
-
-function Test-ClaudeEnabled([string]$flagName) {
-    $candidates = @(
-        (Join-Path $integrationHome $flagName),
-        (Join-Path (Join-Path $env:USERPROFILE '.claude') $flagName)
-    )
-    foreach ($candidate in $candidates) {
-        if (-not (Test-Path -LiteralPath $candidate)) {
-            continue
-        }
-        try {
-            return (Get-Content -LiteralPath $candidate -Raw).Trim() -eq '1'
-        } catch {
-            return $false
-        }
-    }
-    return $false
 }
 
 function Get-EventHash([string]$value) {
@@ -188,20 +166,6 @@ function Get-EventHash([string]$value) {
         return ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
     } catch {
         return $value.GetHashCode().ToString()
-    }
-}
-
-function Read-ConfiguredPort {
-    if (-not (Test-Path -LiteralPath $portFile)) {
-        return
-    }
-    try {
-        $configuredPort = [int](Get-Content -LiteralPath $portFile -Raw).Trim()
-        if ($configuredPort -ge 1024 -and $configuredPort -le 65535) {
-            $script:notifyPort = $configuredPort
-        }
-    } catch {
-        # Keep the default port when the optional setting is invalid.
     }
 }
 
@@ -220,6 +184,11 @@ function Read-StandardInputUtf8 {
 }
 
 try {
+    if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+        Write-NotifyLog 'ignored reason=runtime-helper-missing'
+        exit 0
+    }
+    . $runtimeHelperPath
     $rawInput = Read-StandardInputUtf8
     if ([string]::IsNullOrWhiteSpace($rawInput)) {
         Write-NotifyLog 'ignored reason=missing-input'
@@ -259,12 +228,17 @@ try {
         }
     }
 
-    $target = Get-ClaudeTarget
-    if (-not (Test-ClaudeEnabled $target.enabled_file)) {
+    $runtime = Get-OpenDesktopPetRuntime -IntegrationHome $integrationHome
+    if ($null -eq $runtime) {
+        Write-NotifyLog 'ignored reason=runtime-unavailable'
+        exit 0
+    }
+    $target = Get-ClaudeTarget $runtime
+    if (-not (Test-OpenDesktopPetRuntimeEnabled -Runtime $runtime -Target $target.runtime_target)) {
         Write-NotifyLog ("ignored reason=desktop-pet-disabled target={0}" -f $target.target_app)
         exit 0
     }
-    Read-ConfiguredPort
+    $notifyPort = Get-OpenDesktopPetRuntimePort -Runtime $runtime
 
     $sessionId = [string]$event.session_id
     $identityText = "{0}|{1}|{2}|{3}|{4}" -f `

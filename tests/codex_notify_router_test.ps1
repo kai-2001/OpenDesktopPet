@@ -19,17 +19,24 @@ function Assert-Router([bool]$condition, [string]$message) {
     }
 }
 
-function Set-Flag([string]$name, [bool]$enabled) {
-	$value = if ($enabled) { '1' } else { '0' }
-	Set-Content -LiteralPath (Join-Path $integrationHome $name) -Value $value -Encoding ASCII
+function Save-Runtime([int]$port) {
+    [pscustomobject]@{
+        schema_version = 1
+        instance_id = 'codex-router-test'
+        pid = $PID
+        port = $port
+        enabled_targets = [pscustomobject]$script:enabledTargets
+        executable_paths = [pscustomobject]@{}
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (
+        Join-Path $integrationHome 'open_desktop_pet_runtime.json'
+    ) -Encoding UTF8
 }
 
 function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
     $udp = [System.Net.Sockets.UdpClient]::new(0)
     try {
         $port = $udp.Client.LocalEndPoint.Port
-        Set-Content -LiteralPath (Join-Path $integrationHome 'open_desktop_pet_notify_port.txt') `
-            -Value $port -Encoding ASCII
+		Save-Runtime $port
 		& $bridgePath $eventJson | Out-Null
         $udp.Client.ReceiveTimeout = 3000
         $remote = [System.Net.IPEndPoint]::new([System.Net.IPAddress]::Any, 0)
@@ -50,9 +57,11 @@ function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
 try {
     New-Item -ItemType Directory -Force -Path $integrationHome | Out-Null
     New-Item -ItemType Directory -Force -Path $codexHome | Out-Null
-    Set-Flag 'open_desktop_pet_vscode_codex_enabled.txt' $true
-    Set-Flag 'open_desktop_pet_codex_app_enabled.txt' $false
-    Set-Flag 'open_desktop_pet_terminal_codex_enabled.txt' $false
+	$script:enabledTargets = @{
+		codex_vscode = $true
+		codex_app = $false
+		codex_terminal = $false
+	}
     $env:USERPROFILE = $testRoot
     $env:CODEX_HOME = $codexHome
     $env:OPEN_DESKTOP_PET_SKIP_PROCESS_TREE = '1'
@@ -84,14 +93,14 @@ Set-Content -LiteralPath $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG -Value $event
     $env:VSCODE_PID = ''
     $appEvent = '{"type":"agent-turn-complete","cwd":"C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app","thread-id":"app","turn-id":"1"}'
     Receive-Notification $appEvent $false | Out-Null
-    Set-Flag 'open_desktop_pet_codex_app_enabled.txt' $true
+	$script:enabledTargets.codex_app = $true
     $payload = Receive-Notification $appEvent $true
     Assert-Router ($payload.source -eq 'codex_app') 'Codex App source was not classified.'
     Assert-Router ($payload.target_app -eq 'codex_app') 'Codex App target was not classified.'
 
     $terminalEvent = '{"type":"agent-turn-complete","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","thread-id":"terminal","turn-id":"1"}'
     Receive-Notification $terminalEvent $false | Out-Null
-    Set-Flag 'open_desktop_pet_terminal_codex_enabled.txt' $true
+	$script:enabledTargets.codex_terminal = $true
     $payload = Receive-Notification $terminalEvent $true
     Assert-Router ($payload.source -eq 'codex_cli') 'CLI source was not classified.'
     Assert-Router ($payload.target_app -eq 'terminal') 'CLI target was not classified.'

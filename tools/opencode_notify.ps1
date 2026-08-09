@@ -1,14 +1,16 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
+# OpenDesktopPet runtime schema v1
 # OpenCode bridge for OpenDesktopPet. It distinguishes the host where the
 # OpenCode session was started: VS Code, OpenCode Desktop, or a normal terminal.
 # It is intentionally best-effort: a pet notification must never interrupt an
 # OpenCode session or change its exit status.
 $notifyHost = '127.0.0.1'
-$notifyPort = 38571
 $integrationHome = Join-Path $env:USERPROFILE '.open-desktop-pet'
-$portFile = Join-Path $integrationHome 'open_desktop_pet_notify_port.txt'
-$opencodeAppPathFile = Join-Path $integrationHome 'open_desktop_pet_opencode_app_executable_path.txt'
+$runtimeHelperPath = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
+if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+    $runtimeHelperPath = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
+}
 $logPath = Join-Path $env:TEMP 'OpenDesktopPet-opencode-notify.log'
 
 function Write-NotifyLog([string]$message) {
@@ -56,16 +58,8 @@ function Test-OpenCodeDesktopPath([string]$path) {
     return $false
 }
 
-function Test-OpenCodeDesktopProcess {
-    $configuredPath = ''
-    if (Test-Path -LiteralPath $opencodeAppPathFile) {
-        # An enabled-file can exist while its path is still empty. Treat that
-        # as "not configured" and continue host detection instead of aborting.
-        $rawConfiguredPath = Get-Content -LiteralPath $opencodeAppPathFile -Raw
-        if ($null -ne $rawConfiguredPath) {
-            $configuredPath = $rawConfiguredPath.Trim().Trim('"')
-        }
-    }
+function Test-OpenCodeDesktopProcess([object]$runtime) {
+    $configuredPath = Get-OpenDesktopPetRuntimeExecutablePath -Runtime $runtime -Target 'opencode_app'
     try {
         $parentId = $PID
         for ($index = 0; $index -lt 10 -and $parentId -gt 0; $index++) {
@@ -126,7 +120,7 @@ function Test-VsCodeProcess {
     return $false
 }
 
-function Get-OpenCodeTarget {
+function Get-OpenCodeTarget([object]$runtime) {
     $isVsCodeEnvironment =
         ([string]$env:TERM_PROGRAM).ToLowerInvariant() -eq 'vscode' -or
         -not [string]::IsNullOrWhiteSpace([string]$env:VSCODE_PID) -or
@@ -135,49 +129,40 @@ function Get-OpenCodeTarget {
         return [ordered]@{
             target_app = 'vscode'
             target_executable = 'Code.exe'
-            enabled_file = 'open_desktop_pet_opencode_vscode_enabled.txt'
+            runtime_target = 'opencode_vscode'
         }
     }
-    if (Test-OpenCodeDesktopProcess) {
+    if (Test-OpenCodeDesktopProcess $runtime) {
         return [ordered]@{
             target_app = 'opencode_app'
             target_executable = 'OpenCode.exe'
-            enabled_file = 'open_desktop_pet_opencode_app_enabled.txt'
+            runtime_target = 'opencode_app'
         }
     }
     return [ordered]@{
         target_app = 'terminal'
         target_executable = 'WindowsTerminal.exe'
-        enabled_file = 'open_desktop_pet_opencode_terminal_enabled.txt'
+        runtime_target = 'opencode_terminal'
     }
-}
-
-function Test-OpenCodeEnabled([string]$flagName, [string]$targetApp) {
-    $candidates = @(Join-Path $integrationHome $flagName)
-    if ($targetApp -eq 'terminal') {
-        # Compatibility with the first terminal-only OpenCode build.
-        $candidates += Join-Path $integrationHome 'open_desktop_pet_opencode_enabled.txt'
-    }
-    foreach ($candidate in $candidates) {
-        if (-not (Test-Path -LiteralPath $candidate)) {
-            continue
-        }
-        try {
-            return (Get-Content -LiteralPath $candidate -Raw).Trim() -eq '1'
-        } catch {
-            return $false
-        }
-    }
-    return $false
 }
 
 try {
+	if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
+		Write-NotifyLog 'ignored reason=runtime-helper-missing'
+		exit 0
+	}
+	. $runtimeHelperPath
     if ($args.Count -lt 1 -or [string]::IsNullOrWhiteSpace([string]$args[0])) {
         Write-NotifyLog 'ignored reason=missing-event'
         exit 0
     }
-    $target = Get-OpenCodeTarget
-    if (-not (Test-OpenCodeEnabled $target.enabled_file $target.target_app)) {
+	$runtime = Get-OpenDesktopPetRuntime -IntegrationHome $integrationHome
+	if ($null -eq $runtime) {
+		Write-NotifyLog 'ignored reason=runtime-unavailable'
+		exit 0
+	}
+    $target = Get-OpenCodeTarget $runtime
+    if (-not (Test-OpenDesktopPetRuntimeEnabled -Runtime $runtime -Target $target.runtime_target)) {
         Write-NotifyLog 'ignored reason=desktop-pet-disabled'
         exit 0
     }
@@ -188,12 +173,7 @@ try {
         exit 0
     }
 
-    if (Test-Path -LiteralPath $portFile) {
-        $configuredPort = [int](Get-Content -LiteralPath $portFile -Raw).Trim()
-        if ($configuredPort -ge 1024 -and $configuredPort -le 65535) {
-            $notifyPort = $configuredPort
-        }
-    }
+	$notifyPort = Get-OpenDesktopPetRuntimePort -Runtime $runtime
 
     $payload = [ordered]@{
         schema_version = 1

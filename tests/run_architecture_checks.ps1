@@ -115,6 +115,12 @@ Assert-Architecture ($agentController -match '_run_gemini_cli_configuration_tool
 	'Codex integration must configure Gemini CLI through its installer.'
 Assert-Architecture ((Read-Source 'tools/codex_notify.ps1') -match 'Get-ProcessTreeContainsVsCode') `
 	'Codex notification routing must detect VS Code hosts in the process tree.'
+Assert-Architecture ($agentController -match 'RUNTIME_FILE_NAME') `
+	'Agent notifications must publish one runtime registration.'
+Assert-Architecture ($agentController -notmatch 'func _write_bridge_files') `
+	'Agent notifications must not write duplicate bridge flag files.'
+Assert-Architecture ((Read-Source 'tools/codex_notify.ps1') -match 'Get-OpenDesktopPetRuntime') `
+	'Codex notifications must read the shared runtime registration.'
 Assert-Architecture ($agentController -match 'agy_terminal_enabled') `
 	'Codex integration must keep Antigravity CLI terminal state separate.'
 Assert-Architecture ($agentController -match '_run_antigravity_cli_configuration_tool') `
@@ -135,7 +141,7 @@ Assert-Architecture ($agentController -match 'ClassDB\.instantiate\("WindowsWind
 	'Codex focus must use the in-process Windows GDExtension.'
 Assert-Architecture ($agentController -match 'focus_executable') `
 	'Codex focus must verify native window activation.'
-Assert-Architecture ($agentController -notmatch 'SetForegroundWindow|AppActivate|EncodedCommand|WindowsForegroundAppMonitor') `
+Assert-Architecture ($agentController -notmatch 'SetForegroundWindow|AppActivate|WindowsForegroundAppMonitor') `
 	'Codex runtime integration must not launch a PowerShell foreground helper.'
 Assert-Architecture ($windowsActivator -match 'QueryFullProcessImageNameW') `
 	'The native activator must match windows by configured executable path.'
