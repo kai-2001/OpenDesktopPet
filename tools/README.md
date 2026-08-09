@@ -173,6 +173,31 @@ Antigravity CLI 只送出完成或錯誤狀態，不會把回答、提示詞或�
 
 安裝或解除安裝後請重新啟動 Antigravity CLI。桌寵的開關仍採懶載入，只有開啟通知且缺少或失效時才會執行安裝器。
 
+## 解除安裝 OpenDesktopPet
+
+可攜式版本仍會在使用者資料夾寫入 Agent 通知 hook、橋接器、桌寵設定、存檔與角色包。
+若不再使用桌寵，請雙擊：
+
+```text
+Uninstall-OpenDesktopPet.cmd
+```
+
+解除安裝器會讓使用者選擇：
+
+1. **只移除 Agent 通知整合與開機啟動**：撤回 Codex、Copilot、OpenCode、Claude Code、Gemini CLI 與 Antigravity CLI 的桌寵 hook，保留角色包、存檔與桌寵設定。
+2. **完整移除**：除了上述整合，也會刪除 `%USERPROFILE%\.open-desktop-pet`、Godot 的桌寵資料（`ui_settings.cfg`、`profiles`、`character_packs`）及桌寵診斷記錄。
+
+也可在 PowerShell 直接指定模式：
+
+```powershell
+.\uninstall_open_desktop_pet.ps1 -Mode Integrations
+.\uninstall_open_desktop_pet.ps1 -Mode Complete
+```
+
+兩種模式都只會移除 OpenDesktopPet 寫入各 Agent 設定檔的項目，不會刪除整個
+`.codex`、`.copilot`、`.claude`、`.gemini` 或 OpenCode 資料夾。完成後，請自行刪除
+解壓縮的可攜式發布資料夾；解除安裝器不能在執行中刪除自己的檔案。
+
 ## 通知 payload
 
 所有橋接器都送出同一組基本欄位：`schema_version`、`type`、`agent`、`source`、
@@ -188,6 +213,8 @@ Antigravity CLI 只送出完成或錯誤狀態，不會把回答、提示詞或�
 OpenDesktopPet.exe
 open_desktop_pet_windows.windows.template_release.x86_64.dll
 tools/
+├─ Uninstall-OpenDesktopPet.cmd
+├─ uninstall_open_desktop_pet.ps1
 ├─ Install-Codex-Integration.cmd
 ├─ install_codex_integration.ps1
 ├─ codex_notify.ps1

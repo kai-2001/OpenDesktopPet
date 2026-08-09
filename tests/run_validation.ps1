@@ -55,7 +55,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 & (Join-Path $PSScriptRoot 'antigravity_cli_notify_bridge_test.ps1')
 if ($LASTEXITCODE -ne 0) {
-    throw 'Antigravity CLI notification bridge checks failed.'
+	throw 'Antigravity CLI notification bridge checks failed.'
+}
+& (Join-Path $PSScriptRoot 'open_desktop_pet_uninstaller_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+	throw 'OpenDesktopPet uninstaller checks failed.'
 }
 $isolatedAppData = Join-Path $env:TEMP (
     'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')

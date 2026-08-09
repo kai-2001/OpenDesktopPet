@@ -35,6 +35,8 @@ New-Item -ItemType Directory -Force -Path $toolsOutput | Out-Null
 Copy-Item -LiteralPath $ExecutablePath -Destination (Join-Path $OutputDirectory 'OpenDesktopPet.exe') -Force
 Copy-Item -LiteralPath $extensionPath -Destination (Join-Path $OutputDirectory $extensionFileName) -Force
 foreach ($fileName in @(
+    'Uninstall-OpenDesktopPet.cmd',
+    'uninstall_open_desktop_pet.ps1',
     'Install-Codex-Integration.cmd',
     'install_codex_integration.ps1',
     'codex_notify.ps1',
