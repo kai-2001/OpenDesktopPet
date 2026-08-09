@@ -1,6 +1,6 @@
 extends SceneTree
 
-const ReceiverScript = preload("res://scripts/codex_notification_receiver.gd")
+const ReceiverScript = preload("res://scripts/local_agent_notification_receiver.gd")
 
 var _received: Array[Dictionary] = []
 
@@ -47,7 +47,7 @@ func _run() -> void:
 		_fail("notification type was not preserved")
 		return
 
-	print("CODEX_NOTIFICATION_RECEIVER_TEST_OK")
+	print("LOCAL_AGENT_NOTIFICATION_RECEIVER_TEST_OK")
 	quit(0)
 
 
@@ -56,5 +56,5 @@ func _on_notification_received(notification: Dictionary) -> void:
 
 
 func _fail(message: String) -> void:
-	printerr("CODEX_NOTIFICATION_RECEIVER_TEST_FAILED: %s" % message)
+	printerr("LOCAL_AGENT_NOTIFICATION_RECEIVER_TEST_FAILED: %s" % message)
 	quit(1)

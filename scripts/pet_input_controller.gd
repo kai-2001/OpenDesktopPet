@@ -7,7 +7,7 @@ signal user_activity(timestamp: int)
 signal single_click_requested
 signal care_double_click_requested
 signal context_menu_requested(position: Vector2i)
-signal codex_focus_requested
+signal agent_focus_requested
 signal interaction_region_refresh_requested
 
 var _owner: Node
@@ -15,14 +15,14 @@ var _state: Node
 var _pet: Node2D
 var _window_service
 var _speech_overlay_at: Callable
-var _codex_active: Callable
+var _agent_notification_active: Callable
 var _interrupt_autonomous_action: Callable
 var _dragging := false
 var _left_press_pending := false
 var _drag_offset := Vector2i.ZERO
 var _drag_origin := Vector2i.ZERO
 var _last_drag_mouse := Vector2i.ZERO
-var _codex_bubble_press := false
+var _agent_bubble_press := false
 var _last_mouse := Vector2i.ZERO
 var _cursor_shape := Input.CURSOR_ARROW
 
@@ -41,7 +41,7 @@ func configure(
 	_pet = pet
 	_window_service = window_service
 	_speech_overlay_at = speech_overlay_at
-	_codex_active = codex_active
+	_agent_notification_active = codex_active
 	_interrupt_autonomous_action = interrupt_autonomous_action
 	_last_mouse = _window_service.mouse_position()
 
@@ -92,7 +92,7 @@ func has_pending_press() -> bool:
 func cancel() -> void:
 	_left_press_pending = false
 	_dragging = false
-	_codex_bubble_press = false
+	_agent_bubble_press = false
 	_pet.set_dragging(false)
 	interaction_region_refresh_requested.emit()
 
@@ -106,9 +106,9 @@ func _handle_left_button(event: InputEventMouseButton) -> void:
 		var local_position := Vector2(
 			_window_service.mouse_position() - _window_service.window_position()
 		)
-		if bool(_codex_active.call()) and bool(_speech_overlay_at.call(local_position)):
-			codex_focus_requested.emit()
-			_codex_bubble_press = false
+		if bool(_agent_notification_active.call()) and bool(_speech_overlay_at.call(local_position)):
+			agent_focus_requested.emit()
+			_agent_bubble_press = false
 			return
 		_cancel_press()
 		if _state.wake_sleep("double_click"):
@@ -121,7 +121,7 @@ func _handle_left_button(event: InputEventMouseButton) -> void:
 		_drag_origin = _window_service.mouse_position()
 		_last_drag_mouse = _drag_origin
 		_drag_offset = _drag_origin - _window_service.window_position()
-		_codex_bubble_press = bool(_codex_active.call()) and bool(
+		_agent_bubble_press = bool(_agent_notification_active.call()) and bool(
 			_speech_overlay_at.call(
 				Vector2(_drag_origin - _window_service.window_position())
 			)
@@ -190,11 +190,11 @@ func _finish_left_press() -> void:
 		_pet.set_dragging(false)
 		call_deferred("settle_drag_release", screen, was_at_bottom)
 		_set_cursor_shape(Input.CURSOR_POINTING_HAND)
-		_codex_bubble_press = false
+		_agent_bubble_press = false
 	else:
-		if _codex_bubble_press:
-			_codex_bubble_press = false
-			codex_focus_requested.emit()
+		if _agent_bubble_press:
+			_agent_bubble_press = false
+			agent_focus_requested.emit()
 		else:
 			single_click_requested.emit()
 	interaction_region_refresh_requested.emit()
@@ -221,7 +221,7 @@ func settle_drag_release(screen: int, preserve_bottom_contact: bool) -> void:
 func _cancel_press() -> void:
 	_left_press_pending = false
 	_dragging = false
-	_codex_bubble_press = false
+	_agent_bubble_press = false
 	_pet.set_dragging(false)
 
 

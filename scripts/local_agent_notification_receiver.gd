@@ -1,4 +1,4 @@
-class_name CodexNotificationReceiver
+class_name LocalAgentNotificationReceiver
 extends RefCounted
 
 signal notification_received(notification: Dictionary)

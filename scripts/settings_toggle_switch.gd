@@ -1,4 +1,4 @@
-class_name CodexToggleSwitch
+class_name SettingsToggleSwitch
 extends Button
 
 const TRACK_SIZE := Vector2(46.0, 24.0)

@@ -1,8 +1,8 @@
 class_name DetailsWindowController
 extends RefCounted
 
-const CodexIntegrationControllerScript = preload("res://scripts/codex_integration_controller.gd")
-const CodexToggleSwitchScript = preload("res://scripts/codex_toggle_switch.gd")
+const AgentIntegrationControllerScript = preload("res://scripts/agent_integration_controller.gd")
+const SettingsToggleSwitchScript = preload("res://scripts/settings_toggle_switch.gd")
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 
 signal care_action_requested(action: String)
@@ -51,7 +51,7 @@ var claude_app_enabled := false
 var claude_terminal_enabled := false
 var gemini_terminal_enabled := false
 var agy_terminal_enabled := false
-var agent_port := CodexIntegrationControllerScript.DEFAULT_PORT
+var agent_port := AgentIntegrationControllerScript.DEFAULT_PORT
 var vscode_executable_path := ""
 var codex_app_executable_path := ""
 var terminal_executable_path := ""
@@ -338,8 +338,8 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	))
 	var port_spin_box := SpinBox.new()
 	port_spin_box.name = "AgentPortSpinBox"
-	port_spin_box.min_value = CodexIntegrationControllerScript.MIN_PORT
-	port_spin_box.max_value = CodexIntegrationControllerScript.MAX_PORT
+	port_spin_box.min_value = AgentIntegrationControllerScript.MIN_PORT
+	port_spin_box.max_value = AgentIntegrationControllerScript.MAX_PORT
 	port_spin_box.step = 1
 	port_spin_box.value = agent_port
 	port_spin_box.custom_minimum_size = Vector2(120, 40)
@@ -375,7 +375,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	var vscode_path_line_edit := vscode_controls["line_edit"] as LineEdit
 
-	var codex_toggle := CodexToggleSwitchScript.new()
+	var codex_toggle := SettingsToggleSwitchScript.new()
 	codex_toggle.name = "CodexEnabledToggle"
 	codex_toggle.tooltip_text = "開啟或關閉 VS Code 中的 Codex 通知"
 	codex_toggle.configure(theme_mode, codex_enabled)
@@ -384,7 +384,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Codex", codex_toggle))
 
-	var claude_vscode_toggle := CodexToggleSwitchScript.new()
+	var claude_vscode_toggle := SettingsToggleSwitchScript.new()
 	claude_vscode_toggle.name = "ClaudeCodeVscodeEnabledToggle"
 	claude_vscode_toggle.tooltip_text = "開啟或關閉 VS Code 中的 Claude Code 通知"
 	claude_vscode_toggle.configure(theme_mode, claude_vscode_enabled)
@@ -393,7 +393,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Claude Code", claude_vscode_toggle))
 
-	var copilot_toggle := CodexToggleSwitchScript.new()
+	var copilot_toggle := SettingsToggleSwitchScript.new()
 	copilot_toggle.name = "CopilotEnabledToggle"
 	copilot_toggle.tooltip_text = "開啟或關閉 Copilot Agent 通知"
 	copilot_toggle.configure(theme_mode, copilot_enabled)
@@ -402,7 +402,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Copilot", copilot_toggle))
 
-	var vscode_opencode_toggle := CodexToggleSwitchScript.new()
+	var vscode_opencode_toggle := SettingsToggleSwitchScript.new()
 	vscode_opencode_toggle.name = "VscodeOpenCodeEnabledToggle"
 	vscode_opencode_toggle.tooltip_text = "開啟或關閉 VS Code 中的 OpenCode 通知"
 	vscode_opencode_toggle.configure(theme_mode, vscode_opencode_enabled)
@@ -426,7 +426,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		true,
 		func(path: String) -> void: codex_app_executable_path_changed.emit(path)
 	)
-	var codex_app_toggle := CodexToggleSwitchScript.new()
+	var codex_app_toggle := SettingsToggleSwitchScript.new()
 	codex_app_toggle.name = "CodexAppEnabledToggle"
 	codex_app_toggle.tooltip_text = "開啟或關閉 ChatGPT 中的 Codex 通知"
 	codex_app_toggle.configure(theme_mode, codex_app_enabled)
@@ -450,7 +450,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		false,
 		func(path: String) -> void: opencode_app_executable_path_changed.emit(path)
 	)
-	var opencode_app_toggle := CodexToggleSwitchScript.new()
+	var opencode_app_toggle := SettingsToggleSwitchScript.new()
 	opencode_app_toggle.name = "OpenCodeAppEnabledToggle"
 	opencode_app_toggle.tooltip_text = "開啟或關閉 OpenCode Desktop 通知"
 	opencode_app_toggle.configure(theme_mode, opencode_app_enabled)
@@ -474,7 +474,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		false,
 		func(path: String) -> void: claude_app_executable_path_changed.emit(path)
 	)
-	var claude_app_toggle := CodexToggleSwitchScript.new()
+	var claude_app_toggle := SettingsToggleSwitchScript.new()
 	claude_app_toggle.name = "ClaudeDesktopEnabledToggle"
 	claude_app_toggle.tooltip_text = "開啟或關閉 Claude Desktop Code 通知"
 	claude_app_toggle.configure(theme_mode, claude_app_enabled)
@@ -498,7 +498,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		false,
 		func(path: String) -> void: terminal_executable_path_changed.emit(path)
 	)
-	var terminal_toggle := CodexToggleSwitchScript.new()
+	var terminal_toggle := SettingsToggleSwitchScript.new()
 	terminal_toggle.name = "TerminalCodexEnabledToggle"
 	terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Codex CLI 通知"
 	terminal_toggle.configure(theme_mode, terminal_codex_enabled)
@@ -507,7 +507,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Codex", terminal_toggle))
 
-	var opencode_toggle := CodexToggleSwitchScript.new()
+	var opencode_toggle := SettingsToggleSwitchScript.new()
 	opencode_toggle.name = "TerminalOpenCodeEnabledToggle"
 	opencode_toggle.tooltip_text = "開啟或關閉終端機中的 OpenCode 通知"
 	opencode_toggle.configure(theme_mode, terminal_opencode_enabled)
@@ -516,7 +516,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("OpenCode", opencode_toggle))
 
-	var gemini_terminal_toggle := CodexToggleSwitchScript.new()
+	var gemini_terminal_toggle := SettingsToggleSwitchScript.new()
 	gemini_terminal_toggle.name = "GeminiCliTerminalEnabledToggle"
 	gemini_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Gemini CLI 舊版通知（企業/API Key）"
 	gemini_terminal_toggle.configure(theme_mode, gemini_terminal_enabled)
@@ -525,7 +525,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Gemini CLI（舊版）", gemini_terminal_toggle))
 
-	var agy_terminal_toggle := CodexToggleSwitchScript.new()
+	var agy_terminal_toggle := SettingsToggleSwitchScript.new()
 	agy_terminal_toggle.name = "AgyTerminalEnabledToggle"
 	agy_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Antigravity CLI 通知"
 	agy_terminal_toggle.configure(theme_mode, agy_terminal_enabled)
@@ -534,7 +534,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Antigravity CLI", agy_terminal_toggle))
 
-	var claude_terminal_toggle := CodexToggleSwitchScript.new()
+	var claude_terminal_toggle := SettingsToggleSwitchScript.new()
 	claude_terminal_toggle.name = "ClaudeCodeTerminalEnabledToggle"
 	claude_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Claude Code 通知"
 	claude_terminal_toggle.configure(theme_mode, claude_terminal_enabled)
@@ -543,15 +543,15 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Claude Code", claude_terminal_toggle))
 	_agent_executable_path_summaries = {
-		CodexIntegrationControllerScript.TARGET_VSCODE:
+		AgentIntegrationControllerScript.TARGET_VSCODE:
 			vscode_controls["summary"] as Label,
-		CodexIntegrationControllerScript.TARGET_CODEX_APP:
+		AgentIntegrationControllerScript.TARGET_CODEX_APP:
 			codex_app_controls["summary"] as Label,
-		CodexIntegrationControllerScript.TARGET_OPENCODE_APP:
+		AgentIntegrationControllerScript.TARGET_OPENCODE_APP:
 			opencode_app_controls["summary"] as Label,
-		CodexIntegrationControllerScript.TARGET_CLAUDE_APP:
+		AgentIntegrationControllerScript.TARGET_CLAUDE_APP:
 			claude_app_controls["summary"] as Label,
-		CodexIntegrationControllerScript.TARGET_TERMINAL:
+		AgentIntegrationControllerScript.TARGET_TERMINAL:
 			terminal_controls["summary"] as Label,
 	}
 

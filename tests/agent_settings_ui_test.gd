@@ -376,13 +376,13 @@ func _run_test() -> void:
 	_main = null
 	OS.set_environment("CODEX_HOME", _previous_codex_home)
 	_restore_ui_settings()
-	print("CODEX_SETTINGS_UI_TEST_OK")
+	print("AGENT_SETTINGS_UI_TEST_OK")
 	quit()
 
 
 func _assert_true(value: bool, message: String) -> void:
 	if not value:
-		push_error("CODEX_SETTINGS_UI_TEST_FAILED: " + message)
+		push_error("AGENT_SETTINGS_UI_TEST_FAILED: " + message)
 		quit(1)
 
 

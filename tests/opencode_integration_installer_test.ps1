@@ -36,7 +36,7 @@ try {
     Assert-Installer ($bridgeText.Contains("target_executable = 'OpenCode.exe'")) `
         'The OpenCode bridge must identify the desktop executable target.'
     $controllerText = Get-Content -LiteralPath (
-        Join-Path $projectRoot 'scripts\codex_integration_controller.gd'
+        Join-Path $projectRoot 'scripts\agent_integration_controller.gd'
     ) -Raw -Encoding UTF8
     Assert-Installer (-not $controllerText.Contains(
         'base_path.path_join("OpenCode/opencode.exe")'

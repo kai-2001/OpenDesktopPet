@@ -25,7 +25,7 @@ $gameplay = Read-Source 'scripts/pet_gameplay_coordinator.gd'
 $statsCoordinator = Read-Source 'scripts/stats_window_coordinator.gd'
 $inputController = Read-Source 'scripts/pet_input_controller.gd'
 $characterCoordinator = Read-Source 'scripts/character_pack_coordinator.gd'
-$codexController = Read-Source 'scripts/codex_integration_controller.gd'
+$agentController = Read-Source 'scripts/agent_integration_controller.gd'
 $agentRouter = Read-Source 'scripts/agent_notification_router.gd'
 $windowsActivator = Read-Source 'native/windows/src/windows_window_activator.cpp'
 $windowsExtension = Read-Source 'native/windows/windows_window_activator.gdextension'
@@ -83,59 +83,59 @@ Assert-Architecture ($main -match 'CharacterPackCoordinatorScript') `
 	'main.gd must delegate character-pack coordination.'
 Assert-Architecture ($main -notmatch 'CharacterPackManagerScript') `
 	'main.gd must not depend directly on CharacterPackManager.'
-Assert-Architecture ($main -notmatch '_codex_notification_queue') `
-	'Codex notifications must replace the active bubble instead of queueing.'
-Assert-Architecture ($codexController -match '_focus_target\(TARGET_VSCODE\)') `
+Assert-Architecture ($main -notmatch '_agent_notification_queue') `
+	'Agent notifications must replace the active bubble instead of queueing.'
+Assert-Architecture ($agentController -match '_focus_target\(TARGET_VSCODE\)') `
 	'Codex focus must route VS Code notifications to the configured VS Code target.'
-Assert-Architecture ($codexController -match '"--reuse-window"') `
+Assert-Architecture ($agentController -match '"--reuse-window"') `
 	'Codex focus must reuse the selected VS Code window.'
-Assert-Architecture ($codexController -match 'TARGET_CODEX_APP') `
+Assert-Architecture ($agentController -match 'TARGET_CODEX_APP') `
 	'Codex integration must define a separate Codex App target.'
-Assert-Architecture ($codexController -match 'TARGET_TERMINAL') `
+Assert-Architecture ($agentController -match 'TARGET_TERMINAL') `
 	'Codex integration must define a separate terminal target.'
-Assert-Architecture ($codexController -match 'TARGET_OPENCODE_APP') `
+Assert-Architecture ($agentController -match 'TARGET_OPENCODE_APP') `
 	'Codex integration must define a separate OpenCode Desktop target.'
-Assert-Architecture ($codexController -match 'TARGET_CLAUDE_APP') `
+Assert-Architecture ($agentController -match 'TARGET_CLAUDE_APP') `
 	'Codex integration must define a separate Claude Desktop target.'
-Assert-Architecture ($codexController -match '_detect_claude_app_from_appx') `
+Assert-Architecture ($agentController -match '_detect_claude_app_from_appx') `
 	'Claude Desktop detection must support Microsoft Store Appx installations.'
-Assert-Architecture ($codexController -match 'terminal_opencode_enabled') `
+Assert-Architecture ($agentController -match 'terminal_opencode_enabled') `
 	'Codex integration must keep OpenCode terminal state separate from Codex.'
-Assert-Architecture ($codexController -match '_run_opencode_configuration_tool') `
+Assert-Architecture ($agentController -match '_run_opencode_configuration_tool') `
 	'Codex integration must configure OpenCode through its installer.'
-Assert-Architecture ($codexController -match '_run_claude_code_configuration_tool') `
+Assert-Architecture ($agentController -match '_run_claude_code_configuration_tool') `
 	'Codex integration must configure Claude Code through its installer.'
-Assert-Architecture ($codexController -match 'claude_vscode_enabled') `
+Assert-Architecture ($agentController -match 'claude_vscode_enabled') `
 	'Codex integration must keep Claude Code VS Code state separate.'
-Assert-Architecture ($codexController -match 'claude_terminal_enabled') `
+Assert-Architecture ($agentController -match 'claude_terminal_enabled') `
 	'Codex integration must keep Claude Code terminal state separate.'
-Assert-Architecture ($codexController -match 'gemini_terminal_enabled') `
+Assert-Architecture ($agentController -match 'gemini_terminal_enabled') `
 	'Codex integration must keep Gemini CLI terminal state separate.'
-Assert-Architecture ($codexController -match '_run_gemini_cli_configuration_tool') `
+Assert-Architecture ($agentController -match '_run_gemini_cli_configuration_tool') `
 	'Codex integration must configure Gemini CLI through its installer.'
 Assert-Architecture ((Read-Source 'tools/codex_notify.ps1') -match 'Get-ProcessTreeContainsVsCode') `
 	'Codex notification routing must detect VS Code hosts in the process tree.'
-Assert-Architecture ($codexController -match 'agy_terminal_enabled') `
+Assert-Architecture ($agentController -match 'agy_terminal_enabled') `
 	'Codex integration must keep Antigravity CLI terminal state separate.'
-Assert-Architecture ($codexController -match '_run_antigravity_cli_configuration_tool') `
+Assert-Architecture ($agentController -match '_run_antigravity_cli_configuration_tool') `
 	'Codex integration must configure Antigravity CLI through its installer.'
 Assert-Architecture ($agentRouter -match 'gemini_terminal') `
 	'Agent notification routing must define a Gemini CLI terminal target.'
 Assert-Architecture ($agentRouter -match 'agy_terminal') `
 	'Agent notification routing must define an Antigravity CLI terminal target.'
-Assert-Architecture ($codexController -match 'AgentNotificationRouterScript\.is_notification_enabled') `
+Assert-Architecture ($agentController -match 'AgentNotificationRouterScript\.is_notification_enabled') `
 	'Codex notifications must be filtered by source target and enabled state.'
 Assert-Architecture ($agentRouter -match 'class_name AgentNotificationRouter') `
 	'Agent notification routing rules must have their own cohesive module.'
-Assert-Architecture ($codexController -match 'AgentNotificationRouterScript') `
+Assert-Architecture ($agentController -match 'AgentNotificationRouterScript') `
 	'Codex integration must delegate Agent routing rules to the shared router.'
-Assert-Architecture ($codexController -notmatch 'func _normalize_agent|func _target_display_name') `
+Assert-Architecture ($agentController -notmatch 'func _normalize_agent|func _target_display_name') `
 	'Codex integration must not own cross-Agent display and normalization rules.'
-Assert-Architecture ($codexController -match 'ClassDB\.instantiate\("WindowsWindowActivator"\)') `
+Assert-Architecture ($agentController -match 'ClassDB\.instantiate\("WindowsWindowActivator"\)') `
 	'Codex focus must use the in-process Windows GDExtension.'
-Assert-Architecture ($codexController -match 'focus_executable') `
+Assert-Architecture ($agentController -match 'focus_executable') `
 	'Codex focus must verify native window activation.'
-Assert-Architecture ($codexController -notmatch 'SetForegroundWindow|AppActivate|EncodedCommand|WindowsForegroundAppMonitor') `
+Assert-Architecture ($agentController -notmatch 'SetForegroundWindow|AppActivate|EncodedCommand|WindowsForegroundAppMonitor') `
 	'Codex runtime integration must not launch a PowerShell foreground helper.'
 Assert-Architecture ($windowsActivator -match 'QueryFullProcessImageNameW') `
 	'The native activator must match windows by configured executable path.'
@@ -145,7 +145,7 @@ Assert-Architecture ($windowsActivator -match 'is_executable_foreground') `
 	'The native activator must support a one-shot foreground check.'
 Assert-Architecture ($windowsActivator -notmatch 'powershell|cmd\.exe|CreateProcess') `
 	'The native activator must not launch a shell or helper process.'
-Assert-Architecture ($main -match 'CODEX_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3\.0') `
+Assert-Architecture ($main -match 'AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3\.0') `
 	'Codex notifications must use a three-second foreground duration.'
 Assert-Architecture ($windowsExtension -match 'windows\.debug\.x86_64') `
 	'The Windows GDExtension must provide an x64 debug library.'

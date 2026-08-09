@@ -1,6 +1,6 @@
 extends SceneTree
 
-const ControllerScript = preload("res://scripts/codex_integration_controller.gd")
+const ControllerScript = preload("res://scripts/agent_integration_controller.gd")
 
 var _test_root := ""
 var _previous_user_profile := ""

@@ -97,12 +97,12 @@ try {
     }
 
     $ErrorActionPreference = 'Continue'
-    $codexNotificationOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_notification_receiver_test.gd' 2>&1
-    $codexNotificationExitCode = $LASTEXITCODE
+    $agentNotificationReceiverOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/local_agent_notification_receiver_test.gd' 2>&1
+    $agentNotificationReceiverExitCode = $LASTEXITCODE
     $ErrorActionPreference = $previousErrorActionPreference
-    $codexNotificationOutput | Write-Output
-    if ($codexNotificationExitCode -ne 0 -or -not ($codexNotificationOutput -match 'CODEX_NOTIFICATION_RECEIVER_TEST_OK')) {
-        throw 'Codex notification receiver validation failed.'
+    $agentNotificationReceiverOutput | Write-Output
+    if ($agentNotificationReceiverExitCode -ne 0 -or -not ($agentNotificationReceiverOutput -match 'LOCAL_AGENT_NOTIFICATION_RECEIVER_TEST_OK')) {
+        throw 'Local Agent notification receiver validation failed.'
     }
 
     $ErrorActionPreference = 'Continue'
@@ -124,11 +124,11 @@ try {
     }
 
     $ErrorActionPreference = 'Continue'
-    $codexSettingsUiOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_settings_ui_test.gd' 2>&1
-    $codexSettingsUiExitCode = $LASTEXITCODE
-    $codexSettingsUiOutput | Write-Output
-    if ($codexSettingsUiExitCode -ne 0 -or -not ($codexSettingsUiOutput -match 'CODEX_SETTINGS_UI_TEST_OK')) {
-        throw 'Codex settings UI validation failed.'
+    $agentSettingsUiOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/agent_settings_ui_test.gd' 2>&1
+    $agentSettingsUiExitCode = $LASTEXITCODE
+    $agentSettingsUiOutput | Write-Output
+    if ($agentSettingsUiExitCode -ne 0 -or -not ($agentSettingsUiOutput -match 'AGENT_SETTINGS_UI_TEST_OK')) {
+        throw 'Agent settings UI validation failed.'
     }
 
     $ErrorActionPreference = 'Continue'

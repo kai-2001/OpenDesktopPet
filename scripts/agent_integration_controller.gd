@@ -1,7 +1,7 @@
-class_name CodexIntegrationController
+class_name AgentIntegrationController
 extends RefCounted
 
-const CodexNotificationReceiverScript = preload("res://scripts/codex_notification_receiver.gd")
+const LocalAgentNotificationReceiverScript = preload("res://scripts/local_agent_notification_receiver.gd")
 const AgentNotificationRouterScript = preload("res://scripts/agent_notification_router.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_PORT := 38571
@@ -904,7 +904,7 @@ func _start_receiver() -> void:
 	_stop_receiver()
 	if not is_any_enabled():
 		return
-	_receiver = CodexNotificationReceiverScript.new()
+	_receiver = LocalAgentNotificationReceiverScript.new()
 	_receiver.notification_received.connect(_handle_notification)
 	if not _receiver.start(port):
 		push_warning("Agent 通知接收器無法監聽通訊埠 %d。" % port)
@@ -977,7 +977,7 @@ func _handle_notification(notification: Dictionary) -> void:
 				"%s 正在等待你回到 %s 處理下一步。" % [display_name, target_name],
 				"idle", target_app, agent
 			)
-		"codex_error", "failed", "error":
+		"agent-error", "codex_error", "failed", "error":
 			notification_received.emit(
 				"%s 發生錯誤，請回到 %s 查看。" % [display_name, target_name],
 				"idle", target_app, agent

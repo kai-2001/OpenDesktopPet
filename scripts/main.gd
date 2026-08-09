@@ -1,7 +1,7 @@
 extends Node2D
 
 const CharacterPackCoordinatorScript = preload("res://scripts/character_pack_coordinator.gd")
-const CodexIntegrationControllerScript = preload("res://scripts/codex_integration_controller.gd")
+const AgentIntegrationControllerScript = preload("res://scripts/agent_integration_controller.gd")
 const DesktopWindowServiceScript = preload("res://scripts/desktop_window_service.gd")
 const PetGameplayCoordinatorScript = preload("res://scripts/pet_gameplay_coordinator.gd")
 const PetInputControllerScript = preload("res://scripts/pet_input_controller.gd")
@@ -13,8 +13,8 @@ const DEFAULT_STATS_SIZE := Vector2i(500, 620)
 const MIN_STATS_SIZE := Vector2i(360, 480)
 const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
-const CODEX_NOTIFICATION_DURATION_SECONDS := 60.0
-const CODEX_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3.0
+const AGENT_NOTIFICATION_DURATION_SECONDS := 60.0
+const AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3.0
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
 const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 
@@ -95,11 +95,11 @@ var _pet_interaction_polygon := PackedVector2Array()
 var _status_indicator: StatusIndicator
 var _tray_menu: PopupMenu
 var _details_theme_mode := "light"
-var _codex_controller: CodexIntegrationController
+var _agent_controller: AgentIntegrationController
 var _details_window_controller
-var _codex_notification_active := false
-var _active_codex_target_app := CodexIntegrationControllerScript.TARGET_VSCODE
-var _active_codex_agent := "codex"
+var _agent_notification_active := false
+var _active_agent_target_app := AgentIntegrationControllerScript.TARGET_VSCODE
+var _active_agent := "codex"
 
 
 func _ready() -> void:
@@ -115,7 +115,7 @@ func _ready() -> void:
 		pet,
 		_window_service,
 		Callable(self, "_is_speech_overlay_at"),
-		Callable(self, "_is_codex_notification_active"),
+		Callable(self, "_is_agent_notification_active"),
 		Callable(self, "_interrupt_autonomous_action")
 	)
 	_input_controller.user_activity.connect(_on_user_activity)
@@ -124,7 +124,7 @@ func _ready() -> void:
 		func() -> void: _run_care_action(3)
 	)
 	_input_controller.context_menu_requested.connect(_show_context_menu)
-	_input_controller.codex_focus_requested.connect(_focus_codex_interface)
+	_input_controller.agent_focus_requested.connect(_focus_agent_interface)
 	_input_controller.interaction_region_refresh_requested.connect(
 		_refresh_interaction_polygon
 	)
@@ -141,7 +141,7 @@ func _ready() -> void:
 	_refresh_ui(state.get_snapshot())
 	_setup_context_menu()
 	_setup_status_indicator()
-	_setup_codex_integration()
+	_setup_agent_integration()
 	_setup_autostart_service()
 	_setup_idle_behavior()
 	_last_user_activity_ms = Time.get_ticks_msec()
@@ -149,8 +149,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if _codex_controller != null:
-		_codex_controller.poll()
+	if _agent_controller != null:
+		_agent_controller.poll()
 	_restore_from_system_minimize()
 	_input_controller.process()
 
@@ -160,8 +160,8 @@ func _on_user_activity(timestamp: int) -> void:
 	_gameplay_coordinator.cancel_autonomous_action()
 
 
-func _is_codex_notification_active() -> bool:
-	return _codex_notification_active
+func _is_agent_notification_active() -> bool:
+	return _agent_notification_active
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -188,16 +188,16 @@ func _notification(what: int) -> void:
 
 
 func _exit_tree() -> void:
-	if _codex_controller != null:
-		_codex_controller.shutdown()
+	if _agent_controller != null:
+		_agent_controller.shutdown()
 
 
-func say(text: String, seconds := 6.0, codex_priority := false) -> void:
-	if not codex_priority and _codex_notification_active:
+func say(text: String, seconds := 6.0, agent_priority := false) -> void:
+	if not agent_priority and _agent_notification_active:
 		return
 	_bubble_token += 1
 	var token := _bubble_token
-	_style_bubble(codex_priority)
+	_style_bubble(agent_priority)
 	# Container layout and the native Windows hit-test region are both applied
 	# asynchronously. Keep the bubble hidden until one layout frame has passed
 	# so the compositor never displays the temporary polygon-shaped state.
@@ -214,15 +214,15 @@ func say(text: String, seconds := 6.0, codex_priority := false) -> void:
 		return
 	_layout_speech_bubble(text)
 	bubble.visible = true
-	bubble_tail.visible = not codex_priority
+	bubble_tail.visible = not agent_priority
 	_refresh_interaction_polygon()
 	await get_tree().create_timer(seconds).timeout
 	if token == _bubble_token:
 		bubble.visible = false
 		bubble_tail.visible = false
 		_refresh_interaction_polygon()
-		if codex_priority:
-			_codex_notification_active = false
+		if agent_priority:
+			_agent_notification_active = false
 
 
 func _restore_from_system_minimize() -> void:
@@ -327,18 +327,18 @@ func _connect_signals() -> void:
 		call_deferred("_show_wish_notice", active_wish)
 
 
-func _setup_codex_integration() -> void:
-	_codex_controller = CodexIntegrationControllerScript.new()
-	_codex_controller.notification_received.connect(_handle_codex_notification)
-	_codex_controller.configuration_failed.connect(_handle_agent_configuration_failed)
-	_codex_controller.state_changed.connect(_refresh_codex_settings_ui)
-	_codex_controller.executable_path_detection_started.connect(
+func _setup_agent_integration() -> void:
+	_agent_controller = AgentIntegrationControllerScript.new()
+	_agent_controller.notification_received.connect(_handle_agent_notification)
+	_agent_controller.configuration_failed.connect(_handle_agent_configuration_failed)
+	_agent_controller.state_changed.connect(_refresh_agent_settings_ui)
+	_agent_controller.executable_path_detection_started.connect(
 		_on_executable_path_detection_started
 	)
-	_codex_controller.executable_path_detection_finished.connect(
+	_agent_controller.executable_path_detection_finished.connect(
 		_on_executable_path_detection_finished
 	)
-	_codex_controller.load_settings()
+	_agent_controller.load_settings()
 
 
 func _handle_agent_configuration_failed(target_name: String) -> void:
@@ -357,7 +357,7 @@ func _on_executable_path_detection_finished(targets: Array) -> void:
 		_details_window_controller.set_agent_executable_path_detection_state(
 			targets, false
 		)
-	_refresh_codex_settings_ui()
+	_refresh_agent_settings_ui()
 
 
 func _setup_autostart_service() -> void:
@@ -365,11 +365,11 @@ func _setup_autostart_service() -> void:
 	_autostart_service.operation_completed.connect(_finish_autostart_operation)
 
 
-func _refresh_codex_settings_ui() -> void:
+func _refresh_agent_settings_ui() -> void:
 	_apply_agent_control_state()
-	if _details_window_controller != null and _codex_controller != null:
+	if _details_window_controller != null and _agent_controller != null:
 		_details_window_controller.refresh_executable_path_control(
-			_codex_controller.executable_path,
+			_agent_controller.executable_path,
 			_vscode_executable_line_edit,
 			_vscode_executable_hint,
 			_vscode_executable_summary,
@@ -377,7 +377,7 @@ func _refresh_codex_settings_ui() -> void:
 			true
 		)
 		_details_window_controller.refresh_executable_path_control(
-			_codex_controller.codex_app_executable_path,
+			_agent_controller.codex_app_executable_path,
 			_codex_app_executable_line_edit,
 			_codex_app_executable_hint,
 			_codex_app_executable_summary,
@@ -385,7 +385,7 @@ func _refresh_codex_settings_ui() -> void:
 			true
 		)
 		_details_window_controller.refresh_executable_path_control(
-			_codex_controller.terminal_executable_path,
+			_agent_controller.terminal_executable_path,
 			_terminal_executable_line_edit,
 			_terminal_executable_hint,
 			_terminal_executable_summary,
@@ -393,7 +393,7 @@ func _refresh_codex_settings_ui() -> void:
 			false
 		)
 		_details_window_controller.refresh_executable_path_control(
-			_codex_controller.opencode_app_executable_path,
+			_agent_controller.opencode_app_executable_path,
 			_opencode_app_executable_line_edit,
 			_opencode_app_executable_hint,
 			_opencode_app_executable_summary,
@@ -401,7 +401,7 @@ func _refresh_codex_settings_ui() -> void:
 			false
 		)
 		_details_window_controller.refresh_executable_path_control(
-			_codex_controller.claude_app_executable_path,
+			_agent_controller.claude_app_executable_path,
 			_claude_app_executable_line_edit,
 			_claude_app_executable_hint,
 			_claude_app_executable_summary,
@@ -410,14 +410,14 @@ func _refresh_codex_settings_ui() -> void:
 		)
 	if not is_instance_valid(_agent_status_label):
 		return
-	if _codex_controller == null or not _codex_controller.is_any_enabled():
+	if _agent_controller == null or not _agent_controller.is_any_enabled():
 		_agent_status_label.text = "狀態: 已關閉"
 		_agent_status_label.add_theme_color_override(
 			"font_color", _details_color("#68747a", "#9da1a6")
 		)
 		return
-	if _codex_controller.is_running():
-		_agent_status_label.text = "狀態: 監聽中  127.0.0.1:%d" % _codex_controller.port
+	if _agent_controller.is_running():
+		_agent_status_label.text = "狀態: 監聽中  127.0.0.1:%d" % _agent_controller.port
 		_agent_status_label.add_theme_color_override(
 			"font_color", _details_color("#238b9d", "#4fc1ff")
 		)
@@ -429,7 +429,7 @@ func _refresh_codex_settings_ui() -> void:
 
 
 func _apply_agent_control_state() -> void:
-	var enabled := _codex_controller != null and _codex_controller.is_any_enabled()
+	var enabled := _agent_controller != null and _agent_controller.is_any_enabled()
 	_update_agent_enabled_toggles()
 	if is_instance_valid(_agent_port_spin_box):
 		_agent_port_spin_box.editable = not enabled
@@ -446,55 +446,55 @@ func _apply_agent_control_state() -> void:
 		)
 
 
-func _handle_codex_notification(
+func _handle_agent_notification(
 	message: String, reaction_action: String, target_app: String, agent: String
 ) -> void:
-	_enqueue_codex_status(message, reaction_action, target_app, agent)
+	_enqueue_agent_status(message, reaction_action, target_app, agent)
 
 
-func _enqueue_codex_status(
+func _enqueue_agent_status(
 	message: String,
 	reaction_action: String,
-	target_app := CodexIntegrationControllerScript.TARGET_VSCODE,
+	target_app := AgentIntegrationControllerScript.TARGET_VSCODE,
 	agent := "codex"
 ) -> void:
-	_codex_notification_active = true
-	_active_codex_target_app = target_app
-	_active_codex_agent = agent
+	_agent_notification_active = true
+	_active_agent_target_app = target_app
+	_active_agent = agent
 	_last_state_message = message
 	if is_instance_valid(_last_message_status):
 		_last_message_status.text = "最近訊息：%s" % message
 	var target_is_foreground := (
-		_codex_controller != null
-		and _codex_controller.is_target_foreground(target_app)
+		_agent_controller != null
+		and _agent_controller.is_target_foreground(target_app)
 	)
-	say(message, _codex_notification_duration(target_is_foreground), true)
+	say(message, _agent_notification_duration(target_is_foreground), true)
 	if not state.is_sleeping() and not state.is_action_busy():
 		pet.play_action(reaction_action)
 
 
-func _codex_notification_duration(vscode_is_foreground: bool) -> float:
+func _agent_notification_duration(vscode_is_foreground: bool) -> float:
 	return (
-		CODEX_FOREGROUND_NOTIFICATION_DURATION_SECONDS
+		AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS
 		if vscode_is_foreground
-		else CODEX_NOTIFICATION_DURATION_SECONDS
+		else AGENT_NOTIFICATION_DURATION_SECONDS
 	)
 
 
-func _focus_codex_interface() -> void:
-	if _codex_controller != null and _codex_controller.focus_target(
-			_active_codex_target_app, _active_codex_agent
+func _focus_agent_interface() -> void:
+	if _agent_controller != null and _agent_controller.focus_target(
+			_active_agent_target_app, _active_agent
 	):
-		_dismiss_active_codex_notification()
+		_dismiss_active_agent_notification()
 
 
-func _dismiss_active_codex_notification() -> void:
-	if not _codex_notification_active:
+func _dismiss_active_agent_notification() -> void:
+	if not _agent_notification_active:
 		return
 	_bubble_token += 1
 	bubble.visible = false
 	bubble_tail.visible = false
-	_codex_notification_active = false
+	_agent_notification_active = false
 	_refresh_interaction_polygon()
 
 
@@ -656,64 +656,64 @@ func _build_stats_window() -> void:
 	_stats_window_coordinator.theme_mode = _details_theme_mode
 	_stats_window_coordinator.last_state_message = _last_state_message
 	_stats_window_coordinator.codex_enabled = (
-		_codex_controller != null and _codex_controller.codex_enabled
+		_agent_controller != null and _agent_controller.codex_enabled
 	)
 	_stats_window_coordinator.codex_app_enabled = (
-		_codex_controller != null and _codex_controller.codex_app_enabled
+		_agent_controller != null and _agent_controller.codex_app_enabled
 	)
 	_stats_window_coordinator.terminal_codex_enabled = (
-		_codex_controller != null and _codex_controller.terminal_codex_enabled
+		_agent_controller != null and _agent_controller.terminal_codex_enabled
 	)
 	_stats_window_coordinator.terminal_opencode_enabled = (
-		_codex_controller != null and _codex_controller.terminal_opencode_enabled
+		_agent_controller != null and _agent_controller.terminal_opencode_enabled
 	)
 	_stats_window_coordinator.vscode_opencode_enabled = (
-		_codex_controller != null and _codex_controller.vscode_opencode_enabled
+		_agent_controller != null and _agent_controller.vscode_opencode_enabled
 	)
 	_stats_window_coordinator.opencode_app_enabled = (
-		_codex_controller != null and _codex_controller.opencode_app_enabled
+		_agent_controller != null and _agent_controller.opencode_app_enabled
 	)
 	_stats_window_coordinator.copilot_enabled = (
-		_codex_controller != null and _codex_controller.copilot_enabled
+		_agent_controller != null and _agent_controller.copilot_enabled
 	)
 	_stats_window_coordinator.claude_vscode_enabled = (
-		_codex_controller != null and _codex_controller.claude_vscode_enabled
+		_agent_controller != null and _agent_controller.claude_vscode_enabled
 	)
 	_stats_window_coordinator.claude_app_enabled = (
-		_codex_controller != null and _codex_controller.claude_app_enabled
+		_agent_controller != null and _agent_controller.claude_app_enabled
 	)
 	_stats_window_coordinator.claude_terminal_enabled = (
-		_codex_controller != null and _codex_controller.claude_terminal_enabled
+		_agent_controller != null and _agent_controller.claude_terminal_enabled
 	)
 	_stats_window_coordinator.gemini_terminal_enabled = (
-		_codex_controller != null and _codex_controller.gemini_terminal_enabled
+		_agent_controller != null and _agent_controller.gemini_terminal_enabled
 	)
 	_stats_window_coordinator.agy_terminal_enabled = (
-		_codex_controller != null and _codex_controller.agy_terminal_enabled
+		_agent_controller != null and _agent_controller.agy_terminal_enabled
 	)
-	_stats_window_coordinator.codex_port = (
-		_codex_controller.port
-		if _codex_controller != null
-		else CodexIntegrationControllerScript.DEFAULT_PORT
+	_stats_window_coordinator.agent_port = (
+		_agent_controller.port
+		if _agent_controller != null
+		else AgentIntegrationControllerScript.DEFAULT_PORT
 	)
 	_stats_window_coordinator.codex_executable_path = (
-		_codex_controller.executable_path if _codex_controller != null else ""
+		_agent_controller.executable_path if _agent_controller != null else ""
 	)
 	_stats_window_coordinator.codex_app_executable_path = (
-		_codex_controller.codex_app_executable_path
-		if _codex_controller != null else ""
+		_agent_controller.codex_app_executable_path
+		if _agent_controller != null else ""
 	)
 	_stats_window_coordinator.terminal_executable_path = (
-		_codex_controller.terminal_executable_path
-		if _codex_controller != null else ""
+		_agent_controller.terminal_executable_path
+		if _agent_controller != null else ""
 	)
 	_stats_window_coordinator.opencode_app_executable_path = (
-		_codex_controller.opencode_app_executable_path
-		if _codex_controller != null else ""
+		_agent_controller.opencode_app_executable_path
+		if _agent_controller != null else ""
 	)
 	_stats_window_coordinator.claude_app_executable_path = (
-		_codex_controller.claude_app_executable_path
-		if _codex_controller != null else ""
+		_agent_controller.claude_app_executable_path
+		if _agent_controller != null else ""
 	)
 	_stats_window_coordinator.autostart_supported = _is_autostart_supported()
 	_stats_window_coordinator.interaction_label = Callable(self, "_interaction_label")
@@ -804,7 +804,7 @@ func _build_stats_window() -> void:
 	_claude_app_executable_summary = (
 		agent_refs["claude_app_executable_summary"] as Label
 	)
-	_refresh_codex_settings_ui()
+	_refresh_agent_settings_ui()
 	# The settings builder cannot request this before its signals and control
 	# references exist. Queue the initial query only after initialization.
 	if _is_autostart_supported():
@@ -920,8 +920,8 @@ func _on_care_action_requested(action: String) -> void:
 
 func _on_stats_tab_changed(tab_index: int) -> void:
 	_refresh_stats_tab_buttons(tab_index)
-	if tab_index == 2 and _codex_controller != null:
-		_codex_controller.refresh_enabled_executable_paths_if_invalid()
+	if tab_index == 2 and _agent_controller != null:
+		_agent_controller.refresh_enabled_executable_paths_if_invalid()
 	if tab_index != _character_tab_index or _character_tab_loaded:
 		return
 	_refresh_character_list()
@@ -1246,62 +1246,62 @@ func _update_agent_enabled_toggles() -> void:
 	if is_instance_valid(_agent_codex_enabled_toggle):
 		_agent_codex_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.codex_enabled
+			_agent_controller != null and _agent_controller.codex_enabled
 		)
 	if is_instance_valid(_agent_codex_app_enabled_toggle):
 		_agent_codex_app_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.codex_app_enabled
+			_agent_controller != null and _agent_controller.codex_app_enabled
 		)
 	if is_instance_valid(_agent_terminal_codex_enabled_toggle):
 		_agent_terminal_codex_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.terminal_codex_enabled
+			_agent_controller != null and _agent_controller.terminal_codex_enabled
 		)
 	if is_instance_valid(_agent_terminal_opencode_enabled_toggle):
 		_agent_terminal_opencode_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.terminal_opencode_enabled
+			_agent_controller != null and _agent_controller.terminal_opencode_enabled
 		)
 	if is_instance_valid(_agent_vscode_opencode_enabled_toggle):
 		_agent_vscode_opencode_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.vscode_opencode_enabled
+			_agent_controller != null and _agent_controller.vscode_opencode_enabled
 		)
 	if is_instance_valid(_agent_opencode_app_enabled_toggle):
 		_agent_opencode_app_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.opencode_app_enabled
+			_agent_controller != null and _agent_controller.opencode_app_enabled
 		)
 	if is_instance_valid(_agent_copilot_enabled_toggle):
 		_agent_copilot_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.copilot_enabled
+			_agent_controller != null and _agent_controller.copilot_enabled
 		)
 	if is_instance_valid(_agent_claude_vscode_enabled_toggle):
 		_agent_claude_vscode_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.claude_vscode_enabled
+			_agent_controller != null and _agent_controller.claude_vscode_enabled
 		)
 	if is_instance_valid(_agent_claude_app_enabled_toggle):
 		_agent_claude_app_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.claude_app_enabled
+			_agent_controller != null and _agent_controller.claude_app_enabled
 		)
 	if is_instance_valid(_agent_claude_terminal_enabled_toggle):
 		_agent_claude_terminal_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.claude_terminal_enabled
+			_agent_controller != null and _agent_controller.claude_terminal_enabled
 		)
 	if is_instance_valid(_agent_gemini_terminal_enabled_toggle):
 		_agent_gemini_terminal_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.gemini_terminal_enabled
+			_agent_controller != null and _agent_controller.gemini_terminal_enabled
 		)
 	if is_instance_valid(_agent_agy_terminal_enabled_toggle):
 		_agent_agy_terminal_enabled_toggle.call(
 			"set_enabled_state",
-			_codex_controller != null and _codex_controller.agy_terminal_enabled
+			_agent_controller != null and _agent_controller.agy_terminal_enabled
 		)
 
 
@@ -1497,193 +1497,193 @@ func _on_details_theme_selected(index: int) -> void:
 
 
 func _on_codex_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_codex_enabled(enabled)
+	_agent_controller.set_codex_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_VSCODE]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_VSCODE]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_codex_app_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_codex_app_enabled(enabled)
+	_agent_controller.set_codex_app_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_CODEX_APP]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_CODEX_APP]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_terminal_codex_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_terminal_codex_enabled(enabled)
+	_agent_controller.set_terminal_codex_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_TERMINAL]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_TERMINAL]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_terminal_opencode_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_terminal_opencode_enabled(enabled)
+	_agent_controller.set_terminal_opencode_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_TERMINAL]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_TERMINAL]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_vscode_opencode_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_vscode_opencode_enabled(enabled)
+	_agent_controller.set_vscode_opencode_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_VSCODE]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_VSCODE]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_opencode_app_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_opencode_app_enabled(enabled)
+	_agent_controller.set_opencode_app_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_OPENCODE_APP]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_OPENCODE_APP]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_claude_vscode_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_claude_vscode_enabled(enabled)
+	_agent_controller.set_claude_vscode_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_VSCODE]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_VSCODE]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_claude_app_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_claude_app_enabled(enabled)
+	_agent_controller.set_claude_app_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_CLAUDE_APP]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_CLAUDE_APP]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_claude_terminal_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_claude_terminal_enabled(enabled)
+	_agent_controller.set_claude_terminal_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_TERMINAL]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_TERMINAL]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_gemini_terminal_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_gemini_terminal_enabled(enabled)
+	_agent_controller.set_gemini_terminal_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_TERMINAL]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_TERMINAL]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_agy_terminal_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_agy_terminal_enabled(enabled)
+	_agent_controller.set_agy_terminal_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_TERMINAL]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_TERMINAL]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_copilot_enabled_toggled(enabled: bool) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_copilot_enabled(enabled)
+	_agent_controller.set_copilot_enabled(enabled)
 	if enabled:
-		_codex_controller.refresh_executable_paths_if_invalid(
-			[CodexIntegrationControllerScript.TARGET_VSCODE]
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_VSCODE]
 		)
 	_apply_agent_control_state()
 	call_deferred("_apply_agent_control_state")
 
 
 func _on_agent_port_changed(value: float) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	if _codex_controller.is_any_enabled():
+	if _agent_controller.is_any_enabled():
 		if is_instance_valid(_agent_port_spin_box):
-			_agent_port_spin_box.set_value_no_signal(_codex_controller.port)
+			_agent_port_spin_box.set_value_no_signal(_agent_controller.port)
 		return
-	var pending_port := _codex_controller.normalize_port(roundi(value))
-	_codex_controller.set_port(pending_port)
+	var pending_port := _agent_controller.normalize_port(roundi(value))
+	_agent_controller.set_port(pending_port)
 
 
 func _on_vscode_executable_path_changed(path: String) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_executable_path(path)
-	_refresh_codex_settings_ui()
+	_agent_controller.set_executable_path(path)
+	_refresh_agent_settings_ui()
 
 
 func _on_codex_app_executable_path_changed(path: String) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_codex_app_executable_path(path)
-	_refresh_codex_settings_ui()
+	_agent_controller.set_codex_app_executable_path(path)
+	_refresh_agent_settings_ui()
 
 
 func _on_terminal_executable_path_changed(path: String) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_terminal_executable_path(path)
-	_refresh_codex_settings_ui()
+	_agent_controller.set_terminal_executable_path(path)
+	_refresh_agent_settings_ui()
 
 
 func _on_opencode_app_executable_path_changed(path: String) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_opencode_app_executable_path(path)
-	_refresh_codex_settings_ui()
+	_agent_controller.set_opencode_app_executable_path(path)
+	_refresh_agent_settings_ui()
 
 
 func _on_claude_app_executable_path_changed(path: String) -> void:
-	if _codex_controller == null:
+	if _agent_controller == null:
 		return
-	_codex_controller.set_claude_app_executable_path(path)
-	_refresh_codex_settings_ui()
+	_agent_controller.set_claude_app_executable_path(path)
+	_refresh_agent_settings_ui()
 
 
 func _rebuild_stats_window_after_theme_change(
@@ -1793,8 +1793,8 @@ func _prepare_shutdown() -> void:
 	state.save_state()
 	if _autostart_service != null:
 		_autostart_service.shutdown()
-	if _codex_controller != null:
-		_codex_controller.shutdown()
+	if _agent_controller != null:
+		_agent_controller.shutdown()
 	_remove_status_indicator()
 	_destroy_stats_window()
 
@@ -1955,11 +1955,11 @@ func _clamp_window_position(requested: Vector2i) -> Vector2i:
 	)
 
 
-func _style_bubble(codex_notification := false) -> void:
+func _style_bubble(agent_notification := false) -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = (
 		Color(0.886, 0.957, 0.973, 0.92)
-		if codex_notification
+		if agent_notification
 		else Color(0.953, 0.988, 0.996, 0.82)
 	)
 	style.border_color = Color(0.204, 0.498, 0.6, 0.82)
