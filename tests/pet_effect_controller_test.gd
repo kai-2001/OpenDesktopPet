@@ -35,7 +35,8 @@ func _run() -> void:
 	_assert_true(food != null and water != null and mask != null and zzz != null, "effect sprites are created")
 	_assert_true(not food.visible and not water.visible and not mask.visible and not zzz.visible, "effects start hidden")
 	controller.configure_for_pack(0.58)
-	_assert_true(food.position.x < -30.0 and food.scale.x < 0.45, "effects scale with Codex-sized packs")
+	_assert_true(is_equal_approx(food.position.x, 0.0) and food.scale.x < 0.45, "effects center and scale with Codex-sized packs")
+	_assert_true(is_equal_approx(mask.position.y, -11.6) and is_equal_approx(mask.scale.x, 0.38 * 0.58), "eye mask is slightly above center and enlarged")
 	var custom_food_path := "user://test_runs/pet_effect_custom_food.png"
 	DirAccess.make_dir_recursive_absolute(
 		ProjectSettings.globalize_path("user://test_runs")

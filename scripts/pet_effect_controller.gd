@@ -5,22 +5,22 @@ const EFFECT_LIBRARY_PATH := "res://assets/effects/effect_library.json"
 const DEFAULT_DEFINITIONS := {
 	"food": {
 		"file": "res://assets/effects/food.png",
-		"anchor": [-72.0, 22.0],
+		"anchor": [0.0, 22.0],
 		"scale": 0.45,
 		"duration": 1.6,
 		"sway": 5.0,
 	},
 	"water": {
 		"file": "res://assets/effects/water_cup.png",
-		"anchor": [-58.0, 18.0],
+		"anchor": [0.0, 18.0],
 		"scale": 0.38,
 		"duration": 1.5,
 		"sway": 4.0,
 	},
 	"mask": {
 		"file": "res://assets/effects/eye_mask.png",
-		"anchor": [-70.0, -12.0],
-		"scale": 0.32,
+		"anchor": [0.0, -20.0],
+		"scale": 0.38,
 	},
 	"zzz": {
 		"file": "res://assets/effects/zzz.png",
