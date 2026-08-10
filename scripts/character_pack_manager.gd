@@ -3,6 +3,7 @@ extends RefCounted
 
 const PACKS_ROOT := "user://character_packs"
 const CharacterPackValidatorScript = preload("res://scripts/character_pack_validator.gd")
+const CodexPetImporterScript = preload("res://scripts/codex_pet_importer.gd")
 const REQUIRED_ACTIONS := ["idle", "pet", "eat", "drink", "sleep", "move", "drag", "work"]
 const ALLOWED_PREVIEW_EXTENSIONS := ["png", "jpg", "jpeg", "webp", "svg"]
 const MAX_ARCHIVE_FILES := 2048
@@ -33,8 +34,8 @@ static func list_installed() -> Array[Dictionary]:
 		var manifest: Dictionary = validation.manifest
 		result.append({
 			"id": String(manifest.id),
-			"name": String(manifest.get("name", manifest.id)),
-			"version": String(manifest.get("version", "1.0.0")),
+			"name": String(manifest.get("name", manifest.get("displayName", manifest.id))),
+			"version": _manifest_version(manifest),
 			"root": root,
 			"preview": _preview_path(root, manifest),
 		})
@@ -87,8 +88,8 @@ static func install_archive(archive_path: String) -> Dictionary:
 	return {
 		"ok": true,
 		"id": character_id,
-		"name": String(manifest.get("name", character_id)),
-		"version": String(manifest.get("version", "1.0.0")),
+		"name": String(manifest.get("name", manifest.get("displayName", character_id))),
+		"version": _manifest_version(manifest),
 		"updated": was_update,
 	}
 
@@ -109,6 +110,8 @@ static func inspect_archive(archive_path: String) -> Dictionary:
 	if parsed is not Dictionary:
 		return _failure("pet.json 不是有效的JSON物件。")
 	var manifest: Dictionary = parsed
+	if CodexPetImporterScript.is_codex_manifest(manifest):
+		return CodexPetImporterScript.inspect_manifest(manifest, entries)
 	if int(manifest.get("format_version", 0)) != 1:
 		return _failure("不支援這個角色包格式版本。")
 	var character_id := String(manifest.get("id", "")).strip_edges()
@@ -146,6 +149,15 @@ static func validate_pack(root: String) -> Dictionary:
 	if parsed is not Dictionary:
 		return _failure("pet.json 不是有效的JSON物件。")
 	var manifest: Dictionary = parsed
+	if CodexPetImporterScript.is_codex_manifest(manifest):
+		var codex_validation := CodexPetImporterScript.normalize(root, manifest)
+		if not bool(codex_validation.get("ok", false)):
+			return codex_validation
+		return {
+			"ok": true,
+			"manifest": codex_validation.manifest,
+			"source_format": "codex-pet",
+		}
 	if int(manifest.get("format_version", 0)) != 1:
 		return _failure("不支援這個角色包格式版本。")
 	var raw_id := String(manifest.get("id", "")).strip_edges()
@@ -183,6 +195,14 @@ static func sanitize_character_id(value: String) -> String:
 				or character == "_" or character == "-":
 			result += character
 	return result
+
+
+static func _manifest_version(manifest: Dictionary) -> String:
+	if manifest.has("version"):
+		return String(manifest.get("version", "1.0.0"))
+	if CodexPetImporterScript.is_codex_manifest(manifest):
+		return "codex-v%d" % int(manifest.get("spriteVersionNumber", 1))
+	return "1.0.0"
 
 
 static func _extract_archive(archive_path: String, staging_root: String) -> Dictionary:

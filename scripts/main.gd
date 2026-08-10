@@ -310,10 +310,13 @@ func _refresh_interaction_polygon() -> void:
 func _connect_signals() -> void:
 	state.changed.connect(_refresh_ui)
 	state.message_requested.connect(_show_state_message)
+	state.action_requested.connect(_on_action_requested)
 	state.action_requested.connect(pet.play_action)
 	pet.action_completed.connect(state.receive_action_completed)
 	state.sleep_started.connect(pet.start_sleep_loop)
+	state.sleep_started.connect(pet.start_sleep_effect)
 	state.sleep_ended.connect(pet.stop_sleep_loop)
+	state.sleep_ended.connect(pet.stop_sleep_effect)
 	pet.interaction_region_changed.connect(_apply_interaction_polygon)
 	state.wish_started.connect(_show_wish_notice)
 	# PetState becomes ready before its parent, so its first `changed` signal is
@@ -325,6 +328,10 @@ func _connect_signals() -> void:
 	if not active_wish.is_empty() \
 			and int(snapshot.get("wish_expires_at", 0)) > int(Time.get_unix_time_from_system()):
 		call_deferred("_show_wish_notice", active_wish)
+
+
+func _on_action_requested(action: String, _request_id: int) -> void:
+	pet.play_effect_for_action(action)
 
 
 func _setup_agent_integration() -> void:

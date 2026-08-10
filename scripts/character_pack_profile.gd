@@ -12,6 +12,7 @@ var _runtime = CharacterPackRuntimeScript.new()
 var _manifest: Dictionary = {}
 var _actions: Dictionary = {}
 var _aliases: Dictionary = {}
+var _options: Dictionary = {}
 var _progression: Dictionary = {"level": 1, "affection": 0}
 var _pack_root := ""
 var _pack_scale := 0.31
@@ -46,6 +47,7 @@ func clear() -> void:
 	_manifest.clear()
 	_actions.clear()
 	_aliases.clear()
+	_options.clear()
 	_pack_root = ""
 	_pack_scale = 0.31
 
@@ -116,6 +118,9 @@ func pick_autonomous_action(allow_move: bool) -> String:
 		total_weight += weight
 		candidates.append({"id": action, "ceiling": total_weight})
 	if total_weight <= 0:
+		return ""
+	var chance := autonomous_chance()
+	if chance <= 0.0 or (chance < 1.0 and randf() >= chance):
 		return ""
 	var roll := randi_range(1, total_weight)
 	for candidate: Dictionary in candidates:
@@ -202,6 +207,19 @@ func pack_scale() -> float:
 	return _pack_scale
 
 
+func autonomous_chance() -> float:
+	return clampf(float(_options.get("autonomous_chance", 1.0)), 0.0, 1.0)
+
+
+func effect_scale_ratio() -> float:
+	return clampf(float(_options.get("effect_scale_ratio", _pack_scale / 0.31)), 0.45, 2.0)
+
+
+func effect_overrides() -> Dictionary:
+	var effects: Variant = _options.get("effects", {})
+	return effects.duplicate(true) if effects is Dictionary else {}
+
+
 func interaction_value(action: String, key: String, fallback: Variant) -> Variant:
 	var interactions: Variant = _manifest.get("interactions", {})
 	if interactions is not Dictionary:
@@ -251,6 +269,8 @@ func _load_pack_from(candidate_root: String) -> bool:
 	_manifest = loaded.manifest
 	_actions = loaded.actions
 	_aliases = loaded.aliases
+	_options = loaded.get("options", {}).duplicate(true) \
+		if loaded.get("options", {}) is Dictionary else {}
 	_pack_scale = float(loaded.scale)
 	_pack_root = String(loaded.root)
 	return true

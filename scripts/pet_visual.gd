@@ -6,11 +6,13 @@ signal interaction_region_changed(polygon: PackedVector2Array)
 
 const PetHitboxCalculatorScript = preload("res://scripts/pet_hitbox_calculator.gd")
 const CharacterPackProfileScript = preload("res://scripts/character_pack_profile.gd")
+const PetEffectControllerScript = preload("res://scripts/pet_effect_controller.gd")
 const FRAME_VIEWPORT_PADDING := 2.0
 
 var _profile = CharacterPackProfileScript.new()
 var _hitbox_calculator = PetHitboxCalculatorScript.new()
 var _sprite: Sprite2D
+var _effect_controller: PetEffectController
 var _texture_cache: Dictionary = {}
 var _busy := false
 var _dragging := false
@@ -43,7 +45,13 @@ func _ready() -> void:
 	_sprite = Sprite2D.new()
 	_sprite.z_index = 1
 	add_child(_sprite)
+	_effect_controller = PetEffectControllerScript.new()
+	_effect_controller.name = "EffectLayer"
+	add_child(_effect_controller)
 	if _load_pack():
+		_effect_controller.configure_for_pack(
+			_profile.effect_scale_ratio(), _profile.effect_overrides()
+		)
 		_show_action_frame("idle", _first_frame("idle"))
 		print("CHARACTER_PACK_LOADED id=%s root=%s" % [
 			get_character_id(), get_pack_root()
@@ -89,6 +97,7 @@ func set_progression(snapshot: Dictionary) -> void:
 func reload_character() -> bool:
 	_animation_serial += 1
 	_cancel_active_request()
+	_effect_controller.reset()
 	_dragging = false
 	_busy = false
 	_drag_moving = false
@@ -112,6 +121,9 @@ func reload_character() -> bool:
 		queue_redraw()
 		_emit_interaction_region()
 		return false
+	_effect_controller.configure_for_pack(
+		_profile.effect_scale_ratio(), _profile.effect_overrides()
+	)
 	_idle_clock = 0.0
 	_idle_step = 0
 	_show_action_frame("idle", _first_frame("idle"))
@@ -152,12 +164,12 @@ func cancel_autonomous_action() -> bool:
 
 
 func start_sleep_loop() -> void:
-	if _sleep_loop_active or _dragging or not _profile.has_action("sleep"):
+	if _sleep_loop_active or _dragging or not _profile.has_action("idle"):
 		return
 	_stop_current_animation(false)
 	_sleep_loop_active = true
 	_busy = true
-	_current_action = "sleep"
+	_current_action = "idle"
 	_animation_serial += 1
 	var serial := _animation_serial
 	_run_sleep_loop(serial)
@@ -168,7 +180,7 @@ func stop_sleep_loop(reason := "user") -> void:
 		return
 	_sleep_loop_active = false
 	_animation_serial += 1
-	var definition := _action_definition("sleep")
+	var definition := _action_definition("idle")
 	var wake_sequence := _optional_sequence(definition, "wake_sequence")
 	if reason == "drag" or wake_sequence.is_empty():
 		_busy = false
@@ -177,9 +189,9 @@ func stop_sleep_loop(reason := "user") -> void:
 		_emit_interaction_region()
 		return
 	_busy = true
-	_current_action = "sleep"
+	_current_action = "idle"
 	var serial := _animation_serial
-	await _play_frames("sleep", wake_sequence, definition, serial)
+	await _play_frames("idle", wake_sequence, definition, serial)
 	if serial == _animation_serial and not _dragging:
 		_busy = false
 		_current_action = ""
@@ -188,7 +200,8 @@ func stop_sleep_loop(reason := "user") -> void:
 
 
 func _run_sleep_loop(serial: int) -> void:
-	var definition := _action_definition("sleep")
+	var action := "idle"
+	var definition := _action_definition(action)
 	var sequence := _optional_sequence(definition, "loop_sequence")
 	if sequence.is_empty():
 		sequence = _sequence_for(definition)
@@ -197,13 +210,14 @@ func _run_sleep_loop(serial: int) -> void:
 		for frame: Variant in sequence:
 			if not _sleep_loop_active or serial != _animation_serial:
 				return
-			_show_action_frame("sleep", int(frame))
+			_show_action_frame(action, int(frame))
 			await get_tree().create_timer(frame_time).timeout
 
 
 func _stop_current_animation(restore_idle: bool) -> void:
 	_animation_serial += 1
 	_sleep_loop_active = false
+	_effect_controller.stop_transient_effects()
 	if is_instance_valid(_action_tween):
 		_action_tween.kill()
 	_action_tween = null
@@ -410,6 +424,17 @@ func play_action(requested_action: String, request_id := 0) -> void:
 			action_completed.emit(request_id, requested_action, false)
 		return
 	var action := _resolve_action(requested_action)
+	# Care visuals are intentionally composed from the idle loop plus a shared
+	# overlay. Keep Codex and native character packs visually consistent.
+	if requested_action in ["eat", "drink", "sleep"]:
+		action = "idle"
+	elif requested_action == "work":
+		if _profile.has_action("work"):
+			action = "work"
+		elif _profile.has_action("running"):
+			action = "running"
+	elif requested_action == "pet" and _profile.has_action("jumping"):
+		action = "jumping"
 	if not _profile.has_action(action):
 		if request_id > 0:
 			action_completed.emit(request_id, requested_action, false)
@@ -445,6 +470,21 @@ func play_action(requested_action: String, request_id := 0) -> void:
 		_busy = false
 		_current_action = ""
 		_finish_active_request(true)
+
+
+func play_effect_for_action(action: String) -> void:
+	if _effect_controller != null:
+		_effect_controller.play_for_action(action)
+
+
+func start_sleep_effect() -> void:
+	if _effect_controller != null:
+		_effect_controller.start_sleep()
+
+
+func stop_sleep_effect(_reason := "user") -> void:
+	if _effect_controller != null:
+		_effect_controller.stop_sleep()
 
 
 func pick_autonomous_action(allow_move: bool) -> String:

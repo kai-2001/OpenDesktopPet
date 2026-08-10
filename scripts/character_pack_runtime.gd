@@ -3,6 +3,8 @@ extends RefCounted
 
 const REQUIRED_ACTIONS := ["idle", "pet", "eat", "drink", "sleep", "move", "drag", "work"]
 const CharacterPackValidatorScript = preload("res://scripts/character_pack_validator.gd")
+const CodexPetImporterScript = preload("res://scripts/codex_pet_importer.gd")
+const CharacterPackOptionsScript = preload("res://scripts/character_pack_options.gd")
 
 var _validator = CharacterPackValidatorScript.new()
 
@@ -19,6 +21,8 @@ func load_pack(root: String) -> Dictionary:
 		push_error("pet.json is not valid JSON.")
 		return _failure()
 	var manifest: Dictionary = parsed
+	if CodexPetImporterScript.is_codex_manifest(manifest):
+		return CodexPetImporterScript.normalize(root, manifest)
 	if int(manifest.get("format_version", 0)) != 1:
 		push_warning("Unsupported character-pack format version: %s" % manifest_path)
 		return _failure()
@@ -41,7 +45,7 @@ func load_pack(root: String) -> Dictionary:
 	if not actions.has(fallback):
 		push_warning("Character-pack fallback action does not exist: %s" % fallback)
 		return _failure()
-	return {
+	var loaded := {
 		"ok": true,
 		"manifest": manifest,
 		"actions": actions,
@@ -50,6 +54,10 @@ func load_pack(root: String) -> Dictionary:
 		"scale": clampf(float(manifest.get("scale", 0.31)), 0.01, 4.0),
 		"root": root,
 	}
+	loaded["options"] = CharacterPackOptionsScript.load_for_pack(root, {
+		"effect_scale_ratio": float(loaded.scale) / 0.31,
+	})
+	return loaded
 
 func _failure() -> Dictionary:
 	return {"ok": false}
