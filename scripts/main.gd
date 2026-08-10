@@ -8,6 +8,9 @@ const PetInputControllerScript = preload("res://scripts/pet_input_controller.gd"
 const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
 const StatsWindowCoordinatorScript = preload("res://scripts/stats_window_coordinator.gd")
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
+const CharacterEffectPreferencesScript = preload(
+	"res://scripts/character_effect_preferences.gd"
+)
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_STATS_SIZE := Vector2i(500, 620)
 const MIN_STATS_SIZE := Vector2i(360, 480)
@@ -69,6 +72,20 @@ var _character_list: ItemList
 var _character_feedback: Label
 var _character_use_button: Button
 var _character_delete_button: Button
+var _mask_effect_panel: Control
+var _mask_effect_hint: Control
+var _mask_effect_values: Control
+var _mask_effect_x_spin: SpinBox
+var _mask_effect_y_spin: SpinBox
+var _mask_effect_scale_spin: SpinBox
+var _mask_effect_header_state: Label
+var _mask_effect_header_chevron: Label
+var _mask_effect_apply_button: Button
+var _mask_effect_reset_button: Button
+var _mask_effect_feedback_dialog: AcceptDialog
+var _mask_effect_editing := false
+var _pending_mask_anchor := Vector2.ZERO
+var _pending_mask_scale := 0.38
 var _character_tab_index := -1
 var _character_tab_loaded := false
 var _character_entries: Array[Dictionary] = []
@@ -822,6 +839,18 @@ func _build_stats_window() -> void:
 	_character_list = character_refs["character_list"] as ItemList
 	_character_use_button = character_refs["character_use_button"] as Button
 	_character_delete_button = character_refs["character_delete_button"] as Button
+	_mask_effect_panel = character_refs["mask_effect_panel"] as Control
+	_mask_effect_hint = character_refs["mask_effect_hint"] as Control
+	_mask_effect_values = character_refs["mask_effect_values"] as Control
+	_mask_effect_x_spin = character_refs["mask_effect_x"] as SpinBox
+	_mask_effect_y_spin = character_refs["mask_effect_y"] as SpinBox
+	_mask_effect_scale_spin = character_refs["mask_effect_scale"] as SpinBox
+	_mask_effect_header_state = character_refs["mask_effect_header_state"] as Label
+	_mask_effect_header_chevron = character_refs["mask_effect_header_chevron"] as Label
+	_mask_effect_apply_button = character_refs["mask_effect_apply_button"] as Button
+	_mask_effect_reset_button = character_refs["mask_effect_reset_button"] as Button
+	_mask_effect_feedback_dialog = character_refs["mask_effect_feedback_dialog"] as AcceptDialog
+	_refresh_mask_effect_editor()
 	_character_feedback = character_refs["character_feedback"] as Label
 	_character_import_dialog = character_refs["character_import_dialog"] as FileDialog
 	_character_update_dialog = character_refs["character_update_dialog"] as ConfirmationDialog
@@ -909,6 +938,18 @@ func _connect_details_window_signals() -> void:
 	_details_window_controller.character_delete_confirmed.connect(
 		_delete_selected_character
 	)
+	_details_window_controller.mask_effect_changed.connect(
+		_on_mask_effect_changed
+	)
+	_details_window_controller.mask_effect_toggle_requested.connect(
+		_on_mask_effect_toggle_requested
+	)
+	_details_window_controller.mask_effect_apply_requested.connect(
+		_on_mask_effect_apply_requested
+	)
+	_details_window_controller.mask_effect_reset_requested.connect(
+		_on_mask_effect_reset_requested
+	)
 
 
 func _on_care_action_requested(action: String) -> void:
@@ -927,6 +968,8 @@ func _on_care_action_requested(action: String) -> void:
 
 func _on_stats_tab_changed(tab_index: int) -> void:
 	_refresh_stats_tab_buttons(tab_index)
+	if tab_index != _character_tab_index and _mask_effect_editing:
+		_cancel_mask_effect_editing()
 	if tab_index == 2 and _agent_controller != null:
 		_agent_controller.refresh_enabled_executable_paths_if_invalid()
 	if tab_index != _character_tab_index or _character_tab_loaded:
@@ -1026,10 +1069,121 @@ func _refresh_character_list(message := "") -> void:
 	if not message.is_empty():
 		_character_feedback.text = message
 	_update_character_buttons()
+	_refresh_mask_effect_editor()
 
 
 func _on_character_selected(_index: int) -> void:
 	_update_character_buttons()
+
+
+func _refresh_mask_effect_editor() -> void:
+	if not is_instance_valid(_mask_effect_x_spin) \
+			or not is_instance_valid(_mask_effect_header_state):
+		return
+	var enabled: bool = bool(pet.is_codex_pet())
+	_mask_effect_panel.visible = enabled
+	if not enabled:
+		_mask_effect_editing = false
+		pet.set_effect_preview("mask", false)
+		return
+	_load_mask_effect_editor_values()
+	_set_mask_effect_editing(false)
+
+
+func _load_mask_effect_editor_values() -> void:
+	var definition: Dictionary = pet.effect_editor_definition("mask")
+	var raw_anchor: Variant = definition.get("anchor", [0.0, -20.0])
+	var anchor := Vector2.ZERO
+	if raw_anchor is Array and raw_anchor.size() >= 2:
+		anchor = Vector2(float(raw_anchor[0]), float(raw_anchor[1]))
+	var scale := float(definition.get("scale", 0.38))
+	_pending_mask_anchor = anchor
+	_pending_mask_scale = scale
+	_mask_effect_x_spin.set_value_no_signal(anchor.x)
+	_mask_effect_y_spin.set_value_no_signal(anchor.y)
+	_mask_effect_scale_spin.set_value_no_signal(scale)
+
+
+func _set_mask_effect_editing(editing: bool) -> void:
+	_mask_effect_editing = editing
+	_mask_effect_hint.visible = editing
+	_mask_effect_values.visible = editing
+	_mask_effect_x_spin.editable = editing
+	_mask_effect_y_spin.editable = editing
+	_mask_effect_scale_spin.editable = editing
+	_details_window_controller.configure_mask_effect_header(
+		_mask_effect_header_state, _mask_effect_header_chevron, editing
+	)
+	_mask_effect_apply_button.visible = editing
+	_mask_effect_reset_button.disabled = not editing
+	pet.set_effect_preview("mask", editing)
+
+
+func _cancel_mask_effect_editing() -> void:
+	if not _mask_effect_editing:
+		pet.set_effect_preview("mask", false)
+		return
+	pet.reload_effect_overrides()
+	_load_mask_effect_editor_values()
+	_set_mask_effect_editing(false)
+
+
+func _on_mask_effect_changed(anchor: Vector2, scale: float) -> void:
+	if not pet.is_codex_pet():
+		return
+	if not _mask_effect_editing:
+		return
+	_pending_mask_anchor = anchor
+	_pending_mask_scale = clampf(scale, 0.05, 2.0)
+	pet.apply_effect_override("mask", _pending_mask_effect_definition())
+
+
+func _on_mask_effect_toggle_requested() -> void:
+	if not pet.is_codex_pet():
+		return
+	if not _mask_effect_editing:
+		_set_mask_effect_editing(true)
+		return
+	_cancel_mask_effect_editing()
+
+
+func _on_mask_effect_apply_requested() -> void:
+	if not pet.is_codex_pet() or not _mask_effect_editing:
+		return
+	var saved := CharacterEffectPreferencesScript.set_effect(
+		pet.get_character_id(), "mask", _pending_mask_effect_definition()
+	)
+	if saved:
+		pet.apply_effect_override("mask", _pending_mask_effect_definition())
+		_set_mask_effect_editing(false)
+		_show_mask_effect_feedback("眼罩位置與大小已保存。")
+	else:
+		_show_mask_effect_feedback("保存失敗，請稍後再試。")
+
+
+func _on_mask_effect_reset_requested() -> void:
+	if not pet.is_codex_pet():
+		return
+	CharacterEffectPreferencesScript.clear_effect(
+		pet.get_character_id(), "mask"
+	)
+	pet.apply_effect_override("mask", {})
+	_load_mask_effect_editor_values()
+	_set_mask_effect_editing(true)
+
+
+func _show_mask_effect_feedback(message: String) -> void:
+	if not is_instance_valid(_mask_effect_feedback_dialog):
+		return
+	_mask_effect_feedback_dialog.dialog_text = message
+	_mask_effect_feedback_dialog.popup_centered()
+
+
+func _pending_mask_effect_definition() -> Dictionary:
+	return {
+		"anchor": [_pending_mask_anchor.x, _pending_mask_anchor.y],
+		"scale": _pending_mask_scale,
+	}
 
 
 func _selected_character_entry() -> Dictionary:
@@ -1059,6 +1213,7 @@ func _update_character_buttons() -> void:
 
 
 func _open_character_import_dialog() -> void:
+	_cancel_mask_effect_editing()
 	if is_instance_valid(_character_import_dialog):
 		_character_import_dialog.popup_centered_ratio(0.75)
 
@@ -1112,6 +1267,7 @@ func _install_character_archive_now(path: String) -> void:
 
 
 func _use_selected_character() -> void:
+	_cancel_mask_effect_editing()
 	var entry := _selected_character_entry()
 	if entry.is_empty():
 		return
@@ -1197,6 +1353,7 @@ func _set_selected_character_id(character_id: String) -> void:
 
 
 func _confirm_delete_selected_character() -> void:
+	_cancel_mask_effect_editing()
 	var entry := _selected_character_entry()
 	if entry.is_empty() or not bool(entry.get("installed", false)):
 		return
@@ -1228,6 +1385,7 @@ func _delete_selected_character() -> void:
 
 
 func _open_character_packs_folder() -> void:
+	_cancel_mask_effect_editing()
 	if _character_coordinator.ensure_packs_root() != OK:
 		_character_feedback.text = "無法建立角色包資料夾。"
 		return
@@ -1237,6 +1395,7 @@ func _open_character_packs_folder() -> void:
 
 
 func _run_care_action(id: int) -> void:
+	_cancel_mask_effect_editing()
 	var result: String = _gameplay_coordinator.request_care_action(id)
 	if result == "woke":
 		_last_user_activity_ms = Time.get_ticks_msec()
@@ -1367,6 +1526,7 @@ func _is_stats_window_open() -> bool:
 
 func _destroy_stats_window() -> void:
 	_save_stats_window_size()
+	_cancel_mask_effect_editing()
 	if _stats_window_coordinator != null:
 		_stats_window_coordinator.destroy()
 	_stats_window_coordinator = null
@@ -1415,6 +1575,17 @@ func _destroy_stats_window() -> void:
 	_character_feedback = null
 	_character_use_button = null
 	_character_delete_button = null
+	_mask_effect_panel = null
+	_mask_effect_hint = null
+	_mask_effect_values = null
+	_mask_effect_x_spin = null
+	_mask_effect_y_spin = null
+	_mask_effect_scale_spin = null
+	_mask_effect_header_state = null
+	_mask_effect_header_chevron = null
+	_mask_effect_apply_button = null
+	_mask_effect_reset_button = null
+	_mask_effect_feedback_dialog = null
 	_character_import_dialog = null
 	_character_update_dialog = null
 	_character_delete_dialog = null

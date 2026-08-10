@@ -61,6 +61,8 @@ static func _normalize_effects(root: String, effects: Dictionary) -> Dictionary:
 			definition["duration"] = clampf(float(definition.duration), 0.2, 10.0)
 		if definition.has("sway"):
 			definition["sway"] = clampf(float(definition.sway), 0.0, 100.0)
+		if definition.has("tilt"):
+			definition["tilt"] = clampf(float(definition.tilt), 0.0, 45.0)
 		if not definition.is_empty():
 			result[effect_name] = definition
 	return result

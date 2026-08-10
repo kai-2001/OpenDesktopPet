@@ -7,6 +7,9 @@ const INSTALLED_PACKS_ROOT := "user://character_packs/"
 const CHARACTER_SETTINGS_PATH := "user://ui_settings.cfg"
 const PUBLIC_CHARACTER_ID := "open_desktop_pet_default"
 const CharacterPackRuntimeScript = preload("res://scripts/character_pack_runtime.gd")
+const CharacterEffectPreferencesScript = preload(
+	"res://scripts/character_effect_preferences.gd"
+)
 
 var _runtime = CharacterPackRuntimeScript.new()
 var _manifest: Dictionary = {}
@@ -222,7 +225,9 @@ func effect_scale_ratio() -> float:
 
 func effect_overrides() -> Dictionary:
 	var effects: Variant = _options.get("effects", {})
-	return effects.duplicate(true) if effects is Dictionary else {}
+	var result: Dictionary = effects.duplicate(true) if effects is Dictionary else {}
+	result.merge(CharacterEffectPreferencesScript.load_for_character(character_id()), true)
+	return result
 
 
 func interaction_value(action: String, key: String, fallback: Variant) -> Variant:

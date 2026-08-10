@@ -5,14 +5,16 @@
       "anchor": [0.0, 22.0],
       "scale": 0.45,
       "duration": 1.6,
-      "sway": 5.0
+      "sway": 0.0,
+      "tilt": 7.0
     },
     "water": {
       "file": "res://assets/effects/water_cup.png",
       "anchor": [0.0, 18.0],
       "scale": 0.38,
       "duration": 1.5,
-      "sway": 4.0
+      "sway": 0.0,
+      "tilt": 6.0
     },
     "mask": {
       "file": "res://assets/effects/eye_mask.png",

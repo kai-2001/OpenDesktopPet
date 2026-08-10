@@ -491,6 +491,39 @@ func stop_sleep_effect(_reason := "user") -> void:
 		_effect_controller.stop_sleep()
 
 
+func is_codex_pet() -> bool:
+	return _profile.is_codex_pet()
+
+
+func effect_editor_definition(effect_name: String) -> Dictionary:
+	if _effect_controller == null:
+		return {}
+	return _effect_controller.effect_editor_definition(effect_name)
+
+
+func apply_effect_override(effect_name: String, definition: Dictionary) -> void:
+	if _effect_controller == null:
+		return
+	var overrides := _profile.effect_overrides()
+	if definition.is_empty():
+		overrides.erase(effect_name)
+	else:
+		overrides[effect_name] = definition.duplicate(true)
+	_effect_controller.configure_for_pack(_profile.effect_scale_ratio(), overrides)
+
+
+func reload_effect_overrides() -> void:
+	if _effect_controller != null:
+		_effect_controller.configure_for_pack(
+			_profile.effect_scale_ratio(), _profile.effect_overrides()
+		)
+
+
+func set_effect_preview(effect_name: String, enabled: bool) -> void:
+	if _effect_controller != null:
+		_effect_controller.set_preview(effect_name, enabled)
+
+
 func pick_autonomous_action(allow_move: bool) -> String:
 	return _profile.pick_autonomous_action(allow_move)
 

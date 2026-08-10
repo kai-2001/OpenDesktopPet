@@ -3,6 +3,9 @@ extends SceneTree
 const CodexPetImporterScript = preload("res://scripts/codex_pet_importer.gd")
 const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
 const CharacterPackProfileScript = preload("res://scripts/character_pack_profile.gd")
+const CharacterEffectPreferencesScript = preload(
+	"res://scripts/character_effect_preferences.gd"
+)
 
 const TEST_ROOT := "user://test_runs/codex_pet_importer"
 var _failures := 0
@@ -61,6 +64,26 @@ func _run() -> void:
 	_assert_equal(
 		profile.effect_overrides().food.anchor[0], -31.0,
 		"Codex pack can override food anchor"
+	)
+	var preferences_path := TEST_ROOT.path_join("character_effects.json")
+	_assert_true(
+		CharacterEffectPreferencesScript.set_effect(
+			"codex-test-v2", "mask",
+			{"anchor": [12.0, -28.0], "scale": 0.44}, preferences_path
+		),
+		"character effect preference saves"
+	)
+	var saved_effects := CharacterEffectPreferencesScript.load_for_character(
+		"codex-test-v2", preferences_path
+	)
+	_assert_equal(saved_effects.mask.anchor[0], 12.0, "saved mask X persists")
+	_assert_equal(saved_effects.mask.anchor[1], -28.0, "saved mask Y persists")
+	_assert_equal(saved_effects.mask.scale, 0.44, "saved mask scale persists")
+	_assert_true(
+		CharacterEffectPreferencesScript.clear_effect(
+			"codex-test-v2", "mask", preferences_path
+		),
+		"character effect preference resets"
 	)
 
 	var v1_root := TEST_ROOT.path_join("v1")

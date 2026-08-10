@@ -37,6 +37,17 @@ func _run() -> void:
 	controller.configure_for_pack(0.58)
 	_assert_true(is_equal_approx(food.position.x, 0.0) and food.scale.x < 0.45, "effects center and scale with Codex-sized packs")
 	_assert_true(is_equal_approx(mask.position.y, -11.6) and is_equal_approx(mask.scale.x, 0.38 * 0.58), "eye mask is slightly above center and enlarged")
+	var editor_mask: Dictionary = controller.effect_editor_definition("mask")
+	_assert_true(
+		is_equal_approx(float(editor_mask.anchor[1]), -20.0)
+			and is_equal_approx(float(editor_mask.scale), 0.38),
+		"editor exposes unscaled mask layout"
+	)
+	controller.set_preview("mask", true)
+	await process_frame
+	_assert_true(mask.visible, "mask preview shows immediately")
+	controller.set_preview("mask", false)
+	_assert_true(not mask.visible, "mask preview hides cleanly")
 	var custom_food_path := "user://test_runs/pet_effect_custom_food.png"
 	DirAccess.make_dir_recursive_absolute(
 		ProjectSettings.globalize_path("user://test_runs")
@@ -53,8 +64,27 @@ func _run() -> void:
 	controller.play_for_action("eat")
 	await process_frame
 	_assert_true(food.visible, "food effect starts for eat")
+	var food_anchor := food.position
+	await create_timer(0.3).timeout
+	_assert_true(
+		is_equal_approx(food.position.x, food_anchor.x)
+			and is_equal_approx(food.position.y, food_anchor.y),
+		"food effect tilts in place without horizontal movement"
+	)
 	await create_timer(2.0).timeout
 	_assert_true(not food.visible, "food effect fades out")
+
+	controller.configure_for_pack(0.58, {
+		"food": {"file": custom_food_path, "anchor": [-28.0, 12.0], "sway": 12.0},
+	})
+	controller.play_for_action("eat")
+	await process_frame
+	var moving_food_x := food.position.x
+	await create_timer(0.2).timeout
+	_assert_true(
+		not is_equal_approx(food.position.x, moving_food_x),
+		"food effect can move horizontally when sway is configured"
+	)
 
 	controller.play_for_action("drink")
 	await process_frame

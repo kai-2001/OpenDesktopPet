@@ -8,14 +8,16 @@ const DEFAULT_DEFINITIONS := {
 		"anchor": [0.0, 22.0],
 		"scale": 0.45,
 		"duration": 1.6,
-		"sway": 5.0,
+		"sway": 0.0,
+		"tilt": 7.0,
 	},
 	"water": {
 		"file": "res://assets/effects/water_cup.png",
 		"anchor": [0.0, 18.0],
 		"scale": 0.38,
 		"duration": 1.5,
-		"sway": 4.0,
+		"sway": 0.0,
+		"tilt": 6.0,
 	},
 	"mask": {
 		"file": "res://assets/effects/eye_mask.png",
@@ -32,9 +34,11 @@ const DEFAULT_DEFINITIONS := {
 
 var _definitions: Dictionary = {}
 var _base_definitions: Dictionary = {}
+var _editor_definitions: Dictionary = {}
 var _sprites: Dictionary = {}
 var _texture_cache: Dictionary = {}
 var _active_tweens: Array[Tween] = []
+var _preview_effects: Dictionary = {}
 var _sleep_effect_active := false
 var _effect_serial := 0
 
@@ -54,6 +58,7 @@ func configure_for_pack(effect_scale_ratio: float, overrides: Dictionary = {}) -
 		return
 	var ratio := clampf(effect_scale_ratio, 0.45, 2.0)
 	_definitions = _base_definitions.duplicate(true)
+	_editor_definitions.clear()
 	for effect_name: String in overrides:
 		if not _definitions.has(effect_name) or not overrides[effect_name] is Dictionary:
 			continue
@@ -62,6 +67,7 @@ func configure_for_pack(effect_scale_ratio: float, overrides: Dictionary = {}) -
 		_definitions[effect_name] = definition
 	for effect_name: String in _definitions:
 		var definition: Dictionary = _definitions[effect_name]
+		_editor_definitions[effect_name] = definition.duplicate(true)
 		var raw_anchor: Variant = definition.get("anchor", [0.0, 0.0])
 		if raw_anchor is Array and raw_anchor.size() >= 2:
 			definition["anchor"] = [float(raw_anchor[0]) * ratio, float(raw_anchor[1]) * ratio]
@@ -100,19 +106,38 @@ func stop_sleep() -> void:
 	_sleep_effect_active = false
 	_effect_serial += 1
 	_stop_all_tweens()
-	_set_sprite_visible("mask", false)
-	_set_sprite_visible("zzz", false)
+	_hide_if_not_preview("mask")
+	_hide_if_not_preview("zzz")
 
 
 func reset() -> void:
 	_sleep_effect_active = false
 	_effect_serial += 1
 	_stop_all_tweens()
+	_preview_effects.clear()
 	_hide_all()
 
 
 func stop_transient_effects() -> void:
 	_stop_transient_effects()
+
+
+func effect_editor_definition(effect_name: String) -> Dictionary:
+	return _editor_definitions.get(effect_name, {}).duplicate(true) as Dictionary
+
+
+func set_preview(effect_name: String, enabled: bool) -> void:
+	if not _sprites.has(effect_name):
+		return
+	if enabled:
+		_preview_effects[effect_name] = true
+		_stop_transient_effects()
+		var sprite: Sprite2D = _sprites[effect_name]
+		_reset_sprite(effect_name)
+		sprite.visible = true
+		return
+	_preview_effects.erase(effect_name)
+	_hide_if_not_preview(effect_name)
 
 
 func _load_library() -> void:
@@ -160,7 +185,8 @@ func _play_transient(effect_name: String) -> void:
 	var anchor := _anchor(definition)
 	var base_scale := float(definition.get("scale", 1.0))
 	var duration := maxf(float(definition.get("duration", 1.4)), 0.2)
-	var sway := float(definition.get("sway", 4.0))
+	var sway := float(definition.get("sway", 0.0))
+	var tilt_degrees := float(definition.get("tilt", 7.0))
 	sprite.visible = true
 	sprite.position = anchor
 	sprite.rotation = 0.0
@@ -169,12 +195,13 @@ func _play_transient(effect_name: String) -> void:
 
 	var tween := create_tween()
 	_active_tweens.append(tween)
-	tween.tween_property(sprite, "position", anchor + Vector2(sway, 0.0), duration * 0.16)
-	tween.tween_property(sprite, "rotation", deg_to_rad(7.0), duration * 0.16)
-	tween.tween_property(sprite, "position", anchor - Vector2(sway, 0.0), duration * 0.16)
-	tween.tween_property(sprite, "rotation", deg_to_rad(-7.0), duration * 0.16)
-	tween.tween_property(sprite, "position", anchor, duration * 0.16)
-	tween.tween_property(sprite, "rotation", 0.0, duration * 0.16)
+	var swing_time := duration * 0.2
+	tween.tween_property(sprite, "position", anchor + Vector2(sway, 0.0), swing_time)
+	tween.tween_property(sprite, "rotation", deg_to_rad(tilt_degrees), swing_time)
+	tween.tween_property(sprite, "position", anchor - Vector2(sway, 0.0), swing_time)
+	tween.tween_property(sprite, "rotation", deg_to_rad(-tilt_degrees), swing_time)
+	tween.tween_property(sprite, "position", anchor, swing_time)
+	tween.tween_property(sprite, "rotation", 0.0, swing_time)
 	tween.tween_interval(duration * 0.12)
 	tween.tween_property(sprite, "modulate:a", 0.0, duration * 0.2)
 	_hide_transient_after(sprite, serial, duration, tween)
@@ -256,6 +283,12 @@ func _set_sprite_visible(effect_name: String, visible: bool) -> void:
 	var sprite: Sprite2D = _sprites.get(effect_name) as Sprite2D
 	if sprite:
 		sprite.visible = visible
+
+
+func _hide_if_not_preview(effect_name: String) -> void:
+	if _preview_effects.has(effect_name):
+		return
+	_set_sprite_visible(effect_name, false)
 
 
 func _definition(effect_name: String) -> Dictionary:
