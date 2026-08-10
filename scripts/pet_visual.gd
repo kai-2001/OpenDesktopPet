@@ -169,7 +169,7 @@ func start_sleep_loop() -> void:
 	_stop_current_animation(false)
 	_sleep_loop_active = true
 	_busy = true
-	_current_action = "idle"
+	_current_action = _sleep_visual_action()
 	_animation_serial += 1
 	var serial := _animation_serial
 	_run_sleep_loop(serial)
@@ -180,7 +180,8 @@ func stop_sleep_loop(reason := "user") -> void:
 		return
 	_sleep_loop_active = false
 	_animation_serial += 1
-	var definition := _action_definition("idle")
+	var action := _sleep_visual_action()
+	var definition := _action_definition(action)
 	var wake_sequence := _optional_sequence(definition, "wake_sequence")
 	if reason == "drag" or wake_sequence.is_empty():
 		_busy = false
@@ -189,9 +190,9 @@ func stop_sleep_loop(reason := "user") -> void:
 		_emit_interaction_region()
 		return
 	_busy = true
-	_current_action = "idle"
+	_current_action = action
 	var serial := _animation_serial
-	await _play_frames("idle", wake_sequence, definition, serial)
+	await _play_frames(action, wake_sequence, definition, serial)
 	if serial == _animation_serial and not _dragging:
 		_busy = false
 		_current_action = ""
@@ -200,7 +201,7 @@ func stop_sleep_loop(reason := "user") -> void:
 
 
 func _run_sleep_loop(serial: int) -> void:
-	var action := "idle"
+	var action := _sleep_visual_action()
 	var definition := _action_definition(action)
 	var sequence := _optional_sequence(definition, "loop_sequence")
 	if sequence.is_empty():
@@ -423,10 +424,13 @@ func play_action(requested_action: String, request_id := 0) -> void:
 		if request_id > 0:
 			action_completed.emit(request_id, requested_action, false)
 		return
+	if _profile.is_codex_pet() and requested_action == "sleep":
+		_play_codex_sleep_transition(request_id)
+		return
 	var action := _resolve_action(requested_action)
-	# Care visuals are intentionally composed from the idle loop plus a shared
-	# overlay. Keep Codex and native character packs visually consistent.
-	if requested_action in ["eat", "drink", "sleep"]:
+	# Codex Pet has no native care animations, so compose them from idle plus
+	# shared overlays. Native character packs keep their original actions.
+	if _profile.is_codex_pet() and requested_action in ["eat", "drink", "sleep"]:
 		action = "idle"
 	elif requested_action == "work":
 		if _profile.has_action("work"):
@@ -473,17 +477,17 @@ func play_action(requested_action: String, request_id := 0) -> void:
 
 
 func play_effect_for_action(action: String) -> void:
-	if _effect_controller != null:
+	if _profile.is_codex_pet() and _effect_controller != null:
 		_effect_controller.play_for_action(action)
 
 
 func start_sleep_effect() -> void:
-	if _effect_controller != null:
+	if _profile.is_codex_pet() and _effect_controller != null:
 		_effect_controller.start_sleep()
 
 
 func stop_sleep_effect(_reason := "user") -> void:
-	if _effect_controller != null:
+	if _profile.is_codex_pet() and _effect_controller != null:
 		_effect_controller.stop_sleep()
 
 
@@ -670,6 +674,20 @@ func _action_definition(action: String) -> Dictionary:
 
 func _resolve_action(action: String) -> String:
 	return _profile.resolve_action(action)
+
+
+func _sleep_visual_action() -> String:
+	return "idle" if _profile.is_codex_pet() or not _profile.has_action("sleep") else "sleep"
+
+
+func _play_codex_sleep_transition(request_id: int) -> void:
+	_stop_current_animation(false)
+	_show_action_frame("idle", _first_frame("idle"))
+	_busy = false
+	_current_action = ""
+	_active_request_id = request_id
+	_active_requested_action = "sleep"
+	_finish_active_request(true)
 
 
 func _texture_for(definition: Dictionary) -> Texture2D:

@@ -185,6 +185,11 @@ func character_version() -> String:
 	return String(_manifest.get("version", "1.0.0"))
 
 
+func is_codex_pet() -> bool:
+	return String(_manifest.get("source_format", "")) == "codex-pet" \
+			or String(_manifest.get("format", "")) == "codex-pet"
+
+
 func drag_anchor() -> Variant:
 	var anchor: Variant = _manifest.get("drag_anchor", null)
 	if anchor is not Array or anchor.size() < 2:

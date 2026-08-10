@@ -53,6 +53,7 @@ func _run() -> void:
 
 	var profile := CharacterPackProfileScript.new()
 	_assert_true(profile.load_pack(v2_root), "profile loads normalized Codex v2 pack")
+	_assert_true(profile.is_codex_pet(), "normalized Codex profile is identified as Codex")
 	_assert_equal(profile.character_id(), "codex-test-v2", "profile preserves Codex id")
 	_assert_equal(profile.character_name(), "Codex 測試角色", "profile uses displayName")
 	_assert_true(profile.has_action("jumping"), "profile exposes jumping action")
@@ -84,6 +85,7 @@ func _run() -> void:
 	var installed_root := CharacterPackManagerScript.PACKS_ROOT.path_join("codex-test-v1")
 	var installed_profile := CharacterPackProfileScript.new()
 	_assert_true(installed_profile.load_pack(installed_root), "installed Codex archive loads")
+	_assert_true(installed_profile.is_codex_pet(), "installed Codex profile remains identified as Codex")
 	var listed := CharacterPackManagerScript.list_installed()
 	_assert_true(_contains_id(listed, "codex-test-v1"), "installed Codex pack appears in list")
 	var removed := CharacterPackManagerScript.remove_pack("codex-test-v1")

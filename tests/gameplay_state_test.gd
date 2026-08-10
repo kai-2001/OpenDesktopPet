@@ -61,6 +61,10 @@ func _init() -> void:
 		default_profile.load_pack("res://characters/public/"),
 		"public default character pack must validate and load"
 	)
+	_assert_true(
+		not default_profile.is_codex_pet(),
+		"native character pack must not be identified as Codex"
+	)
 	var duration_profile := CharacterPackProfileScript.new()
 	var pulse_definition := {
 		"move": {
