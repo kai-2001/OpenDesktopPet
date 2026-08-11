@@ -83,8 +83,8 @@ jobs:
           application/bundle_identifier="io.github.kai2001.opendesktoppet"
           application/signature=""
           application/app_category="Games"
-          application/short_version="0.3.0"
-          application/version="0.3.0"
+          application/short_version="0.6.0"
+          application/version="0.6.0"
           application/icon="res://assets/branding/birthmark_app_icon.png"
           display/high_res=true
           codesign/codesign=1
