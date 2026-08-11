@@ -43,11 +43,33 @@ func _run() -> void:
 			and is_equal_approx(float(editor_mask.scale), 0.38),
 		"editor exposes unscaled mask layout"
 	)
+	controller.configure_for_pack(0.58, {
+		"mask": {"anchor": [18.0, -20.0]}
+	})
+	var mask_anchor_x := mask.position.x
+	controller.set_mask_mirrored(true)
+	_assert_true(
+		is_equal_approx(mask.position.x, -mask_anchor_x) and mask.flip_h,
+		"eye mask mirrors its anchor and texture"
+	)
+	controller.set_mask_mirrored(false)
+	_assert_true(
+		is_equal_approx(mask.position.x, mask_anchor_x) and not mask.flip_h,
+		"eye mask restores its canonical orientation"
+	)
 	controller.set_preview("mask", true)
 	await process_frame
 	_assert_true(mask.visible, "mask preview shows immediately")
 	controller.set_preview("mask", false)
 	_assert_true(not mask.visible, "mask preview hides cleanly")
+	controller.start_sleep()
+	await process_frame
+	controller.set_preview("mask", true)
+	controller.set_preview("mask", false)
+	_assert_true(mask.visible, "sleep keeps the mask visible after preview closes")
+	await create_timer(0.2).timeout
+	_assert_true(zzz.visible, "sleep zzz continues while mask preview is edited")
+	controller.stop_sleep()
 	var custom_food_path := "user://test_runs/pet_effect_custom_food.png"
 	DirAccess.make_dir_recursive_absolute(
 		ProjectSettings.globalize_path("user://test_runs")

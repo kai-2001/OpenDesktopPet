@@ -41,6 +41,7 @@ var _active_tweens: Array[Tween] = []
 var _preview_effects: Dictionary = {}
 var _sleep_effect_active := false
 var _effect_serial := 0
+var _mask_mirrored := false
 
 
 func _ready() -> void:
@@ -56,6 +57,10 @@ func _ready() -> void:
 func configure_for_pack(effect_scale_ratio: float, overrides: Dictionary = {}) -> void:
 	if _base_definitions.is_empty():
 		return
+	var sleep_was_active := _sleep_effect_active
+	if sleep_was_active:
+		_effect_serial += 1
+		_stop_all_tweens()
 	var ratio := clampf(effect_scale_ratio, 0.45, 2.0)
 	_definitions = _base_definitions.duplicate(true)
 	_editor_definitions.clear()
@@ -78,6 +83,9 @@ func configure_for_pack(effect_scale_ratio: float, overrides: Dictionary = {}) -
 		if sprite != null:
 			sprite.texture = _texture_for_definition(definition)
 		_reset_sprite(effect_name)
+	if sleep_was_active:
+		_set_sprite_visible("mask", true)
+		_run_zzz_loop(_effect_serial)
 
 
 func play_for_action(action: String) -> void:
@@ -106,8 +114,8 @@ func stop_sleep() -> void:
 	_sleep_effect_active = false
 	_effect_serial += 1
 	_stop_all_tweens()
-	_hide_if_not_preview("mask")
-	_hide_if_not_preview("zzz")
+	_hide_if_not_owned("mask")
+	_hide_if_not_owned("zzz")
 
 
 func reset() -> void:
@@ -115,11 +123,19 @@ func reset() -> void:
 	_effect_serial += 1
 	_stop_all_tweens()
 	_preview_effects.clear()
+	_mask_mirrored = false
 	_hide_all()
 
 
 func stop_transient_effects() -> void:
 	_stop_transient_effects()
+
+
+func set_mask_mirrored(mirrored: bool) -> void:
+	if _mask_mirrored == mirrored:
+		return
+	_mask_mirrored = mirrored
+	_reset_sprite("mask")
 
 
 func effect_editor_definition(effect_name: String) -> Dictionary:
@@ -131,13 +147,12 @@ func set_preview(effect_name: String, enabled: bool) -> void:
 		return
 	if enabled:
 		_preview_effects[effect_name] = true
-		_stop_transient_effects()
 		var sprite: Sprite2D = _sprites[effect_name]
 		_reset_sprite(effect_name)
 		sprite.visible = true
 		return
 	_preview_effects.erase(effect_name)
-	_hide_if_not_preview(effect_name)
+	_hide_if_not_owned(effect_name)
 
 
 func _load_library() -> void:
@@ -273,7 +288,8 @@ func _reset_sprite(effect_name: String) -> void:
 	if sprite == null:
 		return
 	var definition := _definition(effect_name)
-	sprite.position = _anchor(definition)
+	sprite.position = _anchor_for_effect(effect_name, definition)
+	sprite.flip_h = _mask_mirrored if effect_name == "mask" else false
 	sprite.rotation = 0.0
 	sprite.scale = Vector2.ONE * float(definition.get("scale", 1.0))
 	sprite.modulate = Color.WHITE
@@ -285,10 +301,16 @@ func _set_sprite_visible(effect_name: String, visible: bool) -> void:
 		sprite.visible = visible
 
 
-func _hide_if_not_preview(effect_name: String) -> void:
-	if _preview_effects.has(effect_name):
+func _hide_if_not_owned(effect_name: String) -> void:
+	if _effect_has_visibility_owner(effect_name):
 		return
 	_set_sprite_visible(effect_name, false)
+
+
+func _effect_has_visibility_owner(effect_name: String) -> bool:
+	if _preview_effects.has(effect_name):
+		return true
+	return _sleep_effect_active and effect_name in ["mask", "zzz"]
 
 
 func _definition(effect_name: String) -> Dictionary:
@@ -300,6 +322,13 @@ func _anchor(definition: Dictionary) -> Vector2:
 	if raw_anchor is Array and raw_anchor.size() >= 2:
 		return Vector2(float(raw_anchor[0]), float(raw_anchor[1]))
 	return Vector2.ZERO
+
+
+func _anchor_for_effect(effect_name: String, definition: Dictionary) -> Vector2:
+	var anchor := _anchor(definition)
+	if effect_name == "mask" and _mask_mirrored:
+		anchor.x = -anchor.x
+	return anchor
 
 
 func _texture_for_definition(definition: Dictionary) -> Texture2D:

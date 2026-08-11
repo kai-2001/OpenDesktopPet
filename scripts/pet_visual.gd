@@ -52,6 +52,7 @@ func _ready() -> void:
 		_effect_controller.configure_for_pack(
 			_profile.effect_scale_ratio(), _profile.effect_overrides()
 		)
+		_sync_effect_facing()
 		_show_action_frame("idle", _first_frame("idle"))
 		print("CHARACTER_PACK_LOADED id=%s root=%s" % [
 			get_character_id(), get_pack_root()
@@ -124,6 +125,7 @@ func reload_character() -> bool:
 	_effect_controller.configure_for_pack(
 		_profile.effect_scale_ratio(), _profile.effect_overrides()
 	)
+	_sync_effect_facing()
 	_idle_clock = 0.0
 	_idle_step = 0
 	_show_action_frame("idle", _first_frame("idle"))
@@ -275,6 +277,7 @@ func set_facing_direction(direction: int) -> void:
 	if normalized == _facing_direction:
 		return
 	_facing_direction = normalized
+	_sync_effect_facing()
 	var scale_action := _current_action
 	if scale_action.is_empty():
 		scale_action = "drag" if _dragging else "idle"
@@ -510,6 +513,7 @@ func apply_effect_override(effect_name: String, definition: Dictionary) -> void:
 	else:
 		overrides[effect_name] = definition.duplicate(true)
 	_effect_controller.configure_for_pack(_profile.effect_scale_ratio(), overrides)
+	_sync_effect_facing()
 
 
 func reload_effect_overrides() -> void:
@@ -517,10 +521,12 @@ func reload_effect_overrides() -> void:
 		_effect_controller.configure_for_pack(
 			_profile.effect_scale_ratio(), _profile.effect_overrides()
 		)
+		_sync_effect_facing()
 
 
 func set_effect_preview(effect_name: String, enabled: bool) -> void:
 	if _effect_controller != null:
+		_sync_effect_facing()
 		_effect_controller.set_preview(effect_name, enabled)
 
 
@@ -687,6 +693,16 @@ func _is_action_flipped(definition: Dictionary) -> bool:
 		source_facing = "left"
 	var desired_facing := "right" if _facing_direction > 0 else "left"
 	return source_facing != desired_facing
+
+
+func _sync_effect_facing() -> void:
+	if _effect_controller == null or not _profile.is_codex_pet():
+		return
+	var source_facing := _profile.source_facing().to_lower()
+	if source_facing not in ["left", "right"]:
+		source_facing = "left"
+	var desired_facing := "right" if _facing_direction > 0 else "left"
+	_effect_controller.set_mask_mirrored(source_facing != desired_facing)
 
 
 func _sequence_for(definition: Dictionary) -> Array:

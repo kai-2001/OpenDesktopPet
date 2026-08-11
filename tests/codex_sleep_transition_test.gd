@@ -30,6 +30,19 @@ func _run() -> void:
 	_assert_true(visual._profile.load_pack(TEST_ROOT), "Codex test profile loads")
 	visual._texture_cache.clear()
 	visual._effect_controller.configure_for_pack(0.58)
+	visual.apply_effect_override("mask", {
+		"anchor": [18.0, -20.0],
+	})
+	visual.set_facing_direction(-1)
+	visual.set_effect_preview("mask", true)
+	var mask := visual._effect_controller.get_node("Mask") as Sprite2D
+	var left_mask_x := mask.position.x
+	visual.set_facing_direction(1)
+	_assert_true(
+		mask.flip_h and is_equal_approx(mask.position.x, -left_mask_x),
+		"Codex preview mirrors the eye mask with the pet direction"
+	)
+	visual.set_effect_preview("mask", false)
 	visual.action_completed.connect(_on_action_completed)
 
 	var started_at := Time.get_ticks_msec()
