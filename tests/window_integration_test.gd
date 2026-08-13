@@ -68,12 +68,12 @@ func _init() -> void:
 				"status indicator action %d uses the same label" % index
 			)
 		_assert_equal(
-			main._tray_menu.get_item_id(11),
+			main._tray_menu.get_item_id(9),
 			22,
 			"status indicator menu contains the recover-pet action"
 		)
 		_assert_equal(
-			main._tray_menu.get_item_id(13),
+			main._tray_menu.get_item_id(11),
 			7,
 			"status indicator menu keeps the save-and-exit action"
 		)
@@ -230,6 +230,16 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	_assert_true(main._stats_window.visible, "details window opens on first request")
+	main._select_stats_tab(1)
+	await process_frame
+	_assert_true(
+		main._visual_scale_slider.visible and main._visual_scale_slider.size.y > 0.0,
+		"settings tab visibly lays out the visual-size slider"
+	)
+	_assert_true(
+		main._focus_mode_check_box.visible and main._focus_mode_check_box.size.y > 0.0,
+		"settings tab visibly lays out the focus-mode setting"
+	)
 	_assert_true(not main._stats_window.unresizable, "details window can be resized")
 	_assert_true(not main._stats_window.transient, "details window is an independent native window")
 	_assert_true(not main._stats_window.always_on_top, "details window behaves like a normal window")
@@ -299,6 +309,136 @@ func _init() -> void:
 	_assert_true(
 		is_instance_valid(main._autostart_check_box),
 		"details window includes a Windows autostart setting"
+	)
+	_assert_equal(
+		main._visual_scale_slider.min_value,
+		0.5,
+		"visual-size slider starts at the 50 percent limit"
+	)
+	_assert_equal(
+		main._visual_scale_slider.max_value,
+		1.5,
+		"visual-size slider ends at the 150 percent limit"
+	)
+	_assert_true(
+		not main._visual_scale_slider.scrollable,
+		"visual-size slider disables default parent scrolling"
+	)
+	_assert_true(
+		main._visual_scale_slider.get_theme_stylebox("slider") != null,
+		"visual-size slider has a local track style"
+	)
+	_assert_true(
+		main._visual_scale_slider.get_theme_icon("grabber") != null,
+		"visual-size slider has a local grabber texture"
+	)
+	var visual_scale_panel: Control = (
+		main._visual_scale_slider.get_parent().get_parent() as Control
+	)
+	_assert_equal(
+		visual_scale_panel.mouse_filter,
+		Control.MOUSE_FILTER_PASS,
+		"visual-size panel passes wheel input to its local handler"
+	)
+	var scale_before_wheel: float = main._visual_scale_slider.value
+	var scale_wheel := InputEventMouseButton.new()
+	scale_wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+	scale_wheel.pressed = true
+	main._details_window_controller._handle_visual_scale_wheel(
+		scale_wheel,
+		main._visual_scale_slider
+	)
+	_assert_equal(
+		main._visual_scale_slider.value,
+		minf(scale_before_wheel + main._visual_scale_slider.step, 1.5),
+		"wheel input changes only the visual-size slider"
+	)
+	_assert_equal(
+		main.pet._visual_size,
+		main._visual_scale_slider.value,
+		"visual-size changes preview immediately"
+	)
+	await create_timer(0.25).timeout
+	_assert_equal(
+		float(main.state.data.visual_scale),
+		main._visual_scale_slider.value,
+		"visual-size changes persist after input settles"
+	)
+	var scale_before_bounds_test: float = main._visual_scale_slider.value
+	main._visual_scale_slider.value = 1.5
+	await process_frame
+	var scaled_visual_bounds: Rect2 = main.pet.get_visual_bounds_in_canvas()
+	_assert_true(
+		main.get_viewport().get_visible_rect().grow(-1.0).encloses(
+			scaled_visual_bounds
+		),
+		"150 percent visual size expands the transparent window without clipping "
+			+ "(viewport=%s bounds=%s window=%s)" % [
+				main.get_viewport().get_visible_rect(),
+				scaled_visual_bounds,
+				main.get_window().size,
+			]
+	)
+	var eat_definition: Dictionary = main.pet._action_definition("eat")
+	if not eat_definition.is_empty():
+		var eat_sequence: Array = main.pet._sequence_for(eat_definition)
+		main.pet._busy = true
+		main.pet._current_action = "eat"
+		main.pet._geometry_action = ""
+		var stable_desktop_origin: Vector2 = (
+			Vector2(main.get_window().position) + main.position
+		)
+		var action_window_size := Vector2i.ZERO
+		for frame: Variant in eat_sequence:
+			main.pet._show_action_frame("eat", int(frame))
+			await process_frame
+			if action_window_size == Vector2i.ZERO:
+				action_window_size = main.get_window().size
+			else:
+				_assert_equal(
+					main.get_window().size,
+					action_window_size,
+					"large actions reserve one window size for every frame"
+				)
+			var current_desktop_origin: Vector2 = (
+				Vector2(main.get_window().position) + main.position
+			)
+			_assert_true(
+				current_desktop_origin.distance_to(stable_desktop_origin) <= 1.5,
+				"large multi-frame actions keep one desktop canvas anchor "
+					+ "(expected=%s actual=%s)" % [
+						stable_desktop_origin, current_desktop_origin
+					]
+			)
+		main.pet._busy = false
+		main.pet._current_action = ""
+		main.pet._restore_idle()
+	main._visual_scale_slider.value = scale_before_bounds_test
+	await create_timer(0.25).timeout
+
+	main._focus_mode_check_box.button_pressed = true
+	_assert_true(main._focus_mode, "focus-mode UI enables focus mode")
+	main._focus_mode_check_box.button_pressed = false
+	_assert_true(not main._focus_mode, "focus-mode UI disables focus mode")
+	main._keep_screen_on_check_box.button_pressed = true
+	_assert_true(main._keep_screen_on, "keep-awake UI enables the runtime setting")
+	main._keep_screen_on_check_box.button_pressed = false
+	_assert_true(not main._keep_screen_on, "keep-awake UI disables the runtime setting")
+	var runtime_settings := ConfigFile.new()
+	_assert_equal(
+		runtime_settings.load(main.UI_SETTINGS_PATH),
+		OK,
+		"focus and keep-awake settings are persisted"
+	)
+	_assert_equal(
+		bool(runtime_settings.get_value("behavior", "focus_mode", true)),
+		false,
+		"focus-mode persistence matches the UI"
+	)
+	_assert_equal(
+		bool(runtime_settings.get_value("power", "keep_screen_on", true)),
+		false,
+		"keep-awake persistence matches the UI"
 	)
 	var autostart_pressed_style := (
 		main._autostart_check_box.get_theme_stylebox("pressed") as StyleBoxFlat

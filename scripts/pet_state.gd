@@ -3,6 +3,7 @@ extends Node
 
 const PetClockScript = preload("res://scripts/pet_clock.gd")
 const PetStateRepositoryScript = preload("res://scripts/pet_state_repository.gd")
+const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 
 signal changed(snapshot: Dictionary)
 signal message_requested(key: String, fallback: String)
@@ -50,7 +51,7 @@ const DEFAULT_DATA := {
 	"wish_intro_seen": false,
 	"wish_notice_version": 0,
 	"last_pet_reward_at": 0,
-	"visual_scale": 1.0,
+	"visual_scale": PetVisualScaleScript.DEFAULT_VALUE,
 }
 
 var data: Dictionary = DEFAULT_DATA.duplicate(true)
@@ -726,8 +727,11 @@ func _add_xp(amount: int) -> void:
 		_request_message("level_up", "升級了！現在是第 %d 級。" % data.level)
 
 
-func change_visual_size(delta: float) -> void:
-	data.visual_scale = clampf(float(data.visual_scale) + delta, 0.7, 1.15)
+func set_visual_scale(value: float) -> void:
+	var normalized: float = PetVisualScaleScript.normalize(value)
+	if is_equal_approx(float(data.visual_scale), normalized):
+		return
+	data.visual_scale = normalized
 	_commit()
 
 
@@ -827,11 +831,7 @@ func _normalize_loaded_data() -> void:
 	data.xp = maxi(int(data.xp), 0)
 	data.care = maxi(int(data.care), 0)
 
-	data.visual_scale = clampf(
-		float(data.visual_scale),
-		0.7,
-		1.15
-	)
+	data.visual_scale = PetVisualScaleScript.normalize(float(data.visual_scale))
 
 	for key: String in [
 		"last_seen",

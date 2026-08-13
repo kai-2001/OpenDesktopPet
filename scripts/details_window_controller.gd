@@ -3,6 +3,7 @@ extends RefCounted
 
 const AgentIntegrationControllerScript = preload("res://scripts/agent_integration_controller.gd")
 const SettingsToggleSwitchScript = preload("res://scripts/settings_toggle_switch.gd")
+const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 
 signal care_action_requested(action: String)
@@ -28,6 +29,10 @@ signal terminal_executable_path_changed(path: String)
 signal opencode_app_executable_path_changed(path: String)
 signal claude_app_executable_path_changed(path: String)
 signal autostart_toggled(enabled: bool)
+signal keep_screen_on_toggled(enabled: bool)
+signal focus_mode_toggled(enabled: bool)
+signal visual_scale_previewed(value: float)
+signal visual_scale_changed(value: float)
 signal character_selected(index: int)
 signal character_use_requested
 signal character_delete_requested
@@ -62,6 +67,9 @@ var terminal_executable_path := ""
 var opencode_app_executable_path := ""
 var claude_app_executable_path := ""
 var autostart_supported := false
+var keep_screen_on := false
+var focus_mode := false
+var visual_scale := PetVisualScaleScript.DEFAULT_VALUE
 var interaction_label: Callable
 var interaction_icon: Callable
 var stats_bars: Dictionary = {}
@@ -267,6 +275,153 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	settings_content.add_child(theme_hint)
 	settings_content.add_child(HSeparator.new())
 
+	var visual_scale_panel := PanelContainer.new()
+	var visual_scale_panel_style := StyleBoxFlat.new()
+	visual_scale_panel_style.bg_color = _details_color("#f1fafb", "#202c2e")
+	visual_scale_panel_style.border_color = _details_color("#b7dfe4", "#35555a")
+	visual_scale_panel_style.set_border_width_all(1)
+	visual_scale_panel_style.set_corner_radius_all(8)
+	visual_scale_panel_style.content_margin_left = 14
+	visual_scale_panel_style.content_margin_right = 14
+	visual_scale_panel_style.content_margin_top = 12
+	visual_scale_panel_style.content_margin_bottom = 12
+	visual_scale_panel.add_theme_stylebox_override("panel", visual_scale_panel_style)
+	visual_scale_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	var visual_scale_content := VBoxContainer.new()
+	visual_scale_content.add_theme_constant_override("separation", 8)
+	visual_scale_content.mouse_filter = Control.MOUSE_FILTER_PASS
+	visual_scale_panel.add_child(visual_scale_content)
+
+	var visual_scale_value_label: Label = _new_label(
+		"100%", 15, _details_color("#238b9d", "#4fc1ff")
+	)
+	visual_scale_value_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	visual_scale_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	visual_scale_value_label.custom_minimum_size.x = 64
+	visual_scale_value_label.text = "%d%%" % roundi(visual_scale * 100.0)
+	var visual_scale_label: Label = _new_label(
+		"桌寵大小", 16, _details_color("#30383c", "#d4d4d4")
+	)
+	visual_scale_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	visual_scale_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var visual_scale_row := HBoxContainer.new()
+	visual_scale_row.add_theme_constant_override("separation", 12)
+	visual_scale_row.mouse_filter = Control.MOUSE_FILTER_PASS
+	visual_scale_row.add_child(visual_scale_label)
+	visual_scale_row.add_child(visual_scale_value_label)
+
+	var visual_scale_slider := HSlider.new()
+	visual_scale_slider.name = "VisualScaleSlider"
+	visual_scale_slider.min_value = PetVisualScaleScript.MIN_VALUE
+	visual_scale_slider.max_value = PetVisualScaleScript.MAX_VALUE
+	visual_scale_slider.step = PetVisualScaleScript.STEP
+	visual_scale_slider.value = visual_scale
+	visual_scale_slider.scrollable = false
+	visual_scale_slider.custom_minimum_size = Vector2(0, 32)
+	visual_scale_slider.tooltip_text = "調整桌寵顯示大小"
+	var visual_scale_track := StyleBoxFlat.new()
+	visual_scale_track.bg_color = _details_color("#dce5e7", "#3a4145")
+	visual_scale_track.set_corner_radius_all(5)
+	visual_scale_track.content_margin_top = 5
+	visual_scale_track.content_margin_bottom = 5
+	var visual_scale_area := StyleBoxFlat.new()
+	visual_scale_area.bg_color = _details_color("#08a6b5", "#35a9bd")
+	visual_scale_area.set_corner_radius_all(5)
+	visual_scale_area.content_margin_top = 5
+	visual_scale_area.content_margin_bottom = 5
+	var visual_scale_area_highlight := StyleBoxFlat.new()
+	visual_scale_area_highlight.bg_color = _details_color("#087f8b", "#4fc1ff")
+	visual_scale_area_highlight.set_corner_radius_all(5)
+	visual_scale_area_highlight.content_margin_top = 5
+	visual_scale_area_highlight.content_margin_bottom = 5
+	var visual_scale_theme := Theme.new()
+	visual_scale_theme.set_stylebox("slider", "HSlider", visual_scale_track)
+	visual_scale_theme.set_stylebox("grabber_area", "HSlider", visual_scale_area)
+	visual_scale_theme.set_stylebox(
+		"grabber_area_highlight", "HSlider", visual_scale_area_highlight
+	)
+	visual_scale_theme.set_icon(
+		"grabber", "HSlider", _create_slider_grabber_texture(false)
+	)
+	visual_scale_theme.set_icon(
+		"grabber_highlight", "HSlider", _create_slider_grabber_texture(true)
+	)
+	visual_scale_theme.set_constant("center_grabber", "HSlider", 1)
+	visual_scale_slider.theme = visual_scale_theme
+	var visual_scale_commit_timer := Timer.new()
+	visual_scale_commit_timer.one_shot = true
+	visual_scale_commit_timer.wait_time = 0.2
+	visual_scale_slider.add_child(visual_scale_commit_timer)
+	visual_scale_commit_timer.timeout.connect(
+		func() -> void: visual_scale_changed.emit(visual_scale_slider.value)
+	)
+	visual_scale_slider.value_changed.connect(
+		func(value: float) -> void:
+			visual_scale_value_label.text = "%d%%" % roundi(value * 100.0)
+			visual_scale_previewed.emit(value)
+			visual_scale_commit_timer.start()
+	)
+	visual_scale_slider.gui_input.connect(
+		_handle_visual_scale_wheel.bind(visual_scale_slider)
+	)
+	visual_scale_panel.gui_input.connect(
+		_handle_visual_scale_wheel.bind(visual_scale_slider)
+	)
+	visual_scale_content.add_child(visual_scale_row)
+	visual_scale_content.add_child(visual_scale_slider)
+
+	var visual_scale_hint: Label = _new_label(
+		"可調整為原始顯示大小的 %d%%–%d%%；設定會保存。" % [
+			roundi(PetVisualScaleScript.MIN_VALUE * 100.0),
+			roundi(PetVisualScaleScript.MAX_VALUE * 100.0),
+		],
+		13,
+		_details_color("#68747a", "#9da1a6")
+	)
+	visual_scale_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	visual_scale_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	visual_scale_content.add_child(visual_scale_hint)
+	settings_content.add_child(visual_scale_panel)
+	settings_content.add_child(HSeparator.new())
+
+	var focus_mode_check_box := CheckBox.new()
+	focus_mode_check_box.text = "專注模式（不自主移動或做動作）"
+	focus_mode_check_box.add_theme_font_size_override("font_size", 16)
+	_style_checkbox(focus_mode_check_box)
+	focus_mode_check_box.custom_minimum_size = Vector2(0, 40)
+	focus_mode_check_box.button_pressed = focus_mode
+	focus_mode_check_box.toggled.connect(
+		func(enabled: bool) -> void: focus_mode_toggled.emit(enabled)
+	)
+	settings_content.add_child(focus_mode_check_box)
+
+	var focus_mode_hint: Label = _new_label(
+		"開啟後會停止桌寵自主移動、吃飯、喝水、睡覺與其他自主動作；手動操作仍可使用。",
+		13,
+		_details_color("#68747a", "#9da1a6")
+	)
+	focus_mode_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	settings_content.add_child(focus_mode_hint)
+	settings_content.add_child(HSeparator.new())
+
+	var keep_screen_on_check_box := CheckBox.new()
+	keep_screen_on_check_box.text = "保持螢幕喚醒（阻止系統休眠）"
+	keep_screen_on_check_box.add_theme_font_size_override("font_size", 16)
+	_style_checkbox(keep_screen_on_check_box)
+	keep_screen_on_check_box.custom_minimum_size = Vector2(0, 40)
+	keep_screen_on_check_box.button_pressed = keep_screen_on
+	keep_screen_on_check_box.toggled.connect(
+		func(enabled: bool) -> void: keep_screen_on_toggled.emit(enabled)
+	)
+	settings_content.add_child(keep_screen_on_check_box)
+
+	var keep_screen_on_hint: Label = _new_label(
+		"開啟後會要求 Windows 保持螢幕喚醒；關閉後恢復系統電源計畫。",
+		13,
+		_details_color("#68747a", "#9da1a6")
+	)
+	keep_screen_on_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	settings_content.add_child(keep_screen_on_hint)
 	settings_content.add_child(HSeparator.new())
 
 	var autostart_check_box := CheckBox.new()
@@ -302,6 +457,10 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	return {
 		"fps_option_button": fps_option_button,
 		"details_theme_option_button": details_theme_option_button,
+		"visual_scale_slider": visual_scale_slider,
+		"visual_scale_value_label": visual_scale_value_label,
+		"focus_mode_check_box": focus_mode_check_box,
+		"keep_screen_on_check_box": keep_screen_on_check_box,
 		"autostart_check_box": autostart_check_box,
 		"settings_feedback": settings_feedback,
 	}
@@ -1098,6 +1257,44 @@ func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFl
 	style.content_margin_top = 8
 	style.content_margin_bottom = 8
 	return style
+
+
+func _handle_visual_scale_wheel(event: InputEvent, slider: HSlider) -> void:
+	if event is not InputEventMouseButton:
+		return
+	var mouse_event := event as InputEventMouseButton
+	if not mouse_event.pressed:
+		return
+	var delta := 0.0
+	if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP:
+		delta = slider.step
+	elif mouse_event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		delta = -slider.step
+	if is_zero_approx(delta):
+		return
+	slider.value = clampf(slider.value + delta, slider.min_value, slider.max_value)
+	slider.accept_event()
+
+
+func _create_slider_grabber_texture(highlighted: bool) -> Texture2D:
+	const texture_size := 24
+	const radius := 8.5
+	var image := Image.create(texture_size, texture_size, false, Image.FORMAT_RGBA8)
+	var center := Vector2(texture_size, texture_size) * 0.5
+	var fill_color := _details_color("#ffffff", "#eaf7f8")
+	fill_color.a = 0.62 if not highlighted else 0.72
+	var border_color := _details_color("#08a6b5", "#4fc1ff")
+	border_color.a = 0.58 if not highlighted else 0.72
+	for y in texture_size:
+		for x in texture_size:
+			var distance := Vector2(x + 0.5, y + 0.5).distance_to(center)
+			if distance > radius:
+				continue
+			var edge_alpha := clampf(radius - distance, 0.0, 1.0)
+			var pixel_color := border_color if distance > radius - 2.0 else fill_color
+			pixel_color.a *= edge_alpha
+			image.set_pixel(x, y, pixel_color)
+	return ImageTexture.create_from_image(image)
 
 
 func _prepare_mask_numeric_input(spin_box: SpinBox) -> void:

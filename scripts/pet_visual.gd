@@ -7,6 +7,7 @@ signal interaction_region_changed(polygon: PackedVector2Array)
 const PetHitboxCalculatorScript = preload("res://scripts/pet_hitbox_calculator.gd")
 const CharacterPackProfileScript = preload("res://scripts/character_pack_profile.gd")
 const PetEffectControllerScript = preload("res://scripts/pet_effect_controller.gd")
+const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const FRAME_VIEWPORT_PADDING := 2.0
 
 var _profile = CharacterPackProfileScript.new()
@@ -21,7 +22,7 @@ var _drag_frame_clock := 0.0
 var _drag_frame_step := 0
 var _sleep_loop_active := false
 var _facing_direction := -1
-var _visual_size := 1.0
+var _visual_size := PetVisualScaleScript.DEFAULT_VALUE
 var _time := 0.0
 var _idle_clock := 0.0
 var _idle_step := 0
@@ -37,6 +38,7 @@ var _hit_polygon_cache: Dictionary = {}
 var _opaque_bounds_cache: Dictionary = {}
 var _base_window_size := Vector2i.ZERO
 var _base_root_position := Vector2.ZERO
+var _geometry_action := ""
 
 
 func _ready() -> void:
@@ -117,6 +119,7 @@ func reload_character() -> bool:
 	_hit_image_cache.clear()
 	_hit_polygon_cache.clear()
 	_opaque_bounds_cache.clear()
+	_geometry_action = ""
 	_profile.clear()
 	if not _load_pack():
 		queue_redraw()
@@ -244,18 +247,22 @@ func _restore_base_geometry(resize_window := true) -> void:
 	var root_canvas := get_parent() as Node2D
 	if root_canvas:
 		# A previous oversized frame may have shifted the root canvas. Move the
-		# native window by the inverse correction so the pet keeps the same
-		# desktop position while returning to the common baseline.
-		var canvas_delta := root_canvas.position - _base_root_position
-		root_canvas.position = _base_root_position
-		if window and not canvas_delta.is_zero_approx():
-			window.position += Vector2i(
-				roundi(canvas_delta.x),
-				roundi(canvas_delta.y)
+		# native window by the inverse correction while preserving the exact
+		# desktop-space canvas origin. Keeping the fractional remainder on the
+		# canvas prevents subpixel rounding from accumulating between frames.
+		if window and not root_canvas.position.is_equal_approx(_base_root_position):
+			var desktop_canvas_origin := (
+				Vector2(window.position) + root_canvas.position
 			)
+			window.position = Vector2i(
+				roundi(desktop_canvas_origin.x - _base_root_position.x),
+				roundi(desktop_canvas_origin.y - _base_root_position.y)
+			)
+			root_canvas.position = desktop_canvas_origin - Vector2(window.position)
 	if resize_window and window \
 			and _base_window_size.x > 0 and _base_window_size.y > 0:
 		window.size = _base_window_size
+		window.content_scale_size = _base_window_size
 
 
 func set_drag_motion(is_moving: bool) -> void:
@@ -281,8 +288,8 @@ func set_facing_direction(direction: int) -> void:
 	var scale_action := _current_action
 	if scale_action.is_empty():
 		scale_action = "drag" if _dragging else "idle"
-	_apply_sprite_scale(_action_definition(scale_action))
-	_emit_interaction_region()
+	_geometry_action = ""
+	_show_action_frame(scale_action, _current_frame_index())
 
 
 func is_busy() -> bool:
@@ -342,16 +349,19 @@ func finish_progressive_move() -> void:
 	_restore_idle()
 
 
-func change_visual_size(delta: float) -> void:
-	_visual_size = clampf(_visual_size + delta, 0.7, 1.15)
-	scale = Vector2.ONE * _visual_size
-	_emit_interaction_region()
-
-
 func set_visual_size(value: float) -> void:
-	_visual_size = clampf(value, 0.7, 1.15)
+	var normalized: float = PetVisualScaleScript.normalize(value)
+	if is_equal_approx(_visual_size, normalized):
+		return
+	_visual_size = normalized
 	scale = Vector2.ONE * _visual_size
-	_emit_interaction_region()
+	# Scaling invalidates the active action envelope. Recalculate the complete
+	# animation once so subsequent frames remain geometry-only image swaps.
+	var action := _current_action
+	if action.is_empty():
+		action = "drag" if _dragging else "idle"
+	_geometry_action = ""
+	_show_action_frame(action, _current_frame_index())
 
 
 func contains_point(point_in_canvas: Vector2) -> bool:
@@ -568,10 +578,12 @@ func get_pack_root() -> String:
 
 func set_action_definition(action: String, definition: Dictionary) -> void:
 	_profile.set_action_definition(action, definition)
+	_geometry_action = ""
 
 
 func remove_action_definition(action: String) -> void:
 	_profile.remove_action_definition(action)
+	_geometry_action = ""
 
 
 func get_interaction_label(action: String, fallback: String) -> String:
@@ -637,6 +649,40 @@ func _show_action_frame(action: String, frame: int) -> void:
 	var definition := _action_definition(action)
 	if definition.is_empty():
 		return
+	if _geometry_action != action:
+		_activate_action_geometry(action, frame, definition)
+	else:
+		_apply_action_frame_visual(frame, definition)
+	_emit_interaction_region()
+
+
+func _activate_action_geometry(
+	action: String,
+	frame: int,
+	definition: Dictionary
+) -> void:
+	# Return to the common canvas origin once at the action boundary. The
+	# native window may remain large until the new action envelope is known.
+	_restore_base_geometry(false)
+	var envelope := Rect2()
+	var has_bounds := false
+	for action_frame: int in _geometry_frames_for_action(definition):
+		_apply_action_frame_visual(action_frame, definition)
+		var frame_bounds := _opaque_frame_bounds_in_canvas()
+		if frame_bounds.size == Vector2.ZERO:
+			continue
+		if not has_bounds:
+			envelope = frame_bounds
+			has_bounds = true
+		else:
+			envelope = envelope.merge(frame_bounds)
+	_apply_action_frame_visual(frame, definition)
+	if has_bounds:
+		_fit_window_to_bounds(envelope)
+	_geometry_action = action
+
+
+func _apply_action_frame_visual(frame: int, definition: Dictionary) -> void:
 	var texture := _texture_for(definition)
 	if texture == null:
 		return
@@ -655,13 +701,41 @@ func _show_action_frame(action: String, frame: int) -> void:
 	)
 	_sprite.position = _frame_offset(definition, safe_frame)
 	_apply_sprite_scale(definition)
-	# Reset the canvas coordinate system without first shrinking the native
-	# transparent window. Shrinking and immediately growing an oversized frame
-	# makes the Windows compositor briefly expose opaque black strips.
-	_restore_base_geometry(false)
-	_grow_window_to_fit_frame()
-	_keep_frame_inside_viewport()
-	_emit_interaction_region()
+
+
+func _geometry_frames_for_action(definition: Dictionary) -> Array[int]:
+	var result: Array[int] = []
+	for key: String in ["sequence", "enter_sequence", "loop_sequence", "wake_sequence"]:
+		var sequence: Array = (
+			_sequence_for(definition)
+			if key == "sequence"
+			else _optional_sequence(definition, key)
+		)
+		for frame: Variant in sequence:
+			var normalized := int(frame)
+			if normalized not in result:
+				result.append(normalized)
+	if result.is_empty():
+		result.append(0)
+	return result
+
+
+func _current_frame_index() -> int:
+	if not is_instance_valid(_sprite) or not _sprite.region_enabled:
+		return 0
+	var definition := _action_definition(
+		_current_action if not _current_action.is_empty() else (
+			"drag" if _dragging else "idle"
+		)
+	)
+	var columns := maxi(int(definition.get("columns", 1)), 1)
+	var cell_size := _sprite.region_rect.size
+	if cell_size.x <= 0.0 or cell_size.y <= 0.0:
+		return 0
+	return (
+		roundi(_sprite.region_rect.position.y / cell_size.y) * columns
+		+ roundi(_sprite.region_rect.position.x / cell_size.x)
+	)
 
 
 func _apply_sprite_scale(definition: Dictionary) -> void:
@@ -848,33 +922,7 @@ func _source_hit_polygon() -> PackedVector2Array:
 	return result
 
 
-func _keep_frame_inside_viewport() -> void:
-	var visible_bounds := _opaque_frame_bounds_in_canvas()
-	if visible_bounds.size == Vector2.ZERO:
-		return
-	var viewport_rect := get_viewport().get_visible_rect().grow(-FRAME_VIEWPORT_PADDING)
-	if viewport_rect.size.x <= 0.0 or viewport_rect.size.y <= 0.0:
-		return
-	var canvas_shift := Vector2(
-		_axis_containment_shift(
-			visible_bounds.position.x,
-			visible_bounds.end.x,
-			viewport_rect.position.x,
-			viewport_rect.end.x
-		),
-		_axis_containment_shift(
-			visible_bounds.position.y,
-			visible_bounds.end.y,
-			viewport_rect.position.y,
-			viewport_rect.end.y
-		)
-	)
-	if not canvas_shift.is_zero_approx():
-		_sprite.position += global_transform.basis_xform_inv(canvas_shift)
-
-
-func _grow_window_to_fit_frame() -> void:
-	var visible_bounds := _opaque_frame_bounds_in_canvas()
+func _fit_window_to_bounds(visible_bounds: Rect2) -> void:
 	if visible_bounds.size == Vector2.ZERO:
 		return
 	var window := get_window()
@@ -896,6 +944,8 @@ func _grow_window_to_fit_frame() -> void:
 		ceili(required_end.y - required_start.y)
 	)
 	if required_size == window.size:
+		if window.content_scale_size != required_size:
+			window.content_scale_size = required_size
 		return
 	# When content extends past the left or top edge, move the native window
 	# outward and shift the whole scene by the opposite amount. This grows the
@@ -903,26 +953,20 @@ func _grow_window_to_fit_frame() -> void:
 	if required_start != Vector2.ZERO:
 		var root_canvas := get_parent() as Node2D
 		if root_canvas:
-			root_canvas.position -= required_start
-		window.position += Vector2i(floori(required_start.x), floori(required_start.y))
+			var desktop_canvas_origin := (
+				Vector2(window.position) + root_canvas.position
+			)
+			var ideal_window_position := Vector2(window.position) + required_start
+			window.position = Vector2i(
+				roundi(ideal_window_position.x),
+				roundi(ideal_window_position.y)
+			)
+			root_canvas.position = desktop_canvas_origin - Vector2(window.position)
 	window.size = required_size
-
-
-func _axis_containment_shift(
-	content_start: float,
-	content_end: float,
-	limit_start: float,
-	limit_end: float
-) -> float:
-	var content_size := content_end - content_start
-	var limit_size := limit_end - limit_start
-	if content_size > limit_size:
-		return (limit_start + limit_end - content_start - content_end) * 0.5
-	if content_start < limit_start:
-		return limit_start - content_start
-	if content_end > limit_end:
-		return limit_end - content_end
-	return 0.0
+	# The project uses a fixed base viewport. Keep the logical canvas in sync
+	# with a grown native window so oversized frames gain drawable space instead
+	# of being stretched and clipped inside the original 280x320 canvas.
+	window.content_scale_size = required_size
 
 
 func _opaque_frame_bounds_in_canvas() -> Rect2:

@@ -3,6 +3,9 @@ extends RefCounted
 
 const DetailsWindowControllerScript = preload("res://scripts/details_window_controller.gd")
 const AgentIntegrationControllerScript = preload("res://scripts/agent_integration_controller.gd")
+const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
+const DEFAULT_WINDOW_SIZE := Vector2i(640, 620)
+const MIN_WINDOW_SIZE := Vector2i(360, 480)
 
 signal window_input(event: InputEvent)
 signal close_requested
@@ -30,6 +33,9 @@ var terminal_executable_path := ""
 var opencode_app_executable_path := ""
 var claude_app_executable_path := ""
 var autostart_supported := false
+var keep_screen_on := false
+var focus_mode := false
+var visual_scale := PetVisualScaleScript.DEFAULT_VALUE
 var interaction_label: Callable
 var interaction_icon: Callable
 var details_controller
@@ -40,8 +46,8 @@ func build(owner: Node) -> Dictionary:
 	window = Window.new()
 	window.name = "StatsWindow"
 	window.title = "桌寵詳細狀態"
-	window.size = Vector2i(640, 620)
-	window.min_size = Vector2i(360, 480)
+	window.size = DEFAULT_WINDOW_SIZE
+	window.min_size = MIN_WINDOW_SIZE
 	window.unresizable = false
 	window.transient = false
 	window.always_on_top = false
@@ -118,6 +124,9 @@ func build(owner: Node) -> Dictionary:
 	details_controller.opencode_app_executable_path = opencode_app_executable_path
 	details_controller.claude_app_executable_path = claude_app_executable_path
 	details_controller.autostart_supported = autostart_supported
+	details_controller.keep_screen_on = keep_screen_on
+	details_controller.focus_mode = focus_mode
+	details_controller.visual_scale = visual_scale
 	details_controller.interaction_label = interaction_label
 	details_controller.interaction_icon = interaction_icon
 	var status_refs: Dictionary = details_controller.build_status_tab(tabs)
@@ -268,7 +277,6 @@ func _create_details_theme() -> Theme:
 	theme.set_color("font_unselected_color", "TabBar", _details_color("#0f0f0f", "#9da1a6"))
 	theme.set_color("font_hovered_color", "TabBar", _details_color("#0f0f0f", "#ffffff"))
 	return theme
-
 
 func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()

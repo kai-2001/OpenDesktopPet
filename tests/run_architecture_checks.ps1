@@ -12,9 +12,11 @@ function Assert-Architecture([bool]$condition, [string]$message) {
 }
 
 $details = Read-Source 'scripts/details_window_controller.gd'
+$menu = Read-Source 'scripts/pet_menu_builder.gd'
 $main = Read-Source 'scripts/main.gd'
 $state = Read-Source 'scripts/pet_state.gd'
 $visual = Read-Source 'scripts/pet_visual.gd'
+$visualScale = Read-Source 'scripts/pet_visual_scale.gd'
 $profile = Read-Source 'scripts/character_pack_profile.gd'
 $autostart = Read-Source 'scripts/windows_autostart_service.gd'
 $runtime = Read-Source 'scripts/character_pack_runtime.gd'
@@ -73,6 +75,42 @@ Assert-Architecture ($main -match 'StatsWindowCoordinatorScript') `
 	'main.gd must delegate details-window construction.'
 Assert-Architecture ($statsCoordinator -match 'panel\.theme = _create_details_theme\(\)') `
 	'StatsWindowCoordinator must apply the complete details-window theme.'
+Assert-Architecture ($statsCoordinator -notmatch 'HSlider|create_slider_grabber_texture') `
+	'The shared details theme must not style the visual-size slider globally.'
+Assert-Architecture ($details -match 'visual_scale_theme\.set_stylebox\("slider", "HSlider"') `
+	'The visual-size slider must own its track styling locally.'
+Assert-Architecture ($details -match 'visual_scale_theme\.set_icon\(\s*"grabber", "HSlider"') `
+	'The visual-size slider must use the Godot Theme icon API.'
+Assert-Architecture ($details -notmatch 'set_texture|get_theme_texture') `
+	'The details UI must not use nonexistent Godot Theme texture APIs.'
+Assert-Architecture ($details -match 'visual_scale_panel\.gui_input\.connect') `
+	'The visual-size section must capture wheel input before the parent scroll container.'
+Assert-Architecture ($details -match 'visual_scale_panel\.mouse_filter = Control\.MOUSE_FILTER_PASS') `
+	'The visual-size section must pass child input to its wheel handler.'
+Assert-Architecture ($details -match 'focus_mode_check_box\.text = "') `
+	'The focus-mode setting must have a visible label.'
+Assert-Architecture ($details -notmatch 'focus_mode_check_box\.text = .*idle') `
+	'The focus-mode label must not expose implementation wording.'
+Assert-Architecture ($menu -notmatch 'SIZE_SMALLER_ITEM_ID|SIZE_LARGER_ITEM_ID') `
+	'The details settings must be the only visual-size adjustment surface.'
+Assert-Architecture ($visualScale -match 'class_name PetVisualScale') `
+	'Visual-size limits must have one shared policy module.'
+Assert-Architecture ($state -match 'PetVisualScaleScript' -and $visual -match 'PetVisualScaleScript') `
+	'State and rendering must share the visual-size policy.'
+Assert-Architecture ($state -notmatch 'PetVisualScript') `
+	'Gameplay state must not depend on the visual renderer.'
+Assert-Architecture ($state -notmatch 'func change_visual_size' -and $visual -notmatch 'func change_visual_size') `
+	'Obsolete incremental visual-size entry points must stay removed.'
+Assert-Architecture ($visual -notmatch '_keep_frame_inside_viewport|_axis_containment_shift') `
+	'Frame changes must not apply a second per-frame viewport shift.'
+Assert-Architecture ($visual -match 'desktop_canvas_origin') `
+	'Window resizing must preserve one desktop-space canvas anchor.'
+Assert-Architecture ($visual -match 'func _activate_action_geometry') `
+	'Each animation must reserve its complete geometry at the action boundary.'
+Assert-Architecture ($visual -match 'func _geometry_frames_for_action') `
+	'Action geometry must include every configured animation phase.'
+Assert-Architecture ($visual -notmatch '_grow_window_to_fit_frame') `
+	'Animation frames must not resize the native window independently.'
 Assert-Architecture ($inputController -match 'class_name PetInputController') `
 	'PetInputController is missing.'
 Assert-Architecture ($main -match 'PetInputControllerScript') `

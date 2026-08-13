@@ -175,8 +175,12 @@ func _init() -> void:
 	_assert_equal(state.data.affection, 3, "care plus wish affection reward")
 
 	state.data.visual_scale = 1.0
-	state.change_visual_size(0.1)
+	state.set_visual_scale(1.1)
 	_assert_equal(state.data.visual_scale, 1.1, "visual scale persistence")
+	state.set_visual_scale(0.1)
+	_assert_equal(state.data.visual_scale, 0.5, "visual scale lower bound")
+	state.set_visual_scale(2.0)
+	_assert_equal(state.data.visual_scale, 1.5, "visual scale upper bound")
 
 	state.save_state()
 	state.data.coins += 1

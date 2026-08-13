@@ -6,16 +6,19 @@ const DesktopWindowServiceScript = preload("res://scripts/desktop_window_service
 const PetGameplayCoordinatorScript = preload("res://scripts/pet_gameplay_coordinator.gd")
 const PetInputControllerScript = preload("res://scripts/pet_input_controller.gd")
 const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
+const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const StatsWindowCoordinatorScript = preload("res://scripts/stats_window_coordinator.gd")
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
 const CharacterEffectPreferencesScript = preload(
 	"res://scripts/character_effect_preferences.gd"
 )
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
-const DEFAULT_STATS_SIZE := Vector2i(500, 620)
-const MIN_STATS_SIZE := Vector2i(360, 480)
+const DEFAULT_STATS_SIZE := StatsWindowCoordinatorScript.DEFAULT_WINDOW_SIZE
+const MIN_STATS_SIZE := StatsWindowCoordinatorScript.MIN_WINDOW_SIZE
 const DEFAULT_TARGET_FPS := 30
 const TARGET_FPS_OPTIONS := [15, 30, 60]
+const DEFAULT_KEEP_SCREEN_ON := false
+const DEFAULT_FOCUS_MODE := false
 const AGENT_NOTIFICATION_DURATION_SECONDS := 60.0
 const AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3.0
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
@@ -37,6 +40,10 @@ var _unlock_status: Label
 var _last_message_status: Label
 var _fps_option_button: OptionButton
 var _details_theme_option_button: OptionButton
+var _visual_scale_slider: HSlider
+var _visual_scale_value_label: Label
+var _focus_mode_check_box: CheckBox
+var _keep_screen_on_check_box: CheckBox
 var _autostart_check_box: CheckBox
 var _settings_feedback: Label
 var _agent_codex_enabled_toggle: Button
@@ -112,6 +119,8 @@ var _pet_interaction_polygon := PackedVector2Array()
 var _status_indicator: StatusIndicator
 var _tray_menu: PopupMenu
 var _details_theme_mode := "light"
+var _keep_screen_on := DEFAULT_KEEP_SCREEN_ON
+var _focus_mode := DEFAULT_FOCUS_MODE
 var _agent_controller: AgentIntegrationController
 var _details_window_controller
 var _agent_notification_active := false
@@ -600,12 +609,6 @@ func _on_context_action(id: int) -> void:
 			# Let the native PopupMenu finish dispatching `id_pressed` before
 			# destroying either native window.
 			call_deferred("_request_shutdown")
-		20:
-			state.change_visual_size(-0.1)
-			_say_dialogue("size_smaller", "這個大小比較不擋路。", 2.0)
-		21:
-			state.change_visual_size(0.1)
-			_say_dialogue("size_larger", "放大一點點。", 2.0)
 		22:
 			_recover_pet()
 
@@ -657,6 +660,7 @@ func _setup_idle_behavior() -> void:
 func _can_act_autonomously(require_mouse_idle := false) -> bool:
 	var mouse_is_idle := Time.get_ticks_msec() - _last_user_activity_ms >= 4500
 	return (not require_mouse_idle or mouse_is_idle) \
+		and not _focus_mode \
 		and not context_menu.visible \
 		and not _is_stats_window_open() \
 		and not _input_controller.is_dragging() \
@@ -665,6 +669,8 @@ func _can_act_autonomously(require_mouse_idle := false) -> bool:
 
 
 func _run_autonomous_action() -> void:
+	if _focus_mode:
+		return
 	var mouse_is_idle := Time.get_ticks_msec() - _last_user_activity_ms >= 4500
 	_gameplay_coordinator.run_autonomous_action(mouse_is_idle)
 
@@ -740,6 +746,11 @@ func _build_stats_window() -> void:
 		if _agent_controller != null else ""
 	)
 	_stats_window_coordinator.autostart_supported = _is_autostart_supported()
+	_stats_window_coordinator.keep_screen_on = _keep_screen_on
+	_stats_window_coordinator.focus_mode = _focus_mode
+	_stats_window_coordinator.visual_scale = float(
+		state.get_snapshot().get("visual_scale", PetVisualScaleScript.DEFAULT_VALUE)
+	)
 	_stats_window_coordinator.interaction_label = Callable(self, "_interaction_label")
 	_stats_window_coordinator.interaction_icon = Callable(self, "_interaction_icon")
 	var refs: Dictionary = _stats_window_coordinator.build(self)
@@ -764,6 +775,10 @@ func _build_stats_window() -> void:
 	var settings_refs: Dictionary = refs["settings_refs"]
 	_fps_option_button = settings_refs["fps_option_button"] as OptionButton
 	_details_theme_option_button = settings_refs["details_theme_option_button"] as OptionButton
+	_visual_scale_slider = settings_refs["visual_scale_slider"] as HSlider
+	_visual_scale_value_label = settings_refs["visual_scale_value_label"] as Label
+	_focus_mode_check_box = settings_refs["focus_mode_check_box"] as CheckBox
+	_keep_screen_on_check_box = settings_refs["keep_screen_on_check_box"] as CheckBox
 	_autostart_check_box = settings_refs["autostart_check_box"] as CheckBox
 	_settings_feedback = settings_refs["settings_feedback"] as Label
 	var agent_refs: Dictionary = refs["agent_refs"]
@@ -918,6 +933,10 @@ func _connect_details_window_signals() -> void:
 		_on_claude_app_executable_path_changed
 	)
 	_details_window_controller.autostart_toggled.connect(_on_autostart_toggled)
+	_details_window_controller.keep_screen_on_toggled.connect(_on_keep_screen_on_toggled)
+	_details_window_controller.focus_mode_toggled.connect(_on_focus_mode_toggled)
+	_details_window_controller.visual_scale_previewed.connect(_on_visual_scale_previewed)
+	_details_window_controller.visual_scale_changed.connect(_on_visual_scale_changed)
 	_details_window_controller.character_selected.connect(_on_character_selected)
 	_details_window_controller.character_use_requested.connect(_use_selected_character)
 	_details_window_controller.character_delete_requested.connect(
@@ -1540,6 +1559,10 @@ func _destroy_stats_window() -> void:
 	_last_message_status = null
 	_fps_option_button = null
 	_details_theme_option_button = null
+	_visual_scale_slider = null
+	_visual_scale_value_label = null
+	_focus_mode_check_box = null
+	_keep_screen_on_check_box = null
 	_agent_codex_enabled_toggle = null
 	_agent_codex_app_enabled_toggle = null
 	_agent_terminal_codex_enabled_toggle = null
@@ -1616,6 +1639,8 @@ func _load_stats_window_size() -> Vector2i:
 func _load_runtime_settings() -> void:
 	var config := ConfigFile.new()
 	var target_fps := DEFAULT_TARGET_FPS
+	var keep_screen_on := DEFAULT_KEEP_SCREEN_ON
+	var focus_mode := DEFAULT_FOCUS_MODE
 	if config.load(UI_SETTINGS_PATH) == OK:
 		target_fps = int(config.get_value(
 			"performance", "target_fps", DEFAULT_TARGET_FPS
@@ -1623,9 +1648,33 @@ func _load_runtime_settings() -> void:
 		_details_theme_mode = String(config.get_value(
 			"appearance", "details_theme", "light"
 		))
+		keep_screen_on = bool(config.get_value(
+			"power", "keep_screen_on", DEFAULT_KEEP_SCREEN_ON
+		))
+		focus_mode = bool(config.get_value(
+			"behavior", "focus_mode", DEFAULT_FOCUS_MODE
+		))
 	if _details_theme_mode not in ["light", "dark"]:
 		_details_theme_mode = "light"
 	Engine.max_fps = _normalize_target_fps(target_fps)
+	_apply_keep_screen_on(keep_screen_on)
+	_apply_focus_mode(focus_mode)
+
+
+func _apply_keep_screen_on(enabled: bool) -> void:
+	_keep_screen_on = enabled
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.screen_set_keep_on(enabled)
+	if is_instance_valid(_keep_screen_on_check_box):
+		_keep_screen_on_check_box.set_pressed_no_signal(enabled)
+
+
+func _apply_focus_mode(enabled: bool) -> void:
+	_focus_mode = enabled
+	if enabled and _gameplay_coordinator != null:
+		_gameplay_coordinator.cancel_autonomous_action()
+	if is_instance_valid(_focus_mode_check_box):
+		_focus_mode_check_box.set_pressed_no_signal(enabled)
 
 
 func _normalize_target_fps(value: int) -> int:
@@ -1672,6 +1721,30 @@ func _on_details_theme_selected(index: int) -> void:
 		previous_position,
 		previous_size
 	)
+
+
+func _on_keep_screen_on_toggled(enabled: bool) -> void:
+	_apply_keep_screen_on(enabled)
+	var config := ConfigFile.new()
+	config.load(UI_SETTINGS_PATH)
+	config.set_value("power", "keep_screen_on", enabled)
+	config.save(UI_SETTINGS_PATH)
+
+
+func _on_focus_mode_toggled(enabled: bool) -> void:
+	_apply_focus_mode(enabled)
+	var config := ConfigFile.new()
+	config.load(UI_SETTINGS_PATH)
+	config.set_value("behavior", "focus_mode", enabled)
+	config.save(UI_SETTINGS_PATH)
+
+
+func _on_visual_scale_previewed(value: float) -> void:
+	pet.set_visual_size(value)
+
+
+func _on_visual_scale_changed(value: float) -> void:
+	state.set_visual_scale(value)
 
 
 func _on_codex_enabled_toggled(enabled: bool) -> void:
@@ -1991,7 +2064,14 @@ func _save_stats_window_size() -> void:
 
 func _refresh_ui(snapshot: Dictionary) -> void:
 	pet.set_progression(snapshot)
-	pet.set_visual_size(float(snapshot.get("visual_scale", 1.0)))
+	var current_visual_scale := float(snapshot.get(
+		"visual_scale", PetVisualScaleScript.DEFAULT_VALUE
+	))
+	pet.set_visual_size(current_visual_scale)
+	if is_instance_valid(_visual_scale_slider):
+		_visual_scale_slider.set_value_no_signal(current_visual_scale)
+	if is_instance_valid(_visual_scale_value_label):
+		_visual_scale_value_label.text = "%d%%" % roundi(current_visual_scale * 100.0)
 	_update_unlock_tracking()
 	var level_text := "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
 		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20
@@ -2097,7 +2177,7 @@ func _celebrate_unlock(action: String) -> void:
 	await get_tree().create_timer(0.4).timeout
 	var unlock_fallback := "解鎖了新的動作：%s！" % action
 	say(pet.get_dialogue("action_unlocked", unlock_fallback).replace("{action}", action), 4.0)
-	if not pet.is_busy() and not state.is_action_busy():
+	if not _focus_mode and not pet.is_busy() and not state.is_action_busy():
 		pet.play_action(action)
 
 

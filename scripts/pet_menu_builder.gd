@@ -9,8 +9,6 @@ const WORK_ITEM_ID := 4
 const SLEEP_ITEM_ID := 5
 const DETAILS_ITEM_ID := 6
 const EXIT_ITEM_ID := 7
-const SIZE_SMALLER_ITEM_ID := 20
-const SIZE_LARGER_ITEM_ID := 21
 const RECOVER_ITEM_ID := 22
 
 
@@ -39,8 +37,6 @@ static func populate(
 	], SLEEP_ITEM_ID)
 	menu.add_separator()
 	menu.add_item("📊  開啟詳細面板", DETAILS_ITEM_ID)
-	menu.add_item("🔎  角色縮小", SIZE_SMALLER_ITEM_ID)
-	menu.add_item("🔍  角色放大", SIZE_LARGER_ITEM_ID)
 	menu.add_item("🏠  找回桌寵", RECOVER_ITEM_ID)
 	menu.add_separator()
 	menu.add_item("❌  儲存並離開", EXIT_ITEM_ID)
