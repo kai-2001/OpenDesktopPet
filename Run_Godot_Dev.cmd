@@ -2,7 +2,6 @@
 setlocal
 if not "%~1"=="" set "GODOT_EXE=%~1"
 if not defined GODOT_EXE if exist "%~dp0..\..\tools\godot-4.6.3\Godot_v4.6.3-stable_win64.exe" set "GODOT_EXE=%~dp0..\..\tools\godot-4.6.3\Godot_v4.6.3-stable_win64.exe"
-if not defined GODOT_EXE if exist "D:\Godot\godot-editor-4.6.3\Godot_v4.6.3-stable_win64.exe" set "GODOT_EXE=D:\Godot\godot-editor-4.6.3\Godot_v4.6.3-stable_win64.exe"
 if not defined GODOT_EXE set "GODOT_EXE=godot"
 if exist "%GODOT_EXE%" goto launch
 where "%GODOT_EXE%" >nul 2>nul

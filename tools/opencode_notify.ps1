@@ -121,6 +121,28 @@ function Test-VsCodeProcess {
 }
 
 function Get-OpenCodeTarget([object]$runtime) {
+    $forcedTarget = ([string]$env:OPEN_DESKTOP_PET_OPENCODE_TARGET).ToLowerInvariant()
+    if ($forcedTarget -eq 'terminal') {
+        return [ordered]@{
+            target_app = 'terminal'
+            target_executable = 'WindowsTerminal.exe'
+            runtime_target = 'opencode_terminal'
+        }
+    }
+    if ($forcedTarget -eq 'vscode') {
+        return [ordered]@{
+            target_app = 'vscode'
+            target_executable = 'Code.exe'
+            runtime_target = 'opencode_vscode'
+        }
+    }
+    if ($forcedTarget -eq 'opencode_app') {
+        return [ordered]@{
+            target_app = 'opencode_app'
+            target_executable = 'OpenCode.exe'
+            runtime_target = 'opencode_app'
+        }
+    }
     $isVsCodeEnvironment =
         ([string]$env:TERM_PROGRAM).ToLowerInvariant() -eq 'vscode' -or
         -not [string]::IsNullOrWhiteSpace([string]$env:VSCODE_PID) -or

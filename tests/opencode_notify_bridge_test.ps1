@@ -8,6 +8,7 @@ $integrationHome = Join-Path $testRoot '.open-desktop-pet'
 $oldUserProfile = $env:USERPROFILE
 $oldTermProgram = $env:TERM_PROGRAM
 $oldVscodePid = $env:VSCODE_PID
+$oldForcedTarget = $env:OPEN_DESKTOP_PET_OPENCODE_TARGET
 
 function Assert-Bridge([bool]$condition, [string]$message) {
     if (-not $condition) {
@@ -59,6 +60,7 @@ try {
     $env:USERPROFILE = $testRoot
     $env:TERM_PROGRAM = ''
     $env:VSCODE_PID = ''
+    $env:OPEN_DESKTOP_PET_OPENCODE_TARGET = 'terminal'
     # The desktop target may be enabled in the UI before its executable path
     # is configured. The bridge must still classify VS Code/terminal events.
 	$script:opencodeAppPath = ''
@@ -83,6 +85,7 @@ try {
 
     $env:TERM_PROGRAM = 'vscode'
     $env:VSCODE_PID = '1234'
+    $env:OPEN_DESKTOP_PET_OPENCODE_TARGET = ''
     $payload = Receive-Notification $event $true
     Assert-Bridge ($payload.target_app -eq 'vscode') 'VS Code OpenCode target was not classified.'
     Assert-Bridge ($payload.target_platform -eq 'vscode') `
@@ -92,6 +95,7 @@ try {
     $env:USERPROFILE = $oldUserProfile
     $env:TERM_PROGRAM = $oldTermProgram
     $env:VSCODE_PID = $oldVscodePid
+    $env:OPEN_DESKTOP_PET_OPENCODE_TARGET = $oldForcedTarget
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force
     }

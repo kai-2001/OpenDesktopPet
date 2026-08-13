@@ -1,6 +1,7 @@
 .godot/
 build/
 tmp/
+reference_prompts.txt
 private_pets/
 characters/custom/
 素材/
