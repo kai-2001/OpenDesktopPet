@@ -83,10 +83,14 @@ Assert-Architecture ($details -match 'visual_scale_theme\.set_icon\(\s*"grabber"
 	'The visual-size slider must use the Godot Theme icon API.'
 Assert-Architecture ($details -notmatch 'set_texture|get_theme_texture') `
 	'The details UI must not use nonexistent Godot Theme texture APIs.'
-Assert-Architecture ($details -match 'visual_scale_panel\.gui_input\.connect') `
-	'The visual-size section must capture wheel input before the parent scroll container.'
-Assert-Architecture ($details -match 'visual_scale_panel\.mouse_filter = Control\.MOUSE_FILTER_PASS') `
-	'The visual-size section must pass child input to its wheel handler.'
+Assert-Architecture ($details -match 'visual_scale_slider\.gui_input\.connect') `
+	'Only the visual-size slider may capture wheel input.'
+Assert-Architecture ($details -notmatch 'visual_scale_panel\.gui_input\.connect') `
+	'The visual-size settings row must not capture wheel input.'
+Assert-Architecture ($details -match 'visual_scale_slider\.scrollable = false') `
+	'The visual-size slider must pass wheel scrolling to the settings page.'
+Assert-Architecture ($details -notmatch 'visual_scale_panel|visual_scale_panel_style') `
+	'Visual-size controls must use the standard settings layout without a card background.'
 Assert-Architecture ($details -match 'focus_mode_check_box\.text = "') `
 	'The focus-mode setting must have a visible label.'
 Assert-Architecture ($details -notmatch 'focus_mode_check_box\.text = .*idle') `

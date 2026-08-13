@@ -261,8 +261,8 @@ func _restore_base_geometry(resize_window := true) -> void:
 			root_canvas.position = desktop_canvas_origin - Vector2(window.position)
 	if resize_window and window \
 			and _base_window_size.x > 0 and _base_window_size.y > 0:
-		window.size = _base_window_size
 		window.content_scale_size = _base_window_size
+		window.size = _base_window_size
 
 
 func set_drag_motion(is_moving: bool) -> void:
@@ -943,10 +943,6 @@ func _fit_window_to_bounds(visible_bounds: Rect2) -> void:
 		ceili(required_end.x - required_start.x),
 		ceili(required_end.y - required_start.y)
 	)
-	if required_size == window.size:
-		if window.content_scale_size != required_size:
-			window.content_scale_size = required_size
-		return
 	# When content extends past the left or top edge, move the native window
 	# outward and shift the whole scene by the opposite amount. This grows the
 	# transparent canvas without making the pet jump on the desktop.
@@ -962,11 +958,14 @@ func _fit_window_to_bounds(visible_bounds: Rect2) -> void:
 				roundi(ideal_window_position.y)
 			)
 			root_canvas.position = desktop_canvas_origin - Vector2(window.position)
-	window.size = required_size
 	# The project uses a fixed base viewport. Keep the logical canvas in sync
 	# with a grown native window so oversized frames gain drawable space instead
 	# of being stretched and clipped inside the original 280x320 canvas.
 	window.content_scale_size = required_size
+	# Apply the native size last. On Windows, changing the logical content size
+	# can asynchronously reconcile the native dimensions; this final assignment
+	# prevents intermediate width/height combinations during the action.
+	window.size = required_size
 
 
 func _opaque_frame_bounds_in_canvas() -> Rect2:

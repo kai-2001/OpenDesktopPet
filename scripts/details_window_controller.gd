@@ -275,22 +275,8 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	settings_content.add_child(theme_hint)
 	settings_content.add_child(HSeparator.new())
 
-	var visual_scale_panel := PanelContainer.new()
-	var visual_scale_panel_style := StyleBoxFlat.new()
-	visual_scale_panel_style.bg_color = _details_color("#f1fafb", "#202c2e")
-	visual_scale_panel_style.border_color = _details_color("#b7dfe4", "#35555a")
-	visual_scale_panel_style.set_border_width_all(1)
-	visual_scale_panel_style.set_corner_radius_all(8)
-	visual_scale_panel_style.content_margin_left = 14
-	visual_scale_panel_style.content_margin_right = 14
-	visual_scale_panel_style.content_margin_top = 12
-	visual_scale_panel_style.content_margin_bottom = 12
-	visual_scale_panel.add_theme_stylebox_override("panel", visual_scale_panel_style)
-	visual_scale_panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	var visual_scale_content := VBoxContainer.new()
 	visual_scale_content.add_theme_constant_override("separation", 8)
-	visual_scale_content.mouse_filter = Control.MOUSE_FILTER_PASS
-	visual_scale_panel.add_child(visual_scale_content)
 
 	var visual_scale_value_label: Label = _new_label(
 		"100%", 15, _details_color("#238b9d", "#4fc1ff")
@@ -364,9 +350,6 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	visual_scale_slider.gui_input.connect(
 		_handle_visual_scale_wheel.bind(visual_scale_slider)
 	)
-	visual_scale_panel.gui_input.connect(
-		_handle_visual_scale_wheel.bind(visual_scale_slider)
-	)
 	visual_scale_content.add_child(visual_scale_row)
 	visual_scale_content.add_child(visual_scale_slider)
 
@@ -381,7 +364,7 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	visual_scale_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visual_scale_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	visual_scale_content.add_child(visual_scale_hint)
-	settings_content.add_child(visual_scale_panel)
+	settings_content.add_child(visual_scale_content)
 	settings_content.add_child(HSeparator.new())
 
 	var focus_mode_check_box := CheckBox.new()
@@ -1260,39 +1243,68 @@ func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFl
 
 
 func _handle_visual_scale_wheel(event: InputEvent, slider: HSlider) -> void:
-	if event is not InputEventMouseButton:
-		return
 	var mouse_event := event as InputEventMouseButton
-	if not mouse_event.pressed:
+	if mouse_event == null or not mouse_event.pressed:
 		return
-	var delta := 0.0
+	var direction := 0.0
 	if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP:
-		delta = slider.step
+		direction = 1.0
 	elif mouse_event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-		delta = -slider.step
-	if is_zero_approx(delta):
+		direction = -1.0
+	if is_zero_approx(direction):
 		return
-	slider.value = clampf(slider.value + delta, slider.min_value, slider.max_value)
+	slider.value = clampf(
+		slider.value + slider.step * direction,
+		slider.min_value,
+		slider.max_value
+	)
 	slider.accept_event()
 
 
 func _create_slider_grabber_texture(highlighted: bool) -> Texture2D:
-	const texture_size := 24
-	const radius := 8.5
+	const texture_size := 28
+	const shadow_radius := 11.5
+	const outer_radius := 10.0
+	const inner_radius := 5.0
 	var image := Image.create(texture_size, texture_size, false, Image.FORMAT_RGBA8)
 	var center := Vector2(texture_size, texture_size) * 0.5
-	var fill_color := _details_color("#ffffff", "#eaf7f8")
-	fill_color.a = 0.62 if not highlighted else 0.72
-	var border_color := _details_color("#08a6b5", "#4fc1ff")
-	border_color.a = 0.58 if not highlighted else 0.72
+	var shadow_color := Color(0.0, 0.0, 0.0, 0.14 if highlighted else 0.10)
+	var border_color := _details_color("#cfd7da", "#6b7377")
+	var outer_color := _details_color("#ffffff", "#f4f6f7")
+	var inner_color := _details_color(
+		"#079dac" if not highlighted else "#087f8b",
+		"#35a9bd" if not highlighted else "#4fc1ff"
+	)
+	var effective_inner_radius := inner_radius + (0.5 if highlighted else 0.0)
 	for y in texture_size:
 		for x in texture_size:
 			var distance := Vector2(x + 0.5, y + 0.5).distance_to(center)
-			if distance > radius:
-				continue
-			var edge_alpha := clampf(radius - distance, 0.0, 1.0)
-			var pixel_color := border_color if distance > radius - 2.0 else fill_color
-			pixel_color.a *= edge_alpha
+			var pixel_color := Color.TRANSPARENT
+			if distance <= effective_inner_radius - 0.5:
+				pixel_color = inner_color
+			elif distance <= effective_inner_radius + 0.5:
+				pixel_color = inner_color.lerp(
+					outer_color,
+					distance - (effective_inner_radius - 0.5)
+				)
+			elif distance <= outer_radius - 1.0:
+				pixel_color = outer_color
+			elif distance <= outer_radius:
+				pixel_color = border_color
+			elif distance <= outer_radius + 0.5:
+				pixel_color = border_color
+				pixel_color.a = lerpf(
+					1.0,
+					shadow_color.a,
+					distance - outer_radius
+				)
+			elif distance <= shadow_radius:
+				pixel_color = shadow_color
+				pixel_color.a *= clampf(
+					(shadow_radius - distance) / (shadow_radius - outer_radius),
+					0.0,
+					1.0
+				)
 			image.set_pixel(x, y, pixel_color)
 	return ImageTexture.create_from_image(image)
 

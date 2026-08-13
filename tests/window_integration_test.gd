@@ -332,26 +332,40 @@ func _init() -> void:
 		main._visual_scale_slider.get_theme_icon("grabber") != null,
 		"visual-size slider has a local grabber texture"
 	)
-	var visual_scale_panel: Control = (
-		main._visual_scale_slider.get_parent().get_parent() as Control
+	var visual_scale_grabber: Texture2D = (
+		main._visual_scale_slider.get_theme_icon("grabber")
 	)
 	_assert_equal(
-		visual_scale_panel.mouse_filter,
-		Control.MOUSE_FILTER_PASS,
-		"visual-size panel passes wheel input to its local handler"
+		visual_scale_grabber.get_size(),
+		Vector2(28, 28),
+		"visual-size grabber has room for its outer ring and shadow"
+	)
+	var visual_scale_grabber_image := visual_scale_grabber.get_image()
+	var grabber_center_color := visual_scale_grabber_image.get_pixel(14, 14)
+	var grabber_outer_color := visual_scale_grabber_image.get_pixel(14, 6)
+	_assert_true(
+		grabber_center_color.g > 0.4 and grabber_center_color.b > 0.4,
+		"visual-size grabber uses an accent-colored center"
+	)
+	_assert_true(
+		grabber_outer_color.r > 0.8
+			and grabber_outer_color.g > 0.8
+			and grabber_outer_color.b > 0.8,
+		"visual-size grabber uses a white outer circle"
+	)
+	_assert_true(
+		main._visual_scale_slider.get_parent() is VBoxContainer,
+		"visual-size controls use the standard settings layout without a card"
 	)
 	var scale_before_wheel: float = main._visual_scale_slider.value
 	var scale_wheel := InputEventMouseButton.new()
 	scale_wheel.button_index = MOUSE_BUTTON_WHEEL_UP
 	scale_wheel.pressed = true
-	main._details_window_controller._handle_visual_scale_wheel(
-		scale_wheel,
-		main._visual_scale_slider
-	)
+	main._visual_scale_slider.gui_input.emit(scale_wheel)
 	_assert_equal(
 		main._visual_scale_slider.value,
 		minf(scale_before_wheel + main._visual_scale_slider.step, 1.5),
-		"wheel input changes only the visual-size slider"
+		"wheel input changes visual size only on the slider"
 	)
 	_assert_equal(
 		main.pet._visual_size,
@@ -398,7 +412,11 @@ func _init() -> void:
 				_assert_equal(
 					main.get_window().size,
 					action_window_size,
-					"large actions reserve one window size for every frame"
+					"large actions reserve one window size for every frame "
+						+ "(geometry=%s content=%s)" % [
+							main.pet._geometry_action,
+							main.get_window().content_scale_size,
+						]
 				)
 			var current_desktop_origin: Vector2 = (
 				Vector2(main.get_window().position) + main.position
