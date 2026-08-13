@@ -14,6 +14,6 @@ if errorlevel 1 (
 
 :launch
 cd /d "%~dp0"
-echo [%date% %time%] Starting Open Desktop Pet...>>"godot-launch.log"
+echo [%date% %time%] Starting Open Desktop Pet with "%GODOT_EXE%" from "%CD%"...>>"godot-launch.log"
 start "" "%GODOT_EXE%" --path "%CD%"
 endlocal

@@ -1,0 +1,31 @@
+{
+  "effects": {
+    "food": {
+      "file": "res://assets/effects/food.png",
+      "anchor": [0.0, 22.0],
+      "scale": 0.45,
+      "duration": 1.6,
+      "sway": 0.0,
+      "tilt": 7.0
+    },
+    "water": {
+      "file": "res://assets/effects/water_cup.png",
+      "anchor": [0.0, 18.0],
+      "scale": 0.38,
+      "duration": 1.5,
+      "sway": 0.0,
+      "tilt": 6.0
+    },
+    "mask": {
+      "file": "res://assets/effects/eye_mask.png",
+      "anchor": [0.0, -20.0],
+      "scale": 0.38
+    },
+    "zzz": {
+      "file": "res://assets/effects/zzz.png",
+      "anchor": [-24.0, -52.0],
+      "scale": 0.28,
+      "duration": 1.35
+    }
+  }
+}

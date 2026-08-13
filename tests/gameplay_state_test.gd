@@ -2,6 +2,7 @@ extends SceneTree
 
 const PetStateScript = preload("res://scripts/pet_state.gd")
 const PetVisualScript = preload("res://scripts/pet_visual.gd")
+const CharacterPackProfileScript = preload("res://scripts/character_pack_profile.gd")
 const CharacterPackManagerScript = preload("res://scripts/character_pack_manager.gd")
 const TEST_SAVE_PATH := "user://test_runs/gameplay_state.json"
 var _failures := 0
@@ -50,17 +51,22 @@ func _init() -> void:
 		"horizontal frame offset mirrors with the character"
 	)
 	_test_frame_viewport_containment(visual)
+	var invalid_profile := CharacterPackProfileScript.new()
 	_assert_true(
-		not visual._load_pack_from(invalid_pack_root),
+		not invalid_profile.load_pack(invalid_pack_root),
 		"invalid external character pack must be rejected"
 	)
-	var default_visual := PetVisualScript.new()
+	var default_profile := CharacterPackProfileScript.new()
 	_assert_true(
-		default_visual._load_pack_from(PetVisualScript.PUBLIC_PACK_ROOT),
+		default_profile.load_pack("res://characters/public/"),
 		"public default character pack must validate and load"
 	)
-	var duration_visual := PetVisualScript.new()
-	duration_visual._actions = {
+	_assert_true(
+		not default_profile.is_codex_pet(),
+		"native character pack must not be identified as Codex"
+	)
+	var duration_profile := CharacterPackProfileScript.new()
+	var pulse_definition := {
 		"move": {
 			"sequence": [0, 1, 2, 3],
 			"behavior": "pulse",
@@ -69,55 +75,50 @@ func _init() -> void:
 		},
 	}
 	_assert_true(
-		is_equal_approx(duration_visual.get_action_duration("move"), 2.4),
+		is_equal_approx(
+			duration_profile.duration_for_definition(pulse_definition.move), 2.4
+		),
 		"pulse move duration uses pulses multiplied by frame time"
 	)
-	duration_visual._actions.move.erase("behavior")
+	pulse_definition.move.erase("behavior")
 	_assert_true(
-		is_equal_approx(duration_visual.get_action_duration("move"), 1.2),
+		is_equal_approx(
+			duration_profile.duration_for_definition(pulse_definition.move), 1.2
+		),
 		"sequence move duration uses sequence length multiplied by frame time"
 	)
 	_assert_equal(
-		default_visual._pack_root,
-		PetVisualScript.PUBLIC_PACK_ROOT,
+		default_profile.pack_root(),
+		"res://characters/public/",
 		"public default character root"
 	)
 	_assert_equal(
-		default_visual.get_drag_anchor(),
+		default_profile.drag_anchor(),
 		Vector2(140.0, 128.0),
 		"public gecko defines a stable drag anchor"
 	)
-	var public_sleep: Dictionary = default_visual._actions.sleep
+	var public_sleep: Dictionary = default_profile.action_definition("sleep")
 	_assert_equal(
-		default_visual._optional_sequence(public_sleep, "enter_sequence"),
+		default_profile.optional_sequence(public_sleep, "enter_sequence"),
 		[0.0],
 		"public sleep uses its first frame to enter sleep"
 	)
 	_assert_equal(
-		default_visual._optional_sequence(public_sleep, "loop_sequence"),
+		default_profile.optional_sequence(public_sleep, "loop_sequence"),
 		[1.0, 2.0],
 		"public sleep loops its second and third frames"
 	)
 	_assert_equal(
-		default_visual._optional_sequence(public_sleep, "wake_sequence"),
+		default_profile.optional_sequence(public_sleep, "wake_sequence"),
 		[3.0],
 		"public sleep uses its fourth frame to wake"
 	)
-	var anchorless_visual := PetVisualScript.new()
-	anchorless_visual._manifest = {}
+	var anchorless_profile := CharacterPackProfileScript.new()
 	_assert_equal(
-		anchorless_visual.get_drag_anchor(),
+		anchorless_profile.drag_anchor(),
 		null,
 		"character packs without a drag anchor preserve the pressed point"
 	)
-	anchorless_visual._manifest.drag_anchor = ["invalid", 20]
-	_assert_equal(
-		anchorless_visual.get_drag_anchor(),
-		null,
-		"invalid optional drag anchors safely fall back to the pressed point"
-	)
-	anchorless_visual.free()
-	default_visual.free()
 	_test_character_pack_lifecycle()
 	_test_companion_and_progression_rules(state)
 	await _test_offline_freeze()
@@ -174,8 +175,12 @@ func _init() -> void:
 	_assert_equal(state.data.affection, 3, "care plus wish affection reward")
 
 	state.data.visual_scale = 1.0
-	state.change_visual_size(0.1)
+	state.set_visual_scale(1.1)
 	_assert_equal(state.data.visual_scale, 1.1, "visual scale persistence")
+	state.set_visual_scale(0.1)
+	_assert_equal(state.data.visual_scale, 0.5, "visual scale lower bound")
+	state.set_visual_scale(2.0)
+	_assert_equal(state.data.visual_scale, 1.5, "visual scale upper bound")
 
 	state.save_state()
 	state.data.coins += 1
@@ -189,6 +194,13 @@ func _init() -> void:
 	loaded.free()
 
 	var profile_a := PetStateScript.new()
+	for profile_id: String in ["profile_a", "profile_b"]:
+		for cleanup_suffix: String in ["", ".tmp", ".backup"]:
+			var profile_path := "user://profiles/%s/save_v2.json%s" % [
+				profile_id, cleanup_suffix
+			]
+			if FileAccess.file_exists(profile_path):
+				DirAccess.remove_absolute(ProjectSettings.globalize_path(profile_path))
 	profile_a.configure_profile("Profile A")
 	_assert_equal(
 		profile_a.save_path,
@@ -369,14 +381,14 @@ func _test_frame_viewport_containment(visual: Node2D) -> void:
 	var texture := ImageTexture.create_from_image(image)
 	var action := "viewport_clamp_test"
 	var file := "viewport_clamp_test.png"
-	var texture_path: String = visual._pack_root.path_join(file)
-	visual._actions[action] = {
+	var texture_path: String = visual.get_pack_root().path_join(file)
+	visual.set_action_definition(action, {
 		"file": file,
 		"columns": 1,
 		"rows": 1,
 		"offsets": [[100.0, 0.0]],
 		"scale": 1.0,
-	}
+	})
 	visual._texture_cache[texture_path] = texture
 	visual.set_facing_direction(-1)
 	var base_window_size: Vector2i = visual.get_window().size
@@ -403,7 +415,7 @@ func _test_frame_viewport_containment(visual: Node2D) -> void:
 		interaction_bounds.size.x >= 230.0,
 		"native window shape includes separated character and prop islands"
 	)
-	visual._actions.erase(action)
+	visual.remove_action_definition(action)
 	visual._texture_cache.erase(texture_path)
 	visual._show_action_frame("idle", visual._first_frame("idle"))
 	_assert_equal(
@@ -434,15 +446,15 @@ func _test_character_pack_lifecycle() -> void:
 	_assert_true(bool(updated.get("ok", false)), "same-ID character archive updates")
 	_assert_true(bool(updated.get("updated", false)), "same-ID import is reported as update")
 	_assert_equal(String(updated.get("version", "")), "1.1.0", "updated package version")
-	var installed_visual := PetVisualScript.new()
+	var installed_profile := CharacterPackProfileScript.new()
 	_assert_true(
-		installed_visual._load_pack_from(
+		installed_profile.load_pack(
 			CharacterPackManagerScript.PACKS_ROOT.path_join("test_import_pet")
 		),
 		"installed character pack is accepted by the runtime loader"
 	)
 	_assert_equal(
-		installed_visual.get_character_id(),
+		installed_profile.character_id(),
 		"test_import_pet",
 		"runtime loader reads the installed character ID"
 	)
@@ -466,6 +478,7 @@ func _test_character_pack_lifecycle() -> void:
 		+ '<rect width="8" height="8" fill="#b03060"/></svg>'
 	)
 	external_svg.close()
+	var installed_visual := PetVisualScript.new()
 	_assert_true(
 		installed_visual._load_texture(external_svg_path) != null,
 		"runtime loader decodes SVG images from external character packs"

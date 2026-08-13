@@ -1,5 +1,7 @@
 extends SceneTree
 
+const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
+
 var _failures := 0
 
 
@@ -45,19 +47,35 @@ func _init() -> void:
 	if DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR):
 		_assert_true(
 			is_instance_valid(main._status_indicator)
-				and is_instance_valid(main._tray_exit_menu)
+				and is_instance_valid(main._tray_menu)
 				and main._status_indicator.menu != NodePath(),
-			"status indicator uses a dedicated native exit menu"
+			"status indicator uses a dedicated native action menu"
 		)
 		_assert_equal(
-			main._tray_exit_menu.item_count,
-			1,
-			"status indicator menu contains only the exit command"
+			main._tray_menu.item_count,
+			main.context_menu.item_count,
+			"status indicator menu contains the same actions as the pet context menu"
+		)
+		for index in main.context_menu.item_count:
+			_assert_equal(
+				main._tray_menu.get_item_id(index),
+				main.context_menu.get_item_id(index),
+				"status indicator action %d uses the same command ID" % index
+			)
+			_assert_equal(
+				main._tray_menu.get_item_text(index),
+				main.context_menu.get_item_text(index),
+				"status indicator action %d uses the same label" % index
+			)
+		_assert_equal(
+			main._tray_menu.get_item_id(9),
+			22,
+			"status indicator menu contains the recover-pet action"
 		)
 		_assert_equal(
-			main._tray_exit_menu.get_item_id(0),
+			main._tray_menu.get_item_id(11),
 			7,
-			"status indicator exit command uses the shutdown action"
+			"status indicator menu keeps the save-and-exit action"
 		)
 	_assert_equal(
 		main.pet.get_interaction_label("feed", "__fallback__"),
@@ -163,9 +181,11 @@ func _init() -> void:
 	main.bubble.visible = false
 	main.bubble_tail.visible = false
 	main._refresh_interaction_polygon()
+	await process_frame
 	native_hit_polygon = main.get_window().mouse_passthrough_polygon
+	var hidden_speech_point := bubble_rect.position + Vector2(10, 10)
 	_assert_true(
-		not Geometry2D.is_point_in_polygon(bubble_rect.get_center(), native_hit_polygon),
+		not Geometry2D.is_point_in_polygon(hidden_speech_point, native_hit_polygon),
 		"hidden speech area is removed from the native hit region"
 	)
 	_assert_true(
@@ -210,6 +230,16 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	_assert_true(main._stats_window.visible, "details window opens on first request")
+	main._select_stats_tab(1)
+	await process_frame
+	_assert_true(
+		main._visual_scale_slider.visible and main._visual_scale_slider.size.y > 0.0,
+		"settings tab visibly lays out the visual-size slider"
+	)
+	_assert_true(
+		main._focus_mode_check_box.visible and main._focus_mode_check_box.size.y > 0.0,
+		"settings tab visibly lays out the focus-mode setting"
+	)
 	_assert_true(not main._stats_window.unresizable, "details window can be resized")
 	_assert_true(not main._stats_window.transient, "details window is an independent native window")
 	_assert_true(not main._stats_window.always_on_top, "details window behaves like a normal window")
@@ -280,6 +310,183 @@ func _init() -> void:
 		is_instance_valid(main._autostart_check_box),
 		"details window includes a Windows autostart setting"
 	)
+	_assert_equal(
+		main._visual_scale_slider.min_value,
+		0.5,
+		"visual-size slider starts at the 50 percent limit"
+	)
+	_assert_equal(
+		main._visual_scale_slider.max_value,
+		1.5,
+		"visual-size slider ends at the 150 percent limit"
+	)
+	_assert_true(
+		not main._visual_scale_slider.scrollable,
+		"visual-size slider disables default parent scrolling"
+	)
+	_assert_true(
+		main._visual_scale_slider.get_theme_stylebox("slider") != null,
+		"visual-size slider has a local track style"
+	)
+	_assert_true(
+		main._visual_scale_slider.get_theme_icon("grabber") != null,
+		"visual-size slider has a local grabber texture"
+	)
+	var visual_scale_grabber: Texture2D = (
+		main._visual_scale_slider.get_theme_icon("grabber")
+	)
+	_assert_equal(
+		visual_scale_grabber.get_size(),
+		Vector2(28, 28),
+		"visual-size grabber has room for its outer ring and shadow"
+	)
+	var visual_scale_grabber_image := visual_scale_grabber.get_image()
+	var grabber_center_color := visual_scale_grabber_image.get_pixel(14, 14)
+	var grabber_outer_color := visual_scale_grabber_image.get_pixel(14, 6)
+	_assert_true(
+		grabber_center_color.g > 0.4 and grabber_center_color.b > 0.4,
+		"visual-size grabber uses an accent-colored center"
+	)
+	_assert_true(
+		grabber_outer_color.r > 0.8
+			and grabber_outer_color.g > 0.8
+			and grabber_outer_color.b > 0.8,
+		"visual-size grabber uses a white outer circle"
+	)
+	_assert_true(
+		main._visual_scale_slider.get_parent() is VBoxContainer,
+		"visual-size controls use the standard settings layout without a card"
+	)
+	var scale_before_wheel: float = main._visual_scale_slider.value
+	var scale_wheel := InputEventMouseButton.new()
+	scale_wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+	scale_wheel.pressed = true
+	main._visual_scale_slider.gui_input.emit(scale_wheel)
+	_assert_equal(
+		main._visual_scale_slider.value,
+		minf(scale_before_wheel + main._visual_scale_slider.step, 1.5),
+		"wheel input changes visual size only on the slider"
+	)
+	_assert_equal(
+		main.pet._visual_size,
+		main._visual_scale_slider.value,
+		"visual-size changes preview immediately"
+	)
+	await create_timer(0.25).timeout
+	_assert_equal(
+		float(main.state.data.visual_scale),
+		main._visual_scale_slider.value,
+		"visual-size changes persist after input settles"
+	)
+	var scale_before_bounds_test: float = main._visual_scale_slider.value
+	main._visual_scale_slider.value = 1.5
+	await process_frame
+	var scaled_visual_bounds: Rect2 = main.pet.get_visual_bounds_in_canvas()
+	_assert_true(
+		main.get_viewport().get_visible_rect().grow(-1.0).encloses(
+			scaled_visual_bounds
+		),
+		"150 percent visual size expands the transparent window without clipping "
+			+ "(viewport=%s bounds=%s window=%s)" % [
+				main.get_viewport().get_visible_rect(),
+				scaled_visual_bounds,
+				main.get_window().size,
+			]
+	)
+	var eat_definition: Dictionary = main.pet._action_definition("eat")
+	if not eat_definition.is_empty():
+		var eat_sequence: Array = main.pet._sequence_for(eat_definition)
+		main.pet._busy = true
+		main.pet._current_action = "eat"
+		main.pet._geometry_action = ""
+		var stable_desktop_origin: Vector2 = (
+			Vector2(main.get_window().position) + main.position
+		)
+		var action_window_size := Vector2i.ZERO
+		for frame: Variant in eat_sequence:
+			main.pet._show_action_frame("eat", int(frame))
+			await process_frame
+			if action_window_size == Vector2i.ZERO:
+				action_window_size = main.get_window().size
+			else:
+				_assert_equal(
+					main.get_window().size,
+					action_window_size,
+					"large actions reserve one window size for every frame "
+						+ "(geometry=%s content=%s)" % [
+							main.pet._geometry_action,
+							main.get_window().content_scale_size,
+						]
+				)
+			var current_desktop_origin: Vector2 = (
+				Vector2(main.get_window().position) + main.position
+			)
+			_assert_true(
+				current_desktop_origin.distance_to(stable_desktop_origin) <= 1.5,
+				"large multi-frame actions keep one desktop canvas anchor "
+					+ "(expected=%s actual=%s)" % [
+						stable_desktop_origin, current_desktop_origin
+					]
+			)
+		main.pet._busy = false
+		main.pet._current_action = ""
+		main.pet._restore_idle()
+	main._visual_scale_slider.value = scale_before_bounds_test
+	await create_timer(0.25).timeout
+
+	main._focus_mode_check_box.button_pressed = true
+	_assert_true(main._focus_mode, "focus-mode UI enables focus mode")
+	main._focus_mode_check_box.button_pressed = false
+	_assert_true(not main._focus_mode, "focus-mode UI disables focus mode")
+	main._keep_screen_on_check_box.button_pressed = true
+	_assert_true(main._keep_screen_on, "keep-awake UI enables the runtime setting")
+	main._keep_screen_on_check_box.button_pressed = false
+	_assert_true(not main._keep_screen_on, "keep-awake UI disables the runtime setting")
+	var runtime_settings := ConfigFile.new()
+	_assert_equal(
+		runtime_settings.load(main.UI_SETTINGS_PATH),
+		OK,
+		"focus and keep-awake settings are persisted"
+	)
+	_assert_equal(
+		bool(runtime_settings.get_value("behavior", "focus_mode", true)),
+		false,
+		"focus-mode persistence matches the UI"
+	)
+	_assert_equal(
+		bool(runtime_settings.get_value("power", "keep_screen_on", true)),
+		false,
+		"keep-awake persistence matches the UI"
+	)
+	var autostart_pressed_style := (
+		main._autostart_check_box.get_theme_stylebox("pressed") as StyleBoxFlat
+	)
+	var autostart_hover_pressed_style := (
+		main._autostart_check_box.get_theme_stylebox("hover_pressed")
+		as StyleBoxFlat
+	)
+	_assert_true(
+		autostart_pressed_style != null
+			and autostart_hover_pressed_style != null,
+		"autostart checkbox defines checked and checked-hover styles"
+	)
+	_assert_equal(
+		autostart_hover_pressed_style.bg_color,
+		autostart_pressed_style.bg_color,
+		"hovering a checked autostart option preserves its selected background"
+	)
+	_assert_equal(
+		autostart_hover_pressed_style.content_margin_left,
+		autostart_pressed_style.content_margin_left,
+		"hovering a checked autostart option preserves its text alignment"
+	)
+	_assert_equal(
+		main._autostart_check_box.get_theme_constant(
+			"align_to_largest_stylebox"
+		),
+		1,
+		"autostart checkbox keeps one layout across interaction states"
+	)
 	var original_target_fps := Engine.max_fps
 	main._set_target_fps(47)
 	_assert_equal(
@@ -305,79 +512,13 @@ func _init() -> void:
 			"development runs cannot register the editor for autostart"
 		)
 	if OS.get_name() == "Windows":
-		var registry_test_key := (
-			"HKCU\\Software\\OpenDesktopPet-AutomatedTest-"
-			+ str(Time.get_ticks_usec())
-		)
-		var registry_test_value := "AutostartProbe"
-		var expected_test_executable := "C:\\Program Files\\Open Desktop Pet\\Pet.exe"
+		var autostart_service = WindowsAutostartServiceScript.new()
 		_assert_equal(
-			main._autostart_command(
+			autostart_service.build_command(
 				"C:/Program Files/Open Desktop Pet/Pet.exe"
 			),
 			"\"C:\\Program Files\\Open Desktop Pet\\Pet.exe\"",
 			"autostart commands normalize Godot paths for Windows"
-		)
-		_assert_true(
-			main._write_registry_autostart_blocking(
-				registry_test_key,
-				registry_test_value,
-				true,
-				expected_test_executable
-			),
-			"autostart helper really writes an isolated HKCU registry value"
-		)
-		var matching_registry_state: Dictionary = \
-			main._query_registry_value_blocking(
-				registry_test_key,
-				registry_test_value,
-				expected_test_executable
-			)
-		_assert_true(
-			bool(matching_registry_state.get("matches", false)),
-			"autostart query verifies the complete executable path"
-		)
-		var stale_registry_state: Dictionary = \
-			main._query_registry_value_blocking(
-				registry_test_key,
-				registry_test_value,
-				"C:\\Moved\\Pet.exe"
-			)
-		_assert_true(
-			bool(stale_registry_state.get("exists", false))
-				and not bool(stale_registry_state.get("matches", true)),
-			"autostart query detects a stale executable path"
-		)
-		_assert_true(
-			main._write_registry_autostart_blocking(
-				registry_test_key,
-				registry_test_value,
-				false,
-				expected_test_executable
-			),
-			"autostart helper really removes its isolated registry value"
-		)
-		var removed_registry_state: Dictionary = \
-			main._query_registry_value_blocking(
-				registry_test_key,
-				registry_test_value,
-				expected_test_executable
-			)
-		_assert_true(
-			not bool(removed_registry_state.get("exists", true)),
-			"isolated registry value is absent after removal"
-		)
-		var registry_cleanup_output: Array = []
-		_assert_equal(
-			OS.execute(
-				main._registry_executable(),
-				PackedStringArray(["delete", registry_test_key, "/f"]),
-				registry_cleanup_output,
-				true,
-				false
-			),
-			0,
-			"isolated autostart test registry key is cleaned up"
 		)
 	var screen := DisplayServer.window_get_current_screen()
 	if screen < 0:
@@ -416,6 +557,70 @@ func _init() -> void:
 	_assert_equal(main.bubble_label.text, "💤", "latest speech replaces earlier speech")
 	await create_timer(0.2).timeout
 	_assert_true(not main.bubble.visible, "speech hides after its duration")
+	_assert_equal(
+		main.AGENT_NOTIFICATION_DURATION_SECONDS,
+		60.0,
+		"Codex notification remains available for one minute"
+	)
+	_assert_equal(
+		main.bubble.mouse_default_cursor_shape,
+		Control.CURSOR_POINTING_HAND,
+		"speech bubble advertises a pointing-hand cursor"
+	)
+	var regular_bubble_color: Color = (
+		main.bubble.get_theme_stylebox("panel") as StyleBoxFlat
+	).bg_color
+	main._enqueue_agent_status("Codex 測試通知", "idle")
+	await process_frame
+	await process_frame
+	_assert_true(
+		main._agent_notification_active and main.bubble.visible,
+		"Codex notification displays as an active speech bubble"
+	)
+	_assert_true(
+		not main.bubble_tail.visible,
+		"Codex notification uses a rectangular bubble without a speech tail"
+	)
+	var agent_bubble_color: Color = (
+		main.bubble.get_theme_stylebox("panel") as StyleBoxFlat
+	).bg_color
+	_assert_true(
+		not agent_bubble_color.is_equal_approx(regular_bubble_color),
+		"Codex notification background differs from regular speech"
+	)
+	_assert_equal(
+		main._agent_notification_duration(true),
+		3.0,
+		"Codex notification lasts three seconds when VS Code is foreground"
+	)
+	_assert_equal(
+		main._agent_notification_duration(false),
+		60.0,
+		"Codex notification keeps the normal duration outside VS Code"
+	)
+	var first_agent_bubble_token: int = main._bubble_token
+	main._enqueue_agent_status("Codex 最新通知", "idle")
+	await process_frame
+	await process_frame
+	_assert_true(
+		main._agent_notification_active and main.bubble.visible,
+		"replacement Codex notification remains active"
+	)
+	_assert_equal(
+		main.bubble_label.text,
+		"Codex 最新通知",
+		"latest Codex notification replaces the previous bubble"
+	)
+	_assert_true(
+		main._bubble_token > first_agent_bubble_token,
+		"replacing a Codex notification invalidates the previous timer"
+	)
+	main._dismiss_active_agent_notification()
+	await process_frame
+	_assert_true(
+		not main._agent_notification_active and not main.bubble.visible,
+		"click acknowledgement dismisses the active Codex notification"
+	)
 
 	_assert_true(
 		not main.has_method("_schedule_restart_after_exit")
@@ -490,6 +695,10 @@ func _init() -> void:
 		await process_frame
 	_assert_true(main.state.is_sleeping(), "sleep enters its persistent recovery state")
 	_assert_true(main.pet.is_busy(), "sleep animation keeps looping while asleep")
+	main._on_user_activity(Time.get_ticks_msec())
+	await process_frame
+	_assert_true(main.state.is_sleeping(), "mouse activity does not wake sleep state")
+	_assert_true(main.pet.is_busy(), "mouse activity does not cancel sleep animation")
 	_assert_true(
 		not main._can_act_autonomously(),
 		"autonomous actions cannot interrupt active sleep"

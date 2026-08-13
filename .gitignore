@@ -1,8 +1,14 @@
 .godot/
 build/
+tmp/
+reference_prompts.txt
 private_pets/
 characters/custom/
 素材/
 *.log
 tests/trash_window_diagnostic.gd
 tests/trash_window_diagnostic.gd.uid
+native/windows/.sconsign.dblite
+native/windows/src/*.os
+native/windows/bin/*
+!native/windows/bin/*.dll
