@@ -546,6 +546,13 @@ func _say_dialogue(key: String, fallback: String, seconds: float) -> void:
 	say(pet.get_dialogue(key, fallback), seconds)
 
 
+func _say_configured_dialogue(key: String, seconds: float) -> void:
+	var text: String = pet.get_dialogue(key, "")
+	if text.strip_edges().is_empty():
+		return
+	say(text, seconds)
+
+
 func _show_wish_notice(action: String) -> void:
 	say(_wish_icon(action), 6.0)
 
@@ -645,11 +652,7 @@ func _setup_idle_behavior() -> void:
 		if _can_act_autonomously():
 			_run_autonomous_action()
 			if _idle_count % 3 == 0:
-				_say_dialogue(
-					"idle",
-					["我在這裡。", "滾一下好了。", "今天也要照顧我。"].pick_random(),
-					2.5
-				)
+				_say_configured_dialogue("idle", 2.5)
 		timer.wait_time = randf_range(11.0, 19.0)
 		timer.start()
 	)

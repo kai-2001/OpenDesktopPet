@@ -127,6 +127,9 @@ Assert-Architecture ($main -notmatch 'CharacterPackManagerScript') `
 	'main.gd must not depend directly on CharacterPackManager.'
 Assert-Architecture ($main -notmatch '_agent_notification_queue') `
 	'Agent notifications must replace the active bubble instead of queueing.'
+Assert-Architecture `
+	($main -match '_say_configured_dialogue\("idle", 2\.5\)') `
+	'Idle speech must be opt-in through character dialogue.'
 Assert-Architecture ($agentController -match '_focus_target\(TARGET_VSCODE\)') `
 	'Codex focus must route VS Code notifications to the configured VS Code target.'
 Assert-Architecture ($agentController -match '"--reuse-window"') `

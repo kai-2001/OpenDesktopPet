@@ -44,6 +44,13 @@ func _init() -> void:
 		"fallback",
 		"missing character dialogue uses the built-in fallback"
 	)
+	var bubble_token_before_missing_idle: int = main._bubble_token
+	main._say_configured_dialogue("__missing_idle_dialogue__", 0.01)
+	_assert_equal(
+		main._bubble_token,
+		bubble_token_before_missing_idle,
+		"missing idle dialogue does not open a speech bubble"
+	)
 	if DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR):
 		_assert_true(
 			is_instance_valid(main._status_indicator)
