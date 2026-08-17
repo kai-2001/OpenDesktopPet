@@ -33,6 +33,7 @@ $codexTrustService = Read-Source 'scripts/codex_hook_trust_service.gd'
 $windowsActivator = Read-Source 'native/windows/src/windows_window_activator.cpp'
 $windowsExtension = Read-Source 'native/windows/windows_window_activator.gdextension'
 $releasePreparation = Read-Source 'tools/prepare_windows_release.ps1'
+$exportPresets = Read-Source 'export_presets.cfg'
 
 Assert-Architecture ($details -notmatch 'host\.') `
 	'DetailsWindowController must not depend on host private APIs.'
@@ -247,6 +248,8 @@ Assert-Architecture ($windowsExtension -match 'windows\.release\.x86_64') `
 	'The Windows GDExtension must provide an x64 release library.'
 Assert-Architecture ($releasePreparation -match [regex]::Escape('open_desktop_pet_windows.windows.template_release.x86_64.dll')) `
 	'The release package must include the native Windows GDExtension.'
+Assert-Architecture ($exportPresets -match 'exclude_filter=.*tmp/\*') `
+	'The public export must exclude local temporary and test artifacts.'
 
 & git -C $projectRoot diff --check
 if ($LASTEXITCODE -ne 0) {
