@@ -35,14 +35,14 @@ func _run() -> void:
 	_make_directory(integration_home)
 	_write(integration_home.path_join("open_desktop_pet_runtime.ps1"), "# OpenDesktopPet runtime schema v1")
 	_write(codex_home.path_join("open_desktop_pet_codex_installed.txt"), "1")
-	_write(codex_home.path_join("open_desktop_pet_notify.ps1"), "# OpenDesktopPet runtime schema v1")
+	_write(integration_home.path_join("codex_stop_notify.ps1"), "# OpenDesktopPet runtime schema v1")
 	_write(
-		codex_home.path_join("config.toml"),
-		"notify = [\"powershell.exe\", \"open_desktop_pet_notify.ps1\"]"
+		codex_home.path_join("hooks.json"),
+		"{\"hooks\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"commandWindows\":\"powershell.exe -File codex_stop_notify.ps1\"}]}]}}"
 	)
 	_assert_true(controller.is_codex_configured(), "Codex valid files are detected")
-	_write(codex_home.path_join("config.toml"), "model = \"gpt-5.6-luna\"")
-	_assert_true(not controller.is_codex_configured(), "Codex notify drift is detected")
+	_write(codex_home.path_join("hooks.json"), "{\"hooks\":{\"Stop\":[]}}")
+	_assert_true(not controller.is_codex_configured(), "Codex Stop hook drift is detected")
 
 	_write(integration_home.path_join("open_desktop_pet_copilot_installed.txt"), "1")
 	_write(integration_home.path_join("vscode_copilot_notify.ps1"), "# OpenDesktopPet runtime schema v1")

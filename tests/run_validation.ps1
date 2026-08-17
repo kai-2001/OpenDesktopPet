@@ -102,6 +102,13 @@ try {
         throw 'Agent notification router validation failed.'
     }
 
+	$codexTrustOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_hook_trust_service_test.gd' 2>&1
+	$codexTrustExitCode = $LASTEXITCODE
+	$codexTrustOutput | Write-Output
+	if ($codexTrustExitCode -ne 0 -or -not ($codexTrustOutput -match 'CODEX_HOOK_TRUST_SERVICE_TEST_OK')) {
+		throw 'Codex Hook trust service validation failed.'
+	}
+
     $ErrorActionPreference = 'Continue'
     $gameplayOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/gameplay_state_test.gd' 2>&1
     $gameplayExitCode = $LASTEXITCODE

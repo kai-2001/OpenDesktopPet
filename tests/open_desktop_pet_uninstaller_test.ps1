@@ -53,6 +53,7 @@ try {
     Write-TestFile (Join-Path $userDataHome 'profiles\default\save_v2.json') '{"hunger":75}'
     Write-TestFile (Join-Path $userDataHome 'character_packs\custom\pet.json') '{"id":"custom"}'
     foreach ($logName in @(
+		'OpenDesktopPet-codex-stop-hook.log',
         'OpenDesktopPet-codex-notify.log',
         'OpenDesktopPet-vscode-hook.log',
         'OpenDesktopPet-opencode-notify.log',
@@ -81,13 +82,13 @@ try {
     Assert-Uninstaller (Test-Path -LiteralPath (Join-Path $testTemp 'OpenDesktopPet-codex-notify.log')) `
         'Integration-only uninstall removed diagnostic logs.'
 
-    $codexConfig = Get-Content -LiteralPath (Join-Path $testProfile '.codex\config.toml') -Raw -Encoding UTF8
+    $codexHooks = Get-Content -LiteralPath (Join-Path $testProfile '.codex\hooks.json') -Raw -Encoding UTF8
     $copilotConfig = Get-Content -LiteralPath (Join-Path $testProfile '.copilot\hooks\open-desktop-pet.json') -Raw -Encoding UTF8
     $claudeConfig = Get-Content -LiteralPath (Join-Path $testProfile '.claude\settings.json') -Raw -Encoding UTF8
     $geminiConfig = Get-Content -LiteralPath (Join-Path $testProfile '.gemini\settings.json') -Raw -Encoding UTF8
     $agyConfig = Get-Content -LiteralPath (Join-Path $testProfile '.gemini\config\hooks.json') -Raw -Encoding UTF8
-    Assert-Uninstaller ($codexConfig -notmatch 'open_desktop_pet_notify\.ps1') `
-        'Integration-only uninstall did not restore the Codex configuration.'
+    Assert-Uninstaller ($codexHooks -notmatch 'codex_stop_notify\.ps1') `
+        'Integration-only uninstall did not remove the Codex Stop hook.'
     Assert-Uninstaller ($copilotConfig -notmatch 'vscode_copilot_notify\.ps1') `
         'Integration-only uninstall did not remove the Copilot hook.'
     Assert-Uninstaller (-not (Test-Path -LiteralPath (Join-Path $testProfile '.config\opencode\plugins\open-desktop-pet.js'))) `
@@ -109,6 +110,7 @@ try {
     Assert-Uninstaller (-not (Test-Path -LiteralPath $userDataHome)) `
         'Complete uninstall did not remove OpenDesktopPet user data.'
     foreach ($logName in @(
+		'OpenDesktopPet-codex-stop-hook.log',
         'OpenDesktopPet-codex-notify.log',
         'OpenDesktopPet-vscode-hook.log',
         'OpenDesktopPet-opencode-notify.log',

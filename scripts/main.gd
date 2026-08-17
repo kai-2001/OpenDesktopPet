@@ -2,6 +2,7 @@ extends Node2D
 
 const CharacterPackCoordinatorScript = preload("res://scripts/character_pack_coordinator.gd")
 const AgentIntegrationControllerScript = preload("res://scripts/agent_integration_controller.gd")
+const CodexHookTrustService = preload("res://scripts/codex_hook_trust_service.gd")
 const DesktopWindowServiceScript = preload("res://scripts/desktop_window_service.gd")
 const PetGameplayCoordinatorScript = preload("res://scripts/pet_gameplay_coordinator.gd")
 const PetInputControllerScript = preload("res://scripts/pet_input_controller.gd")
@@ -60,6 +61,10 @@ var _agent_gemini_terminal_enabled_toggle: Button
 var _agent_agy_terminal_enabled_toggle: Button
 var _agent_port_spin_box: SpinBox
 var _agent_status_label: Label
+var _codex_setup_progress_bar: ProgressBar
+var _codex_trust_review_button: Button
+var _codex_trust_recheck_button: Button
+var _codex_trust_dialog: ConfirmationDialog
 var _vscode_executable_line_edit: LineEdit
 var _vscode_executable_hint: Label
 var _vscode_executable_summary: Label
@@ -364,6 +369,9 @@ func _setup_agent_integration() -> void:
 	_agent_controller = AgentIntegrationControllerScript.new()
 	_agent_controller.notification_received.connect(_handle_agent_notification)
 	_agent_controller.configuration_failed.connect(_handle_agent_configuration_failed)
+	_agent_controller.codex_unavailable.connect(_handle_codex_unavailable)
+	_agent_controller.codex_trust_required.connect(_handle_codex_trust_required)
+	_agent_controller.codex_trust_ready.connect(_handle_codex_trust_ready)
 	_agent_controller.state_changed.connect(_refresh_agent_settings_ui)
 	_agent_controller.executable_path_detection_started.connect(
 		_on_executable_path_detection_started
@@ -376,6 +384,96 @@ func _setup_agent_integration() -> void:
 
 func _handle_agent_configuration_failed(target_name: String) -> void:
 	say("%s 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。" % target_name, 8.0)
+
+
+func _handle_codex_unavailable(target_name: String, _message: String) -> void:
+	say(
+		"%s 通知無法開啟：找不到支援 Hook 審查的 Codex。請先安裝或更新 "
+		+ "Codex Desktop、VS Code Codex 擴充功能或 Codex CLI。" % target_name,
+		8.0
+	)
+
+
+func _handle_codex_trust_required(
+	target_name: String, status: String, message: String
+) -> void:
+	_apply_agent_control_state()
+	if not is_instance_valid(_codex_trust_dialog):
+		say("%s 的 Codex Hook 尚待信任，請開啟 Hook 審查。" % target_name, 8.0)
+		return
+	var status_hint := "目前狀態：%s" % message
+	if status == CodexHookTrustService.STATUS_UNAVAILABLE:
+		status_hint += "\n這台電腦找不到可用的 Codex 執行核心，請先安裝或更新 Codex。"
+	_codex_trust_dialog.dialog_text = (
+		"你正在開啟「%s Codex」通知。三種 Codex 共用同一份 Stop Hook 信任。"
+		+ "\n\n%s\n\n"
+		+ "不需另外安裝 CLI；桌寵會使用 Codex Desktop、VS Code 擴充功能或"
+		+ "獨立 CLI 所提供的 Codex 核心。\n\n"
+		+ "1. 按「開啟 Codex 信任畫面」。\n"
+		+ "2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n"
+		+ "3. 在 Hook 清單選取 Stop，再按 Enter 開啟詳細內容。\n"
+		+ "4. 找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。"
+		+ "[ ] 表示尚未信任；顯示 [x] 才算完成信任。\n"
+		+ "5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n"
+		+ "6. 回到桌寵，按「我已信任，檢查通知」。\n\n"
+		+ "選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。"
+	) % [target_name, status_hint]
+	_codex_trust_dialog.popup_centered(Vector2i(700, 540))
+
+
+func _handle_codex_trust_ready(target_name: String, target_app: String) -> void:
+	if is_instance_valid(_codex_trust_dialog):
+		_codex_trust_dialog.hide()
+	_apply_agent_control_state()
+	_enqueue_agent_status(
+		"%s 的 Codex 通知已完成信任並啟用。" % target_name,
+		"idle",
+		target_app,
+		"codex"
+	)
+
+
+func _open_codex_hook_review() -> void:
+	if _agent_controller == null or not _agent_controller.open_codex_hook_review():
+		if is_instance_valid(_codex_trust_dialog):
+			_codex_trust_dialog.dialog_text = (
+				"無法開啟 Codex Hook 審查。請確認 Codex Desktop、VS Code 的 Codex "
+				+ "擴充功能或 Codex CLI 已安裝並更新，再重新嘗試。"
+			)
+			call_deferred("_show_codex_trust_dialog")
+		return
+	_apply_agent_control_state()
+
+
+func _recheck_codex_hook_trust() -> void:
+	if _agent_controller == null:
+		say("Codex 通知服務尚未就緒，請關閉並重新開啟桌寵。", 6.0)
+		return
+	if _agent_controller.is_codex_setup_busy():
+		say("正在檢查 Codex Hook，完成前不需要再按一次。", 6.0)
+		return
+	if not _agent_controller.has_pending_codex_trust():
+		say(
+			"尚未選擇要啟用哪一種 Codex 通知。請在下方找到你使用的程式"
+			+ "（VS Code、ChatGPT 或終端機），把它的 Codex 開關打開。",
+			8.0
+		)
+		return
+	if not _agent_controller.recheck_pending_codex_trust():
+		say("無法開始檢查，請重新開啟桌寵後再試。", 6.0)
+		return
+	_apply_agent_control_state()
+
+
+func _show_codex_trust_dialog() -> void:
+	if is_instance_valid(_codex_trust_dialog):
+		_codex_trust_dialog.popup_centered(Vector2i(580, 330))
+
+
+func _cancel_codex_hook_trust() -> void:
+	if _agent_controller != null:
+		_agent_controller.cancel_pending_codex_enable()
+	_apply_agent_control_state()
 
 
 func _on_executable_path_detection_started(targets: Array) -> void:
@@ -443,6 +541,34 @@ func _refresh_agent_settings_ui() -> void:
 		)
 	if not is_instance_valid(_agent_status_label):
 		return
+	var codex_trust_pending := (
+		_agent_controller != null and _agent_controller.has_pending_codex_trust()
+	)
+	var codex_setup_busy := (
+		_agent_controller != null and _agent_controller.is_codex_setup_busy()
+	)
+	if is_instance_valid(_codex_setup_progress_bar):
+		_codex_setup_progress_bar.visible = codex_setup_busy
+	if is_instance_valid(_codex_trust_review_button):
+		_codex_trust_review_button.visible = codex_trust_pending
+		_codex_trust_review_button.disabled = codex_setup_busy
+	if is_instance_valid(_codex_trust_recheck_button):
+		_codex_trust_recheck_button.visible = codex_trust_pending
+		_codex_trust_recheck_button.disabled = codex_setup_busy
+	if codex_setup_busy:
+		_agent_status_label.text = "狀態: 正在檢查 Codex 與通知設定…"
+		_agent_status_label.add_theme_color_override(
+			"font_color", _details_color("#238b9d", "#4fc1ff")
+		)
+		return
+	if codex_trust_pending:
+		_agent_status_label.text = (
+			"尚未啟用：請先在 Codex 信任桌寵 Hook，再按「我已信任，檢查通知」"
+		)
+		_agent_status_label.add_theme_color_override(
+			"font_color", _details_color("#a66b16", "#dcdcaa")
+		)
+		return
 	if _agent_controller == null or not _agent_controller.is_any_enabled():
 		_agent_status_label.text = "狀態: 已關閉"
 		_agent_status_label.add_theme_color_override(
@@ -463,7 +589,17 @@ func _refresh_agent_settings_ui() -> void:
 
 func _apply_agent_control_state() -> void:
 	var enabled := _agent_controller != null and _agent_controller.is_any_enabled()
+	var codex_busy := (
+		_agent_controller != null and _agent_controller.is_codex_setup_busy()
+	)
 	_update_agent_enabled_toggles()
+	for toggle: Button in [
+		_agent_codex_enabled_toggle,
+		_agent_codex_app_enabled_toggle,
+		_agent_terminal_codex_enabled_toggle,
+	]:
+		if is_instance_valid(toggle):
+			toggle.disabled = codex_busy
 	if is_instance_valid(_agent_port_spin_box):
 		_agent_port_spin_box.editable = not enabled
 		_agent_port_spin_box.mouse_filter = (
@@ -787,6 +923,18 @@ func _build_stats_window() -> void:
 	var agent_refs: Dictionary = refs["agent_refs"]
 	_agent_port_spin_box = agent_refs["agent_port_spin_box"] as SpinBox
 	_agent_status_label = agent_refs["agent_status_label"] as Label
+	_codex_setup_progress_bar = (
+		agent_refs["codex_setup_progress_bar"] as ProgressBar
+	)
+	_codex_trust_review_button = (
+		agent_refs["codex_trust_review_button"] as Button
+	)
+	_codex_trust_recheck_button = (
+		agent_refs["codex_trust_recheck_button"] as Button
+	)
+	_codex_trust_dialog = agent_refs["codex_trust_dialog"] as ConfirmationDialog
+	_codex_trust_dialog.confirmed.connect(_open_codex_hook_review)
+	_codex_trust_dialog.canceled.connect(_cancel_codex_hook_trust)
 	_agent_codex_enabled_toggle = agent_refs["codex_enabled_toggle"] as Button
 	_agent_codex_app_enabled_toggle = (
 		agent_refs["codex_app_enabled_toggle"] as Button
@@ -920,6 +1068,12 @@ func _connect_details_window_signals() -> void:
 		_on_agy_terminal_enabled_toggled
 	)
 	_details_window_controller.agent_port_changed.connect(_on_agent_port_changed)
+	_details_window_controller.codex_trust_review_requested.connect(
+		_open_codex_hook_review
+	)
+	_details_window_controller.codex_trust_recheck_requested.connect(
+		_recheck_codex_hook_trust
+	)
 	_details_window_controller.vscode_executable_path_changed.connect(
 		_on_vscode_executable_path_changed
 	)
@@ -1580,6 +1734,10 @@ func _destroy_stats_window() -> void:
 	_agent_agy_terminal_enabled_toggle = null
 	_agent_port_spin_box = null
 	_agent_status_label = null
+	_codex_setup_progress_bar = null
+	_codex_trust_review_button = null
+	_codex_trust_recheck_button = null
+	_codex_trust_dialog = null
 	_vscode_executable_line_edit = null
 	_vscode_executable_hint = null
 	_vscode_executable_summary = null

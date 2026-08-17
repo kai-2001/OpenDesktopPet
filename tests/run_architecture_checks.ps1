@@ -29,6 +29,7 @@ $inputController = Read-Source 'scripts/pet_input_controller.gd'
 $characterCoordinator = Read-Source 'scripts/character_pack_coordinator.gd'
 $agentController = Read-Source 'scripts/agent_integration_controller.gd'
 $agentRouter = Read-Source 'scripts/agent_notification_router.gd'
+$codexTrustService = Read-Source 'scripts/codex_hook_trust_service.gd'
 $windowsActivator = Read-Source 'native/windows/src/windows_window_activator.cpp'
 $windowsExtension = Read-Source 'native/windows/windows_window_activator.gdextension'
 $releasePreparation = Read-Source 'tools/prepare_windows_release.ps1'
@@ -158,14 +159,18 @@ Assert-Architecture ($agentController -match 'gemini_terminal_enabled') `
 	'Codex integration must keep Gemini CLI terminal state separate.'
 Assert-Architecture ($agentController -match '_run_gemini_cli_configuration_tool') `
 	'Codex integration must configure Gemini CLI through its installer.'
-Assert-Architecture ((Read-Source 'tools/codex_notify.ps1') -match 'Get-ProcessTreeContainsVsCode') `
+Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match 'Test-ProcessTreeContainsVsCode') `
 	'Codex notification routing must detect VS Code hosts in the process tree.'
 Assert-Architecture ($agentController -match 'RUNTIME_FILE_NAME') `
 	'Agent notifications must publish one runtime registration.'
 Assert-Architecture ($agentController -notmatch 'func _write_bridge_files') `
 	'Agent notifications must not write duplicate bridge flag files.'
-Assert-Architecture ((Read-Source 'tools/codex_notify.ps1') -match 'Get-OpenDesktopPetRuntime') `
+Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match 'Get-OpenDesktopPetRuntime') `
 	'Codex notifications must read the shared runtime registration.'
+Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match "hook_event_name -ne 'Stop'") `
+	'Codex notifications must be driven by the completed-chat Stop hook.'
+Assert-Architecture ((Read-Source 'tools/install_codex_integration.ps1') -match 'Remove-LegacyNotifyIntegration') `
+	'Codex Stop-hook installation must remove the obsolete notify integration.'
 Assert-Architecture ($agentController -match 'agy_terminal_enabled') `
 	'Codex integration must keep Antigravity CLI terminal state separate.'
 Assert-Architecture ($agentController -match '_run_antigravity_cli_configuration_tool') `
@@ -180,6 +185,44 @@ Assert-Architecture ($agentRouter -match 'class_name AgentNotificationRouter') `
 	'Agent notification routing rules must have their own cohesive module.'
 Assert-Architecture ($agentController -match 'AgentNotificationRouterScript') `
 	'Codex integration must delegate Agent routing rules to the shared router.'
+Assert-Architecture ($agentController -match 'CodexHookTrustServiceScript') `
+	'Codex integration must delegate Hook trust protocol handling to a cohesive service.'
+Assert-Architecture ($codexTrustService -match 'parse_status_output') `
+	'Codex Hook trust status parsing must be independently testable.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match '(?s)Start-Process.*-WindowStyle Normal') `
+	'Codex Hook review must explicitly create a visible Windows console.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match 'OpenDesktopPetCodexHookReview') `
+	'Codex Hook review must prevent duplicate interactive windows.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "TERM = 'xterm-256color'") `
+	'Codex Hook review must launch its TUI with an interactive terminal mode.'
+Assert-Architecture ($codexTrustService -notmatch '"-NoExit"') `
+	'Codex Hook review must not leave an empty PowerShell host behind.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "method = 'hooks/list'") `
+	'Codex Hook trust checks must inspect the Codex-reported status.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "ValidateSet\('Availability', 'Status', 'Launch', 'Review'\)") `
+	'Codex Hook review must provide a separate executable availability check.'
+Assert-Architecture ($agentController -match '(?s)func _run_codex_setup_task.*get_codex_availability_status\(\).*_run_codex_configuration_tool.*get_codex_hook_trust_status\(\)') `
+	'Codex availability must be checked before installing or validating hooks.'
+Assert-Architecture ($agentController -match '(?s)Thread\.new\(\).*_run_codex_setup_task') `
+	'Codex setup and Hook status checks must not block the UI thread.'
+Assert-Architecture ($agentController -notmatch 'CODEX_TRUST_POLL_INTERVALS_MS|_poll_codex_trust_monitor|_schedule_next_codex_trust_check') `
+	'Codex Hook trust must not be checked by background polling.'
+Assert-Architecture ($agentController -match 'func recheck_pending_codex_trust') `
+	'Codex Hook trust must expose an explicit user-triggered recheck action.'
+Assert-Architecture ($agentController -match 'CODEX_SETUP_SETTINGS_SECTION.*pending_target') `
+	'Pending Codex notification setup must survive closing the review window or restarting the pet.'
+Assert-Architecture ($agentController -match '(?s)is_trusted\(status\).*_set_codex_target_enabled\(target, true\).*codex_trust_ready\.emit') `
+	'Every successful Codex trust check must enable the requested target and report success.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match '& \$codexExecutable --no-alt-screen') `
+	'Codex Hook review must launch the interactive Codex TUI.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -notmatch "--no-alt-screen '/hooks'") `
+	'Codex Hook review must not submit /hooks as an Agent prompt.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match [regex]::Escape('.vscode\extensions')) `
+	'Codex Hook review must support the executable bundled with the VS Code extension.'
+Assert-Architecture ($main -notmatch '_reopen_codex_trust_dialog') `
+	'Opening Codex Hook review must not immediately reopen the blocking trust dialog.'
+Assert-Architecture ($releasePreparation -match 'codex_hook_review\.ps1') `
+	'Windows releases must include the Codex Hook review helper.'
 Assert-Architecture ($agentController -notmatch 'func _normalize_agent|func _target_display_name') `
 	'Codex integration must not own cross-Agent display and normalization rules.'
 Assert-Architecture ($agentController -match 'ClassDB\.instantiate\("WindowsWindowActivator"\)') `

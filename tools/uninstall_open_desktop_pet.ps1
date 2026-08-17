@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 
 $script:failures = New-Object System.Collections.Generic.List[string]
 $integrationHomeFileNames = @(
+	'codex_stop_notify.ps1',
     'vscode_copilot_notify.ps1',
     'opencode_notify.ps1',
     'claude_code_notify.ps1',
@@ -42,12 +43,13 @@ $integrationHomeFileNames = @(
     'open_desktop_pet_antigravity_cli_installed.txt'
 )
 $codexHomeFileNames = @(
-    'open_desktop_pet_notify.ps1',
+	'open_desktop_pet_notify.ps1',
     'open_desktop_pet_previous_notify.json',
     'open_desktop_pet_notify_enabled.txt',
     'open_desktop_pet_codex_installed.txt'
 )
 $temporaryLogFileNames = @(
+	'OpenDesktopPet-codex-stop-hook.log',
     'OpenDesktopPet-codex-notify.log',
     'OpenDesktopPet-vscode-hook.log',
     'OpenDesktopPet-opencode-notify.log',

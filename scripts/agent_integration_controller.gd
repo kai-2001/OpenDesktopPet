@@ -3,6 +3,7 @@ extends RefCounted
 
 const LocalAgentNotificationReceiverScript = preload("res://scripts/local_agent_notification_receiver.gd")
 const AgentNotificationRouterScript = preload("res://scripts/agent_notification_router.gd")
+const CodexHookTrustServiceScript = preload("res://scripts/codex_hook_trust_service.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_PORT := 38571
 const MIN_PORT := 1024
@@ -17,8 +18,10 @@ const OPENCODE_INSTALL_MARKER := "open_desktop_pet_opencode_installed.txt"
 const CLAUDE_CODE_INSTALL_MARKER := "open_desktop_pet_claude_code_installed.txt"
 const GEMINI_CLI_INSTALL_MARKER := "open_desktop_pet_gemini_cli_installed.txt"
 const AGY_INSTALL_MARKER := "open_desktop_pet_antigravity_cli_installed.txt"
-const CODEX_CONFIG_FILE_NAME := "config.toml"
-const CODEX_NOTIFY_SCRIPT_FILE_NAME := "open_desktop_pet_notify.ps1"
+const CODEX_HOOK_CONFIG_FILE_NAME := "hooks.json"
+const CODEX_STOP_SCRIPT_FILE_NAME := "codex_stop_notify.ps1"
+const CODEX_HOOK_REVIEW_TOOL_FILE_NAME := "codex_hook_review.ps1"
+const CODEX_SETUP_SETTINGS_SECTION := "codex_setup"
 const COPILOT_HOOK_CONFIG_FILE_NAME := "open-desktop-pet.json"
 const COPILOT_NOTIFY_SCRIPT_FILE_NAME := "vscode_copilot_notify.ps1"
 const OPENCODE_PLUGIN_FILE_NAME := "open-desktop-pet.js"
@@ -43,6 +46,9 @@ signal notification_received(
 )
 signal state_changed
 signal configuration_failed(target_name: String)
+signal codex_unavailable(target_name: String, message: String)
+signal codex_trust_required(target_name: String, status: String, message: String)
+signal codex_trust_ready(target_name: String, target_app: String)
 signal executable_path_detection_started(targets: Array)
 signal executable_path_detection_finished(targets: Array)
 
@@ -71,6 +77,13 @@ var _last_event_id := ""
 var _active_target_app := TARGET_VSCODE
 var _active_agent := "codex"
 var _window_activator
+var _codex_hook_trust_service = CodexHookTrustServiceScript.new()
+var _pending_codex_target := ""
+var _pending_codex_target_name := ""
+var _codex_setup_thread: Thread
+var _codex_setup_mode := ""
+var _codex_setup_target := ""
+var _codex_setup_target_name := ""
 var _runtime_instance_id := ""
 var _executable_path_detection_thread: Thread
 var _active_executable_path_detection_targets: Array[String] = []
@@ -93,6 +106,14 @@ func load_settings() -> void:
 		terminal_codex_enabled = bool(
 			config.get_value("codex_terminal", "enabled", false)
 		)
+		_pending_codex_target = String(config.get_value(
+			CODEX_SETUP_SETTINGS_SECTION, "pending_target", ""
+		))
+		_pending_codex_target_name = String(config.get_value(
+			CODEX_SETUP_SETTINGS_SECTION, "pending_target_name", ""
+		))
+		if not _is_codex_notification_target(_pending_codex_target):
+			_clear_pending_codex_enable()
 		terminal_opencode_enabled = bool(
 			config.get_value("opencode_terminal", "enabled", false)
 		)
@@ -147,12 +168,14 @@ func load_settings() -> void:
 
 
 func poll() -> void:
+	_poll_codex_setup()
 	_poll_executable_path_detection()
 	if _receiver != null:
 		_receiver.poll()
 
 
 func shutdown() -> void:
+	_stop_codex_setup()
 	_stop_executable_path_detection()
 	_stop_receiver()
 	_remove_runtime_if_owned()
@@ -163,11 +186,8 @@ func set_enabled(value: bool) -> void:
 
 
 func set_codex_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_codex_configuration("VS Code"):
-		codex_enabled = false
-		enabled = false
-		_persist_agent_state()
+	if value and DisplayServer.get_name() != "headless":
+		_begin_codex_enable(TARGET_VSCODE, "VS Code")
 		return
 	codex_enabled = value
 	enabled = value
@@ -175,23 +195,70 @@ func set_codex_enabled(value: bool) -> void:
 
 
 func set_codex_app_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_codex_configuration("ChatGPT"):
-		codex_app_enabled = false
-		_persist_agent_state()
+	if value and DisplayServer.get_name() != "headless":
+		_begin_codex_enable(TARGET_CODEX_APP, "ChatGPT")
 		return
 	codex_app_enabled = value
 	_persist_agent_state()
 
 
 func set_terminal_codex_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_codex_configuration("終端機"):
-		terminal_codex_enabled = false
-		_persist_agent_state()
+	if value and DisplayServer.get_name() != "headless":
+		_begin_codex_enable(TARGET_TERMINAL, "終端機")
 		return
 	terminal_codex_enabled = value
 	_persist_agent_state()
+
+
+func get_codex_hook_trust_status() -> Dictionary:
+	if not is_codex_configured():
+		return {
+			"status": CodexHookTrustServiceScript.STATUS_MISSING,
+			"message": "尚未安裝桌寵的 Codex Stop Hook。",
+			"enabled": false,
+			"trust_status": "",
+		}
+	return _codex_hook_trust_service.query_status(
+		_tool_path(CODEX_HOOK_REVIEW_TOOL_FILE_NAME),
+		_codex_status_working_directory()
+	)
+
+
+func get_codex_availability_status() -> Dictionary:
+	return _codex_hook_trust_service.query_availability(
+		_tool_path(CODEX_HOOK_REVIEW_TOOL_FILE_NAME),
+		_codex_status_working_directory()
+	)
+
+
+func open_codex_hook_review() -> bool:
+	var opened := _codex_hook_trust_service.open_review(
+		_tool_path(CODEX_HOOK_REVIEW_TOOL_FILE_NAME)
+	)
+	if opened and not _pending_codex_target.is_empty():
+		state_changed.emit()
+	return opened
+
+
+func recheck_pending_codex_trust() -> bool:
+	if _pending_codex_target.is_empty() or is_codex_setup_busy():
+		return false
+	return _start_codex_setup(
+		"recheck", _pending_codex_target, _pending_codex_target_name
+	)
+
+
+func cancel_pending_codex_enable() -> void:
+	_clear_pending_codex_enable()
+	_persist_agent_state()
+
+
+func has_pending_codex_trust() -> bool:
+	return not _pending_codex_target.is_empty()
+
+
+func is_codex_setup_busy() -> bool:
+	return _codex_setup_thread != null
 
 
 func set_copilot_enabled(value: bool) -> void:
@@ -464,13 +531,39 @@ func is_codex_configured() -> bool:
 	if not FileAccess.file_exists(codex_home.path_join(CODEX_INSTALL_MARKER)):
 		return false
 	if not _has_runtime_bridge_support(
-		integration_home, codex_home.path_join(CODEX_NOTIFY_SCRIPT_FILE_NAME)
+		integration_home, integration_home.path_join(CODEX_STOP_SCRIPT_FILE_NAME)
 	):
 		return false
-	var config_text := _read_text_file(codex_home.path_join(CODEX_CONFIG_FILE_NAME))
-	return config_text.contains("notify") and config_text.contains(
-		CODEX_NOTIFY_SCRIPT_FILE_NAME
+	return _has_codex_stop_hook(
+		_read_text_file(codex_home.path_join(CODEX_HOOK_CONFIG_FILE_NAME))
 	)
+
+
+func _has_codex_stop_hook(config_text: String) -> bool:
+	var parsed: Variant = JSON.parse_string(config_text)
+	if not parsed is Dictionary:
+		return false
+	var hooks: Variant = parsed.get("hooks", {})
+	if not hooks is Dictionary:
+		return false
+	var stop_groups: Variant = hooks.get("Stop", [])
+	if not stop_groups is Array:
+		return false
+	for group: Variant in stop_groups:
+		if not group is Dictionary:
+			continue
+		var handlers: Variant = group.get("hooks", [])
+		if not handlers is Array:
+			continue
+		for handler: Variant in handlers:
+			if not handler is Dictionary:
+				continue
+			var command := String(handler.get("command", ""))
+			var windows_command := String(handler.get("commandWindows", ""))
+			if command.contains(CODEX_STOP_SCRIPT_FILE_NAME) \
+					or windows_command.contains(CODEX_STOP_SCRIPT_FILE_NAME):
+				return true
+	return false
 
 
 func is_copilot_configured() -> bool:
@@ -585,12 +678,154 @@ func _expected_antigravity_cli_hook_command() -> String:
 	return "powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand %s" % encoded_invocation
 
 
+func _begin_codex_enable(target: String, target_name: String) -> bool:
+	if is_codex_setup_busy():
+		return false
+	_pending_codex_target = target
+	_pending_codex_target_name = target_name
+	_set_codex_target_enabled(target, false)
+	_persist_agent_state()
+	if _start_codex_setup("enable", target, target_name):
+		return true
+	_clear_pending_codex_enable()
+	_persist_agent_state()
+	configuration_failed.emit(target_name)
+	return false
+
+
+func _start_codex_setup(mode: String, target: String, target_name: String) -> bool:
+	if is_codex_setup_busy():
+		return false
+	_codex_setup_mode = mode
+	_codex_setup_target = target
+	_codex_setup_target_name = target_name
+	_codex_setup_thread = Thread.new()
+	var start_error := _codex_setup_thread.start(
+		Callable(self, "_run_codex_setup_task").bind(mode)
+	)
+	if start_error != OK:
+		_codex_setup_thread = null
+		_codex_setup_mode = ""
+		_codex_setup_target = ""
+		_codex_setup_target_name = ""
+		return false
+	state_changed.emit()
+	return true
+
+
+func _run_codex_setup_task(mode: String) -> Dictionary:
+	if mode == "enable":
+		var availability := get_codex_availability_status()
+		if not _codex_hook_trust_service.is_available(availability):
+			return {"stage": "unavailable", "status": availability}
+		if not is_codex_configured():
+			if not _run_codex_configuration_tool() or not is_codex_configured():
+				return {"stage": "configuration_failed"}
+	return {"stage": "status", "status": get_codex_hook_trust_status()}
+
+
+func _poll_codex_setup() -> void:
+	if _codex_setup_thread == null or _codex_setup_thread.is_alive():
+		return
+	var result: Dictionary = _codex_setup_thread.wait_to_finish()
+	var mode := _codex_setup_mode
+	var target := _codex_setup_target
+	var target_name := _codex_setup_target_name
+	_codex_setup_thread = null
+	_codex_setup_mode = ""
+	_codex_setup_target = ""
+	_codex_setup_target_name = ""
+	match String(result.get("stage", "")):
+		"unavailable":
+			var unavailable_status: Dictionary = result.get("status", {})
+			_clear_pending_codex_enable()
+			_persist_agent_state()
+			codex_unavailable.emit(
+				target_name, String(unavailable_status.get("message", ""))
+			)
+			state_changed.emit()
+		"configuration_failed":
+			_clear_pending_codex_enable()
+			_persist_agent_state()
+			configuration_failed.emit(target_name)
+			state_changed.emit()
+		"status":
+			_finish_codex_status_check(
+				mode, target, target_name, result.get("status", {})
+			)
+		_:
+			_clear_pending_codex_enable()
+			_persist_agent_state()
+			configuration_failed.emit(target_name)
+			state_changed.emit()
+
+
+func _finish_codex_status_check(
+	mode: String, target: String, target_name: String, status: Dictionary
+) -> void:
+	if _codex_hook_trust_service.is_trusted(status):
+		_clear_pending_codex_enable()
+		_set_codex_target_enabled(target, true)
+		_persist_agent_state()
+		codex_trust_ready.emit(target_name, target)
+		return
+	_pending_codex_target = target
+	_pending_codex_target_name = target_name
+	_set_codex_target_enabled(target, false)
+	_persist_agent_state()
+	if mode == "enable" or mode == "recheck":
+		codex_trust_required.emit(
+			target_name,
+			String(status.get("status", "")),
+			String(status.get("message", ""))
+		)
+
+
+func _stop_codex_setup() -> void:
+	if _codex_setup_thread == null:
+		return
+	_codex_setup_thread.wait_to_finish()
+	_codex_setup_thread = null
+	_codex_setup_mode = ""
+	_codex_setup_target = ""
+	_codex_setup_target_name = ""
+
+
 func _has_runtime_bridge_support(integration_home: String, bridge_path: String) -> bool:
 	var helper_text := _read_text_file(integration_home.path_join(RUNTIME_HELPER_FILE_NAME))
 	var bridge_text := _read_text_file(bridge_path)
 	return helper_text.contains(RUNTIME_BRIDGE_MARKER) and bridge_text.contains(
 		RUNTIME_BRIDGE_MARKER
 	)
+
+
+func _set_codex_target_enabled(target: String, value: bool) -> void:
+	match target:
+		TARGET_CODEX_APP:
+			codex_app_enabled = value
+		TARGET_TERMINAL:
+			terminal_codex_enabled = value
+		_:
+			codex_enabled = value
+			enabled = value
+
+
+func _is_codex_notification_target(target: String) -> bool:
+	return target in [TARGET_VSCODE, TARGET_CODEX_APP, TARGET_TERMINAL]
+
+
+func _clear_pending_codex_enable() -> void:
+	_pending_codex_target = ""
+	_pending_codex_target_name = ""
+
+
+func _codex_status_working_directory() -> String:
+	if OS.has_feature("editor"):
+		return ProjectSettings.globalize_path("res://")
+	var executable_directory := OS.get_executable_path().get_base_dir()
+	if not executable_directory.is_empty():
+		return executable_directory
+	return _user_profile_path()
 
 
 func _ensure_codex_configuration(target_name: String) -> bool:
@@ -988,6 +1223,14 @@ func _save_settings() -> void:
 	config.set_value("codex_app", "executable_path", codex_app_executable_path)
 	config.set_value("codex_terminal", "enabled", terminal_codex_enabled)
 	config.set_value("codex_terminal", "executable_path", terminal_executable_path)
+	config.set_value(
+		CODEX_SETUP_SETTINGS_SECTION, "pending_target", _pending_codex_target
+	)
+	config.set_value(
+		CODEX_SETUP_SETTINGS_SECTION,
+		"pending_target_name",
+		_pending_codex_target_name
+	)
 	config.set_value("opencode_terminal", "enabled", terminal_opencode_enabled)
 	config.set_value("opencode_vscode", "enabled", vscode_opencode_enabled)
 	config.set_value("opencode_app", "enabled", opencode_app_enabled)

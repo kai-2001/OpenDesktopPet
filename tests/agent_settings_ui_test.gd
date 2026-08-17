@@ -11,7 +11,9 @@ const TEST_PORT := 49876
 
 func _init() -> void:
 	_previous_codex_home = OS.get_environment("CODEX_HOME")
-	_test_codex_home = ProjectSettings.globalize_path("user://codex-ui-test-home")
+	_test_codex_home = ProjectSettings.globalize_path(
+		"user://codex-ui-test-home-" + str(Time.get_ticks_usec())
+	)
 	_ui_settings_path = ProjectSettings.globalize_path("user://ui_settings.cfg")
 	if FileAccess.file_exists(_ui_settings_path):
 		_previous_ui_settings = FileAccess.get_file_as_bytes(_ui_settings_path)
@@ -99,6 +101,15 @@ func _run_test() -> void:
 	var status_label := _main.find_child(
 		"AgentStatusLabel", true, false
 	) as Label
+	var codex_trust_dialog := _main.find_child(
+		"CodexHookTrustDialog", true, false
+	) as ConfirmationDialog
+	var codex_trust_recheck := _main.find_child(
+		"CodexHookTrustRecheckButton", true, false
+	) as Button
+	var codex_setup_progress := _main.find_child(
+		"CodexSetupProgressBar", true, false
+	) as ProgressBar
 	var executable_path := _main.find_child(
 		"VscodeExecutablePath", true, false
 	) as LineEdit
@@ -142,6 +153,29 @@ func _run_test() -> void:
 	)
 	_assert_true(port_spin_box != null, "Codex port input exists")
 	_assert_true(status_label != null, "Codex status label exists")
+	_assert_true(codex_trust_dialog != null, "Codex trust guidance dialog exists")
+	_assert_true(codex_trust_recheck != null, "Codex trust page review action exists")
+	_assert_true(codex_setup_progress != null, "Codex setup progress indicator exists")
+	_assert_true(
+		not codex_trust_recheck.visible,
+		"Codex trust page review action stays hidden without pending review"
+	)
+	_assert_true(
+		codex_trust_dialog.dialog_text.contains("我已信任，檢查通知"),
+		"Codex trust dialog explains manual completion verification"
+	)
+	_assert_true(
+		codex_trust_dialog.dialog_text.contains("顯示 [x] 才算完成信任"),
+		"Codex trust dialog explains the trusted checkbox state"
+	)
+	_assert_true(
+		codex_trust_dialog.dialog_text.contains("按 Esc 返回 Hook 清單"),
+		"Codex trust dialog explains how to leave hook review"
+	)
+	_assert_true(
+		codex_trust_dialog.ok_button_text == "開啟 Codex 信任畫面",
+		"Codex trust dialog does not pretend the pet grants trust"
+	)
 	_assert_true(executable_path != null, "VS Code executable path input exists")
 	_assert_true(executable_browse != null, "VS Code executable browse button exists")
 	_assert_true(executable_hint != null, "VS Code executable validation hint exists")

@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$bridgePath = Join-Path $projectRoot 'tools\codex_notify.ps1'
+$bridgePath = Join-Path $projectRoot 'tools\codex_stop_notify.ps1'
 $testRoot = Join-Path $env:TEMP (
     'OpenDesktopPet-Codex-Router-Test-' + [guid]::NewGuid().ToString('N')
 )
@@ -11,7 +11,6 @@ $oldCodexHome = $env:CODEX_HOME
 $oldTermProgram = $env:TERM_PROGRAM
 $oldVscodePid = $env:VSCODE_PID
 $oldSkipProcessTree = $env:OPEN_DESKTOP_PET_SKIP_PROCESS_TREE
-$oldPreviousNotifyLog = $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG
 
 function Assert-Router([bool]$condition, [string]$message) {
     if (-not $condition) {
@@ -37,7 +36,27 @@ function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
     try {
         $port = $udp.Client.LocalEndPoint.Port
 		Save-Runtime $port
-		& $bridgePath $eventJson | Out-Null
+		$startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+		$startInfo.FileName = 'powershell.exe'
+		$startInfo.ArgumentList.Add('-NoProfile')
+		$startInfo.ArgumentList.Add('-ExecutionPolicy')
+		$startInfo.ArgumentList.Add('Bypass')
+		$startInfo.ArgumentList.Add('-File')
+		$startInfo.ArgumentList.Add($bridgePath)
+		$startInfo.UseShellExecute = $false
+		$startInfo.RedirectStandardInput = $true
+		$startInfo.RedirectStandardOutput = $true
+		$startInfo.RedirectStandardError = $true
+		$process = [System.Diagnostics.Process]::Start($startInfo)
+		$process.StandardInput.Write($eventJson)
+		$process.StandardInput.Close()
+		if (-not $process.WaitForExit(10000)) {
+			$process.Kill()
+			throw 'The Codex Stop-hook bridge timed out.'
+		}
+		Assert-Router ($process.ExitCode -eq 0) 'The Codex Stop-hook bridge failed.'
+		Assert-Router ([string]::IsNullOrWhiteSpace($process.StandardOutput.ReadToEnd())) `
+			'The Stop hook must not write model-visible output.'
         $udp.Client.ReceiveTimeout = 3000
         $remote = [System.Net.IPEndPoint]::new([System.Net.IPAddress]::Any, 0)
         try {
@@ -68,37 +87,28 @@ try {
     $env:TERM_PROGRAM = 'vscode'
     $env:VSCODE_PID = '1234'
 
-    $previousNotifyScript = Join-Path $testRoot 'previous-notify.ps1'
-    $previousNotifyLog = Join-Path $testRoot 'previous-notify-event.json'
-    @'
-param([string]$eventJson)
-Set-Content -LiteralPath $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG -Value $eventJson -Encoding UTF8
-'@ | Set-Content -LiteralPath $previousNotifyScript -Encoding UTF8
-    $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG = $previousNotifyLog
-    [pscustomobject]@{
-        command = @('powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $previousNotifyScript)
-    } | ConvertTo-Json -Compress | Set-Content -LiteralPath (
-        Join-Path $codexHome 'open_desktop_pet_previous_notify.json'
-    ) -Encoding UTF8
-
-    $vscodeEvent = '{"type":"agent-turn-complete","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","thread-id":"vscode","turn-id":"1"}'
-    $payload = Receive-Notification $vscodeEvent $true
+	$vscodeEvent = '{"hook_event_name":"Stop","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","session_id":"vscode","turn_id":"1","last_assistant_message":"完成：中文測試「桌寵」"}'
+	$payload = Receive-Notification $vscodeEvent $true
     Assert-Router ($payload.source -eq 'codex_vscode') 'VS Code Codex source was not classified.'
     Assert-Router ($payload.target_app -eq 'vscode') 'VS Code Codex target was not classified.'
     Assert-Router ($payload.agent -eq 'codex') 'Codex agent was not normalized.'
     Assert-Router ($payload.target_executable -eq 'Code.exe') 'VS Code executable target was not normalized.'
-    Assert-Router (Test-Path -LiteralPath $previousNotifyLog) 'Previous Codex notify was not invoked.'
+	Assert-Router ($payload.session_id -eq 'vscode') 'Stop-hook session id was not preserved.'
+	Assert-Router ($payload.thread_id -eq 'vscode') 'Stop-hook session id must map to thread id.'
+
+	$unsupportedEvent = '{"hook_event_name":"PostToolUse","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","session_id":"vscode","turn_id":"2"}'
+	Receive-Notification $unsupportedEvent $false | Out-Null
 
     $env:TERM_PROGRAM = ''
     $env:VSCODE_PID = ''
-    $appEvent = '{"type":"agent-turn-complete","cwd":"C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app","thread-id":"app","turn-id":"1"}'
+	$appEvent = '{"hook_event_name":"Stop","cwd":"C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app","session_id":"app","turn_id":"1"}'
     Receive-Notification $appEvent $false | Out-Null
 	$script:enabledTargets.codex_app = $true
     $payload = Receive-Notification $appEvent $true
     Assert-Router ($payload.source -eq 'codex_app') 'Codex App source was not classified.'
     Assert-Router ($payload.target_app -eq 'codex_app') 'Codex App target was not classified.'
 
-    $terminalEvent = '{"type":"agent-turn-complete","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","thread-id":"terminal","turn-id":"1"}'
+	$terminalEvent = '{"hook_event_name":"Stop","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","session_id":"terminal","turn_id":"1"}'
     Receive-Notification $terminalEvent $false | Out-Null
 	$script:enabledTargets.codex_terminal = $true
     $payload = Receive-Notification $terminalEvent $true
@@ -112,7 +122,6 @@ Set-Content -LiteralPath $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG -Value $event
     $env:TERM_PROGRAM = $oldTermProgram
     $env:VSCODE_PID = $oldVscodePid
     $env:OPEN_DESKTOP_PET_SKIP_PROCESS_TREE = $oldSkipProcessTree
-    $env:OPEN_DESKTOP_PET_PREVIOUS_NOTIFY_LOG = $oldPreviousNotifyLog
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force
     }

@@ -1,6 +1,6 @@
 # Agent 通知橋接器
 
-`codex_notify.ps1`、`vscode_agent_notify.ps1`、`opencode_notify.ps1`、
+`codex_stop_notify.ps1`、`vscode_agent_notify.ps1`、`opencode_notify.ps1`、
 `claude_code_notify.ps1`、`gemini_cli_notify.ps1` 與 `antigravity_cli_notify.ps1` 是 Open Desktop Pet 的 Windows 本機通知橋接器。Codex App、VS Code Codex、Codex CLI、VS Code Copilot、終端機 OpenCode、Claude Code、Gemini CLI 與 Antigravity CLI
 共用桌寵的一個 `127.0.0.1` UDP 通訊埠；橋接器會先判斷來源與目標屬地，
 桌寵再統一處理氣泡與視窗切換。
@@ -20,10 +20,10 @@
 所有橋接器只讀這一份 runtime 檔。桌寵結束時只會刪除屬於自己的註冊，
 不再將全域 `*_enabled.txt` 寫成 `0`；`.codex` 也不再保存桌寵的啟用旗標。
 
-橋接器只記錄事件類型、工作目錄與處理結果，診斷檔位於：
+Codex 橋接器只記錄 Stop 事件、工作目錄與處理結果，診斷檔位於：
 
 ```text
-%TEMP%\OpenDesktopPet-codex-notify.log
+%TEMP%\OpenDesktopPet-codex-stop-hook.log
 ```
 
 Claude Code bridge 的診斷檔為 `%TEMP%\OpenDesktopPet-claude-code-notify.log`。
@@ -44,12 +44,17 @@ Antigravity CLI bridge 的診斷檔為 `%TEMP%\OpenDesktopPet-antigravity-cli-no
 Install-Codex-Integration.cmd
 ```
 
-桌寵會先在本機檢查橋接器、安裝標記與 Codex `config.toml`，不會為了檢查而啟動 PowerShell。
-只有檢查到檔案缺失或 `notify` 指向失效時，才會自動執行安裝器。安裝器會把橋接器複製到
-使用者的 `%USERPROFILE%\.codex`，並更新該使用者的 Codex `config.toml`。
-若原本已有不同的 `notify` 設定，會先保存到
-`%USERPROFILE%\.codex\open_desktop_pet_previous_notify.json`，桌寵通知完成後仍會轉發給原本的
-notify 命令；解除安裝時會恢復原本設定。第一次安裝或修復後仍須重新啟動 VS Code 或 Codex。
+桌寵會先在本機檢查橋接器、安裝標記與 Codex `hooks.json`，不會為了檢查而啟動 PowerShell。
+只有檢查到檔案缺失或 Stop hook 失效時，才會自動執行安裝器。安裝器會把橋接器複製到
+`%USERPROFILE%\.open-desktop-pet`，並只在 `%USERPROFILE%\.codex\hooks.json` 新增或更新
+桌寵自己的非同步 `Stop` handler；原本的其他 hook 會保留。舊版 `notify` 桌寵橋接會在安裝時
+自動遷移並移除，原本不屬於桌寵的 notify 命令則會保留。第一次安裝或修復後須重新啟動
+VS Code 或 Codex，並依 Codex 提示檢閱及信任新的 hook。
+
+第一次從桌寵開啟任一 Codex 通知時，桌寵會向 Codex 查詢 Hook 的實際信任狀態。
+若尚未信任、內容已變更或被停用，開關不會顯示為成功；桌寵會顯示引導視窗，
+由使用者開啟 Codex CLI、輸入 `/hooks` 並在 Codex 的官方審查頁面完成確認。
+回到桌寵按「重新檢查」後，只有 Codex 回報 Hook 已啟用且為 `trusted`，才會真正開啟通知。
 
 ## 安裝 VS Code Copilot user hook
 
@@ -217,7 +222,7 @@ tools/
 ├─ uninstall_open_desktop_pet.ps1
 ├─ Install-Codex-Integration.cmd
 ├─ install_codex_integration.ps1
-├─ codex_notify.ps1
+├─ codex_stop_notify.ps1
 ├─ install_copilot_integration.ps1
 ├─ vscode_agent_notify.ps1
 ├─ install_opencode_integration.ps1
@@ -247,29 +252,41 @@ tools/
 
 ## 手動設定
 
-在使用者的 Codex 設定檔：
+在使用者的 Codex hook 設定檔：
 
 ```text
-%USERPROFILE%\.codex\config.toml
+%USERPROFILE%\.codex\hooks.json
 ```
 
 加入以下內容，將路徑換成實際安裝位置：
 
-```toml
-notify = [
-  "powershell.exe",
-  "-NoProfile",
-  "-File",
-  "C:\\Apache24\\htdocs\\OpenDesktopPet\\tools\\codex_notify.ps1"
-]
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Apache24\\\\htdocs\\\\OpenDesktopPet\\\\tools\\\\codex_stop_notify.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Apache24\\\\htdocs\\\\OpenDesktopPet\\\\tools\\\\codex_stop_notify.ps1\"",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
 ```
 
-Codex App、Codex IDE 擴充功能與 Codex CLI 共用這個通知設定。桌寵會依來源
+Codex App、Codex IDE 擴充功能與 Codex CLI 共用這個 Stop hook。它只在一輪聊天停止時通知，
+不會把中途的模型工具往返誤當成完成。桌寵會依來源
 開關決定是否轉發：VS Code Codex 轉回 VS Code、Codex App 轉回 Codex App，
 外部 Codex CLI 轉回終端機。從 VS Code 內建終端機啟動的 CLI 會歸到 VS Code。
 
-若不想再使用通知，從 `config.toml` 移除 `notify` 設定後重新啟動 Codex
-或 VS Code 即可。
+若不想再使用通知，請執行 `install_codex_integration.ps1 -Uninstall`；它只移除桌寵自己的
+Stop handler，不會刪除其他 Codex hooks。完成後重新啟動 Codex 或 VS Code。
 
 ## VS Code Agent Hook 測試
 

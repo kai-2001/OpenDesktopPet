@@ -23,6 +23,8 @@ signal agent_claude_terminal_enabled_toggled(enabled: bool)
 signal agent_gemini_terminal_enabled_toggled(enabled: bool)
 signal agent_agy_terminal_enabled_toggled(enabled: bool)
 signal agent_port_changed(value: float)
+signal codex_trust_review_requested
+signal codex_trust_recheck_requested
 signal vscode_executable_path_changed(path: String)
 signal codex_app_executable_path_changed(path: String)
 signal terminal_executable_path_changed(path: String)
@@ -503,6 +505,59 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	status_label.name = "AgentStatusLabel"
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(status_label)
+	var codex_setup_progress := ProgressBar.new()
+	codex_setup_progress.name = "CodexSetupProgressBar"
+	codex_setup_progress.custom_minimum_size.y = 5
+	codex_setup_progress.show_percentage = false
+	codex_setup_progress.indeterminate = true
+	codex_setup_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	codex_setup_progress.visible = false
+	content.add_child(codex_setup_progress)
+	var codex_trust_review_button := Button.new()
+	codex_trust_review_button.name = "CodexHookTrustPageReviewButton"
+	codex_trust_review_button.text = "開啟 Codex 信任畫面"
+	codex_trust_review_button.tooltip_text = "前往 Codex 檢視並信任桌寵的 Stop Hook"
+	codex_trust_review_button.custom_minimum_size.y = 40
+	codex_trust_review_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	codex_trust_review_button.visible = false
+	codex_trust_review_button.pressed.connect(
+		func() -> void: codex_trust_review_requested.emit()
+	)
+	var codex_trust_recheck_button := Button.new()
+	codex_trust_recheck_button.name = "CodexHookTrustRecheckButton"
+	codex_trust_recheck_button.text = "我已信任，檢查通知"
+	codex_trust_recheck_button.tooltip_text = "檢查桌寵的 Codex Stop Hook 是否已受信任"
+	codex_trust_recheck_button.custom_minimum_size.y = 40
+	codex_trust_recheck_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	codex_trust_recheck_button.visible = false
+	codex_trust_recheck_button.pressed.connect(
+		func() -> void: codex_trust_recheck_requested.emit()
+	)
+	var codex_trust_actions := HBoxContainer.new()
+	codex_trust_actions.add_theme_constant_override("separation", 10)
+	codex_trust_actions.add_child(codex_trust_review_button)
+	codex_trust_actions.add_child(codex_trust_recheck_button)
+	content.add_child(codex_trust_actions)
+	var codex_trust_dialog := ConfirmationDialog.new()
+	codex_trust_dialog.name = "CodexHookTrustDialog"
+	codex_trust_dialog.title = "信任 Codex 通知 Hook"
+	codex_trust_dialog.dialog_text = (
+		"Codex 必須先信任桌寵的 Stop Hook，通知才會生效。\n\n"
+		+ "1. 按「開啟 Codex 信任畫面」。\n"
+		+ "2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n"
+		+ "3. 在 Hook 清單選取 Stop，再按 Enter 開啟詳細內容。\n"
+		+ "4. 找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。"
+		+ "[ ] 表示尚未信任；顯示 [x] 才算完成信任。\n"
+		+ "5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n"
+		+ "6. 回到桌寵，按「我已信任，檢查通知」。\n\n"
+		+ "選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。\n\n"
+		+ "不需另外安裝 CLI；桌寵會使用已安裝 Codex 產品提供的核心。\n\n"
+		+ "審查選單會顯示在「Codex Hook Review」PowerShell 視窗，"
+		+ "不會出現在 GPT Codex 或 VS Code 面板裡。"
+	)
+	codex_trust_dialog.ok_button_text = "開啟 Codex 信任畫面"
+	codex_trust_dialog.cancel_button_text = "稍後"
+	agent_scroll.add_child(codex_trust_dialog)
 	content.add_child(HSeparator.new())
 
 	var vscode_controls := _build_executable_path_controls(
@@ -710,6 +765,10 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	return {
 		"agent_port_spin_box": port_spin_box,
 		"agent_status_label": status_label,
+		"codex_setup_progress_bar": codex_setup_progress,
+		"codex_trust_review_button": codex_trust_review_button,
+		"codex_trust_recheck_button": codex_trust_recheck_button,
+		"codex_trust_dialog": codex_trust_dialog,
 		"codex_enabled_toggle": codex_toggle,
 		"copilot_enabled_toggle": copilot_toggle,
 		"vscode_opencode_enabled_toggle": vscode_opencode_toggle,
