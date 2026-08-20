@@ -10,6 +10,8 @@ const SLEEP_ITEM_ID := 5
 const DETAILS_ITEM_ID := 6
 const EXIT_ITEM_ID := 7
 const RECOVER_ITEM_ID := 22
+const REMINDER_VIEW_ALL_ITEM_ID := 8
+const REMINDER_ITEM_ID_BASE := 1000
 
 
 static func populate(
@@ -38,5 +40,27 @@ static func populate(
 	menu.add_separator()
 	menu.add_item("📊  開啟詳細面板", DETAILS_ITEM_ID)
 	menu.add_item("🏠  找回桌寵", RECOVER_ITEM_ID)
+
+
+static func populate_today_reminders(
+	menu: PopupMenu, reminders: Array[Dictionary]
+) -> void:
+	if reminders.is_empty():
+		return
+	menu.add_separator()
+	menu.add_item("今日待辦", REMINDER_VIEW_ALL_ITEM_ID)
+	menu.set_item_disabled(menu.item_count - 1, true)
+	for index: int in mini(reminders.size(), 4):
+		var reminder: Dictionary = reminders[index]
+		var time := "整日" if bool(reminder.get("all_day", false)) else String(reminder.get("due_time", ""))
+		menu.add_item(
+			"  %s  %s" % [time, String(reminder.get("title", ""))],
+			REMINDER_ITEM_ID_BASE + index
+		)
+	if reminders.size() > 4:
+		menu.add_item("查看全部今日待辦", REMINDER_VIEW_ALL_ITEM_ID)
+
+
+static func append_exit(menu: PopupMenu) -> void:
 	menu.add_separator()
 	menu.add_item("❌  儲存並離開", EXIT_ITEM_ID)

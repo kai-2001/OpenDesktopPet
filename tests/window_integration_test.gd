@@ -74,15 +74,19 @@ func _init() -> void:
 				main.context_menu.get_item_text(index),
 				"status indicator action %d uses the same label" % index
 			)
-		_assert_equal(
-			main._tray_menu.get_item_id(9),
-			22,
+		var recover_item_index := -1
+		for index in main._tray_menu.item_count:
+			if main._tray_menu.get_item_id(index) == 22:
+				recover_item_index = index
+				break
+		_assert_true(
+			recover_item_index >= 0,
 			"status indicator menu contains the recover-pet action"
 		)
 		_assert_equal(
-			main._tray_menu.get_item_id(11),
+			main._tray_menu.get_item_id(main._tray_menu.item_count - 1),
 			7,
-			"status indicator menu keeps the save-and-exit action"
+			"status indicator menu keeps save-and-exit as the final action"
 		)
 	_assert_equal(
 		main.pet.get_interaction_label("feed", "__fallback__"),
@@ -237,7 +241,7 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	_assert_true(main._stats_window.visible, "details window opens on first request")
-	main._select_stats_tab(1)
+	main._select_stats_tab(2)
 	await process_frame
 	_assert_true(
 		main._visual_scale_slider.visible and main._visual_scale_slider.size.y > 0.0,

@@ -55,8 +55,8 @@ func _run_test() -> void:
 	var character_list := _main.find_child("CharacterList", true, false) as ItemList
 	_assert_true(stats_window != null, "details window exists")
 	_assert_true(tabs != null, "details tabs exist")
-	_assert_true(tabs.get_tab_count() == 4, "details window has four tabs")
-	_assert_true(_main._stats_tab_buttons[2].text == "Agent", "Agent tab uses the short label")
+	_assert_true(tabs.get_tab_count() == 5, "details window has five tabs")
+	_assert_true(_main._stats_tab_buttons[3].text == "Agent", "Agent tab uses the short label")
 	_assert_true(character_list != null, "character list exists")
 
 	var codex_toggle := _main.find_child(
@@ -311,14 +311,14 @@ func _run_test() -> void:
 		terminal_path.text.is_empty(),
 		"terminal executable detection is deferred until the Agent tab is opened"
 	)
-	tabs.current_tab = 2
+	tabs.current_tab = 3
 	for _frame in 120:
 		await process_frame
 		if not executable_path.text.is_empty() \
 				or not codex_app_path.text.is_empty() \
 				or not terminal_path.text.is_empty():
 			break
-	_assert_true(tabs.current_tab == 2, "Agent notification tab can be selected")
+	_assert_true(tabs.current_tab == 3, "Agent notification tab can be selected")
 	if OS.get_name() == "Windows":
 		_assert_true(
 			executable_path.text.is_empty()
@@ -335,9 +335,9 @@ func _run_test() -> void:
 			or FileAccess.file_exists(terminal_path.text),
 			"Agent tab refreshes the terminal executable path when it can be detected"
 		)
-	tabs.current_tab = 3
+	tabs.current_tab = 4
 	await process_frame
-	_assert_true(tabs.current_tab == 3, "character tab can be selected")
+	_assert_true(tabs.current_tab == 4, "character tab can be selected")
 
 	_main.call("_prepare_shutdown")
 	_assert_true(

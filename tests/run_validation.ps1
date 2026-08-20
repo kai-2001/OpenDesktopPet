@@ -113,10 +113,29 @@ try {
     $gameplayOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/gameplay_state_test.gd' 2>&1
     $gameplayExitCode = $LASTEXITCODE
     $ErrorActionPreference = $previousErrorActionPreference
-    $gameplayOutput | Write-Output
+	$gameplayOutput | Write-Output
     if ($gameplayExitCode -ne 0 -or -not ($gameplayOutput -match 'GAMEPLAY_STATE_TEST_OK')) {
-        throw 'Gameplay state validation failed.'
-    }
+		throw 'Gameplay state validation failed.'
+	}
+
+	$ErrorActionPreference = 'Continue'
+	$taskReminderLog = Join-Path $isolatedAppData 'task-reminder-test.log'
+	$taskReminderOutput = & $GodotExe --headless --log-file $taskReminderLog --path $projectRoot --script 'res://tests/task_reminder_test.gd' 2>&1
+	$taskReminderExitCode = $LASTEXITCODE
+	$ErrorActionPreference = $previousErrorActionPreference
+	$taskReminderOutput | Write-Output
+	for ($attempt = 0; $attempt -lt 20 -and -not (Test-Path -LiteralPath $taskReminderLog); $attempt++) {
+		Start-Sleep -Milliseconds 50
+	}
+	$taskReminderLogOutput = if (Test-Path -LiteralPath $taskReminderLog) {
+		Get-Content -LiteralPath $taskReminderLog -Raw -Encoding UTF8
+	} else {
+		''
+	}
+	$taskReminderLogOutput | Write-Output
+	if ($taskReminderExitCode -ne 0 -or -not ($taskReminderLogOutput -match 'TASK_REMINDER_TEST_OK')) {
+		throw 'Task reminder validation failed.'
+	}
 
     $ErrorActionPreference = 'Continue'
     $agentNotificationReceiverOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/local_agent_notification_receiver_test.gd' 2>&1

@@ -38,6 +38,7 @@ var focus_mode := false
 var visual_scale := PetVisualScaleScript.DEFAULT_VALUE
 var interaction_label: Callable
 var interaction_icon: Callable
+var reminder_coordinator
 var details_controller
 var window: Window
 
@@ -82,9 +83,10 @@ func build(owner: Node) -> Dictionary:
 	navigation.add_theme_constant_override("separation", 8)
 	navigation_margin.add_child(navigation)
 	var tab_buttons: Array[Button] = []
-	for tab_index: int in 4:
+	var tab_names: Array[String] = ["狀態", "待辦", "設定", "Agent", "角色"]
+	for tab_index: int in tab_names.size():
 		var navigation_button := Button.new()
-		navigation_button.text = ["狀態", "設定", "Agent", "角色"][tab_index]
+		navigation_button.text = tab_names[tab_index]
 		navigation_button.custom_minimum_size.y = 40
 		navigation_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		navigation_button.focus_mode = Control.FOCUS_NONE
@@ -130,6 +132,9 @@ func build(owner: Node) -> Dictionary:
 	details_controller.interaction_label = interaction_label
 	details_controller.interaction_icon = interaction_icon
 	var status_refs: Dictionary = details_controller.build_status_tab(tabs)
+	var reminder_refs: Dictionary = details_controller.build_reminders_tab(
+		tabs, reminder_coordinator
+	)
 	var settings_refs: Dictionary = details_controller.build_settings_tab(tabs)
 	var agent_refs: Dictionary = details_controller.build_agent_tab(tabs)
 	var character_refs: Dictionary = details_controller.build_character_tab(
@@ -142,6 +147,7 @@ func build(owner: Node) -> Dictionary:
 		"tab_buttons": tab_buttons,
 		"details_controller": details_controller,
 		"status_refs": status_refs,
+		"reminder_refs": reminder_refs,
 		"settings_refs": settings_refs,
 		"agent_refs": agent_refs,
 		"character_refs": character_refs,
