@@ -18,6 +18,11 @@ function Assert-Installer([bool]$condition, [string]$message) {
 	}
 }
 
+function Test-StartsWithJsonObject([string]$path) {
+	$bytes = [System.IO.File]::ReadAllBytes($path)
+	return $bytes.Length -gt 0 -and $bytes[0] -eq 0x7B
+}
+
 function Get-DesktopPetHandlers($config) {
 	$handlers = @()
 	foreach ($group in @($config.hooks.Stop)) {
@@ -68,6 +73,8 @@ try {
 	& $installerPath | Write-Output
 	$installedHooksText = Get-Content -LiteralPath $hooksPath -Raw -Encoding UTF8
 	$installedHooks = $installedHooksText | ConvertFrom-Json
+	Assert-Installer (Test-StartsWithJsonObject $hooksPath) `
+		'The generated hooks.json must be UTF-8 without a BOM.'
 	$desktopHandlers = @(Get-DesktopPetHandlers $installedHooks)
 	Assert-Installer ($installedHooks.description -eq 'keep me') `
 		'The installer must preserve top-level hook metadata.'
@@ -77,8 +84,8 @@ try {
 		'The installer must preserve unrelated Stop groups.'
 	Assert-Installer ($desktopHandlers.Count -eq 1) `
 		'The installer must add exactly one OpenDesktopPet Stop handler.'
-	Assert-Installer ($desktopHandlers[0].async -eq $true) `
-		'The notification Stop hook must be asynchronous.'
+	Assert-Installer ($null -eq $desktopHandlers[0].PSObject.Properties['async']) `
+		'The notification Stop hook must not declare an unsupported async mode.'
 	Assert-Installer ($desktopHandlers[0].timeout -eq 5) `
 		'The notification Stop hook must use the bounded timeout.'
 	Assert-Installer (
@@ -87,6 +94,8 @@ try {
 
 	& $installerPath | Out-Null
 	$reinstalledHooksText = Get-Content -LiteralPath $hooksPath -Raw -Encoding UTF8
+	Assert-Installer (Test-StartsWithJsonObject $hooksPath) `
+		'Reinstalling must keep hooks.json in UTF-8 without a BOM.'
 	Assert-Installer ($reinstalledHooksText -eq $installedHooksText) `
 		'Reinstalling the same Stop hook must be idempotent.'
 
