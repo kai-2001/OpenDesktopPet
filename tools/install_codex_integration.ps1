@@ -27,8 +27,9 @@ $legacyBridgeFileName = [IO.Path]::GetFileName($legacyNotifyBridge)
 
 function Save-HookConfig($config) {
 	$tempPath = "$hookConfigPath.open-desktop-pet.tmp"
-	$config | ConvertTo-Json -Depth 20 |
-		Set-Content -LiteralPath $tempPath -Encoding UTF8
+	$json = $config | ConvertTo-Json -Depth 20
+	$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+	[System.IO.File]::WriteAllText($tempPath, $json, $utf8NoBom)
 	Move-Item -LiteralPath $tempPath -Destination $hookConfigPath -Force
 }
 
@@ -322,7 +323,6 @@ $stopHandler = [pscustomobject]@{
 	type = 'command'
 	command = $windowsCommand
 	commandWindows = $windowsCommand
-	async = $true
 	timeout = 5
 }
 $stopGroup = [pscustomobject]@{ hooks = @($stopHandler) }
