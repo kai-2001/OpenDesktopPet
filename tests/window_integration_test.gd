@@ -44,6 +44,48 @@ func _init() -> void:
 		"fallback",
 		"missing character dialogue uses the built-in fallback"
 	)
+	_assert_true(
+		not main.task_reminder_badge.visible,
+		"task reminder badge is hidden when no today reminder exists"
+	)
+	var today_reminder: Dictionary = main._task_reminder_coordinator.create_reminder(
+		"徽章整合測試", Time.get_date_string_from_system(false), "", true
+	)
+	await process_frame
+	main._show_startup_message()
+	await process_frame
+	await process_frame
+	_assert_true(
+		main.bubble.visible and main.bubble_label.text.contains("徽章整合測試"),
+		"today reminder replaces the normal startup bubble"
+	)
+	_assert_true(main.task_reminder_badge.visible, "today reminder displays the compact badge")
+	var badge_center: Vector2 = main.task_reminder_badge.get_global_rect().get_center()
+	_assert_true(
+		main._is_interactive_overlay_at(badge_center),
+		"task reminder badge is handled as an interactive overlay"
+	)
+	_assert_true(
+		Geometry2D.is_point_in_polygon(
+			badge_center, main.get_window().mouse_passthrough_polygon
+		),
+		"native desktop hit region includes the visible task reminder badge"
+	)
+	main.task_reminder_badge.pressed.emit()
+	await process_frame
+	await process_frame
+	_assert_true(
+		is_instance_valid(main._stats_window) and main._stats_tabs.current_tab == 1,
+		"clicking the task reminder badge opens the reminders tab"
+	)
+	main._task_reminder_coordinator.set_status(
+		String(today_reminder.get("id", "")), "done"
+	)
+	await process_frame
+	_assert_true(
+		not main.task_reminder_badge.visible,
+		"completing the final today reminder hides the badge"
+	)
 	var bubble_token_before_missing_idle: int = main._bubble_token
 	main._say_configured_dialogue("__missing_idle_dialogue__", 0.01)
 	_assert_equal(
@@ -172,7 +214,7 @@ func _init() -> void:
 	if bubble_pet_overlap.x < 0:
 		bubble_pet_overlap = bubble_rect.get_center()
 	_assert_true(
-		main._is_speech_overlay_at(bubble_pet_overlap),
+		main._is_interactive_overlay_at(bubble_pet_overlap),
 		"speech pass-through test uses the visible bubble area"
 	)
 	_assert_true(

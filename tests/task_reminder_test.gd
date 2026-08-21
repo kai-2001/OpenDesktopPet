@@ -1,6 +1,9 @@
 extends SceneTree
 
 const TaskReminderCoordinatorScript = preload("res://scripts/task_reminder_coordinator.gd")
+const TaskReminderPresentationCoordinatorScript = preload(
+	"res://scripts/task_reminder_presentation_coordinator.gd"
+)
 const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
 const TaskReminderRepositoryScript = preload("res://scripts/task_reminder_repository.gd")
 const TaskReminderSectionScript = preload("res://scripts/task_reminder_section.gd")
@@ -22,6 +25,8 @@ func _run() -> void:
 	var coordinator = TaskReminderCoordinatorScript.new()
 	coordinator.repository = repository
 	coordinator.initialize()
+	var presentation = TaskReminderPresentationCoordinatorScript.new()
+	presentation.configure(coordinator)
 	var migrated_progress := repository.create(
 		"舊進行中資料", Time.get_date_string_from_system(false), "", true, "in_progress"
 	)
@@ -47,10 +52,13 @@ func _run() -> void:
 	)
 	_assert_true(not created.is_empty(), "today reminder can be created")
 	_assert_equal(coordinator.get_open_today_reminders().size(), 1, "today open reminder is listed")
-	_assert_true(coordinator.has_startup_notice(), "today reminder requests startup notice")
 	_assert_true(
-		coordinator.startup_notice_text().contains("測試今天的待辦"),
-		"startup notice contains the reminder title"
+		not presentation.startup_message().is_empty(),
+		"today reminder requests a startup presentation"
+	)
+	_assert_true(
+		presentation.startup_message().contains("測試今天的待辦"),
+		"startup presentation contains the reminder title"
 	)
 
 	var reopened = TaskReminderCoordinatorScript.new()
@@ -58,10 +66,9 @@ func _run() -> void:
 	reopened_repository.save_path = TEST_PATH
 	reopened.repository = reopened_repository
 	reopened.initialize()
-	_assert_true(
-		reopened.has_startup_notice(),
-		"reopening the app still requests the today's reminder notice"
-	)
+	var reopened_presentation = TaskReminderPresentationCoordinatorScript.new()
+	reopened_presentation.configure(reopened)
+	_assert_true(not reopened_presentation.startup_message().is_empty(), "reopening retains the startup presentation")
 
 	var updated := coordinator.set_status(
 		String(created.get("id", "")), "done"
@@ -72,9 +79,10 @@ func _run() -> void:
 		"completed reminder is no longer open today"
 	)
 	_assert_true(
-		not coordinator.has_startup_notice(),
-		"completed reminder does not request startup notice"
+		coordinator.get_open_today_reminders().is_empty(),
+		"completed reminder clears the today reminder query"
 	)
+	_assert_equal(presentation.startup_message(), "", "completed reminder clears the startup presentation")
 	_assert_context_menu_today_section_visibility()
 
 	for index: int in 9:

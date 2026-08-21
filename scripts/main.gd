@@ -10,6 +10,9 @@ const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const StatsWindowCoordinatorScript = preload("res://scripts/stats_window_coordinator.gd")
 const TaskReminderCoordinatorScript = preload("res://scripts/task_reminder_coordinator.gd")
+const TaskReminderPresentationCoordinatorScript = preload(
+	"res://scripts/task_reminder_presentation_coordinator.gd"
+)
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
 const CharacterEffectPreferencesScript = preload(
 	"res://scripts/character_effect_preferences.gd"
@@ -24,8 +27,7 @@ const DEFAULT_FOCUS_MODE := false
 const AGENT_NOTIFICATION_DURATION_SECONDS := 60.0
 const AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3.0
 const STARTUP_DIALOGUE_DURATION_SECONDS := 5.0
-const STARTUP_REMINDER_DELAY_SECONDS := 5.2
-const TASK_REMINDER_DURATION_SECONDS := 8.0
+const STARTUP_REMINDER_DURATION_SECONDS := 8.0
 const REMINDERS_TAB_INDEX := 1
 const AGENT_TAB_INDEX := 3
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
@@ -36,6 +38,7 @@ const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 @onready var bubble: PanelContainer = $SpeechBubble
 @onready var bubble_label: Label = $SpeechBubble/Margin/Label
 @onready var bubble_tail: Polygon2D = $SpeechTail
+@onready var task_reminder_badge: TaskReminderBadge = $TaskReminderBadge
 @onready var context_menu: PopupMenu = $ContextMenu
 var _stats_window: Window
 var _stats_tabs: TabContainer
@@ -120,6 +123,7 @@ var _character_coordinator
 var _input_controller
 var _stats_window_coordinator
 var _task_reminder_coordinator
+var _task_reminder_presentation
 var _bubble_token := 0
 var _shutting_down := false
 var _idle_count := 0
@@ -137,7 +141,6 @@ var _focus_mode := DEFAULT_FOCUS_MODE
 var _agent_controller: AgentIntegrationController
 var _details_window_controller
 var _agent_notification_active := false
-var _pending_task_reminder_notice := ""
 var _active_agent_target_app := AgentIntegrationControllerScript.TARGET_VSCODE
 var _active_agent := "codex"
 
@@ -154,7 +157,7 @@ func _ready() -> void:
 		state,
 		pet,
 		_window_service,
-		Callable(self, "_is_speech_overlay_at"),
+		Callable(self, "_is_interactive_overlay_at"),
 		Callable(self, "_is_agent_notification_active"),
 		Callable(self, "_interrupt_autonomous_action")
 	)
@@ -175,8 +178,13 @@ func _ready() -> void:
 	state.configure_profile(pet.get_character_id())
 	_task_reminder_coordinator = TaskReminderCoordinatorScript.new()
 	_task_reminder_coordinator.initialize()
+	_task_reminder_presentation = TaskReminderPresentationCoordinatorScript.new()
+	_task_reminder_presentation.configure(_task_reminder_coordinator)
 	_task_reminder_coordinator.reminders_changed.connect(_on_reminders_changed)
 	_task_reminder_coordinator.reminder_due.connect(_on_reminder_due)
+	task_reminder_badge.pressed.connect(_open_task_reminders_from_badge)
+	task_reminder_badge.visibility_changed.connect(_refresh_interaction_polygon)
+	task_reminder_badge.resized.connect(_on_task_reminder_badge_resized)
 	_load_runtime_settings()
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
@@ -269,10 +277,6 @@ func say(text: String, seconds := 6.0, agent_priority := false) -> void:
 		_refresh_interaction_polygon()
 		if agent_priority:
 			_agent_notification_active = false
-		if not _agent_notification_active and not _pending_task_reminder_notice.is_empty():
-			var pending_notice := _pending_task_reminder_notice
-			_pending_task_reminder_notice = ""
-			call_deferred("_show_task_reminder_notice", pending_notice)
 
 
 func _restore_from_system_minimize() -> void:
@@ -318,28 +322,20 @@ func _finish_window_setup() -> void:
 	# transparency, then reveal the already-loaded sprite in one complete frame.
 	await get_tree().process_frame
 	pet.visible = true
-	var startup_bubble_token := _bubble_token + 1
-	_say_dialogue(
-		"startup", "右鍵操作・雙擊摸摸", STARTUP_DIALOGUE_DURATION_SECONDS
-	)
-	if _task_reminder_coordinator == null \
-			or not _task_reminder_coordinator.has_startup_notice():
-		return
-	# The normal startup greeting gets first priority. A reminder follows it
-	# instead of competing for the same bubble and cancelling it halfway through.
-	await get_tree().create_timer(STARTUP_REMINDER_DELAY_SECONDS).timeout
-	if _shutting_down or _bubble_token != startup_bubble_token:
-		return
-	_show_task_reminder_notice(_task_reminder_coordinator.startup_notice_text())
+	_show_startup_message()
+	_refresh_task_reminder_badge(true)
 
 
 func _is_pet_interactive_at(local_point: Vector2) -> bool:
-	if _is_speech_overlay_at(local_point):
+	if _is_interactive_overlay_at(local_point):
 		return true
 	return pet.contains_point(local_point)
 
 
-func _is_speech_overlay_at(local_point: Vector2) -> bool:
+func _is_interactive_overlay_at(local_point: Vector2) -> bool:
+	if task_reminder_badge.visible \
+			and task_reminder_badge.get_global_rect().has_point(local_point):
+		return true
 	if bubble.visible and bubble.get_global_rect().has_point(local_point):
 		return true
 	if bubble_tail.visible:
@@ -352,20 +348,35 @@ func _is_speech_overlay_at(local_point: Vector2) -> bool:
 
 func _apply_interaction_polygon(polygon: PackedVector2Array) -> void:
 	_pet_interaction_polygon = polygon
+	_position_task_reminder_badge()
 	_refresh_interaction_polygon()
 
 
 func _refresh_interaction_polygon() -> void:
-	var bubble_rect := bubble.get_global_rect()
-	var tail_points := PackedVector2Array()
-	for point: Vector2 in bubble_tail.polygon:
-		tail_points.append(bubble_tail.to_global(point))
+	var overlay_points := PackedVector2Array()
+	if bubble.visible:
+		var bubble_rect := bubble.get_global_rect()
+		overlay_points.append_array(PackedVector2Array([
+			bubble_rect.position,
+			Vector2(bubble_rect.end.x, bubble_rect.position.y),
+			bubble_rect.end,
+			Vector2(bubble_rect.position.x, bubble_rect.end.y),
+		]))
+	if bubble_tail.visible:
+		for point: Vector2 in bubble_tail.polygon:
+			overlay_points.append(bubble_tail.to_global(point))
+	if task_reminder_badge.visible:
+		var badge_rect := task_reminder_badge.get_global_rect()
+		overlay_points.append_array(PackedVector2Array([
+			badge_rect.position,
+			Vector2(badge_rect.end.x, badge_rect.position.y),
+			badge_rect.end,
+			Vector2(badge_rect.position.x, badge_rect.end.y),
+		]))
 	_window_service.apply_interaction_polygon(
 		get_window(),
 		_pet_interaction_polygon,
-		bubble.visible,
-		bubble_rect,
-		tail_points
+		overlay_points
 	)
 
 
@@ -696,10 +707,6 @@ func _dismiss_active_agent_notification() -> void:
 	bubble_tail.visible = false
 	_agent_notification_active = false
 	_refresh_interaction_polygon()
-	if not _pending_task_reminder_notice.is_empty():
-		var pending_notice := _pending_task_reminder_notice
-		_pending_task_reminder_notice = ""
-		call_deferred("_show_task_reminder_notice", pending_notice)
 
 
 func _show_state_message(key: String, fallback: String) -> void:
@@ -715,22 +722,57 @@ func _show_state_message(key: String, fallback: String) -> void:
 
 func _on_reminders_changed() -> void:
 	_refresh_reminder_menus()
+	_refresh_task_reminder_badge()
 
 
 func _on_reminder_due(reminder: Dictionary) -> void:
-	var title := String(reminder.get("title", ""))
-	if title.is_empty():
+	if reminder.is_empty():
 		return
-	_show_task_reminder_notice("提醒你：\n%s" % title)
+	_refresh_task_reminder_badge(true)
 
 
-func _show_task_reminder_notice(text: String) -> void:
-	if text.strip_edges().is_empty():
+func _refresh_task_reminder_badge(pulse_overdue := false) -> void:
+	if _task_reminder_presentation == null:
+		task_reminder_badge.clear()
+		_refresh_interaction_polygon()
 		return
-	if _agent_notification_active:
-		_pending_task_reminder_notice = text
+	task_reminder_badge.present(
+		_task_reminder_presentation.badge_state(), pulse_overdue
+	)
+	_position_task_reminder_badge()
+	_refresh_interaction_polygon()
+
+
+func _position_task_reminder_badge() -> void:
+	if not task_reminder_badge.visible:
 		return
-	say(text, TASK_REMINDER_DURATION_SECONDS)
+	if _task_reminder_presentation == null:
+		return
+	task_reminder_badge.position = _task_reminder_presentation.badge_position(
+		pet.get_visual_bounds_in_canvas(),
+		get_viewport_rect().size,
+		task_reminder_badge.size
+	)
+
+
+func _open_task_reminders_from_badge() -> void:
+	call_deferred("_show_stats_window", REMINDERS_TAB_INDEX)
+
+
+func _on_task_reminder_badge_resized() -> void:
+	_position_task_reminder_badge()
+	_refresh_interaction_polygon()
+
+
+func _show_startup_message() -> void:
+	if _task_reminder_presentation != null:
+		var today_notice: String = _task_reminder_presentation.startup_message()
+		if not today_notice.is_empty():
+			say(today_notice, STARTUP_REMINDER_DURATION_SECONDS)
+			return
+	_say_dialogue(
+		"startup", "右鍵操作・雙擊摸摸", STARTUP_DIALOGUE_DURATION_SECONDS
+	)
 
 
 func _say_dialogue(key: String, fallback: String, seconds: float) -> void:

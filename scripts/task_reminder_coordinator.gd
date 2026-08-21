@@ -126,24 +126,6 @@ func get_reminder(id: String) -> Dictionary:
 	return {}
 
 
-func has_startup_notice() -> bool:
-	return not get_open_today_reminders().is_empty() \
-		or not get_overdue_reminders().is_empty()
-
-
-func startup_notice_text() -> String:
-	var today_items := get_open_today_reminders()
-	var overdue_items := get_overdue_reminders()
-	var lines: Array[String] = []
-	if not today_items.is_empty():
-		lines.append("今天有 %d 件待辦" % today_items.size())
-		for reminder: Dictionary in today_items.slice(0, mini(today_items.size(), 2)):
-			lines.append("・%s" % _display_title(reminder))
-	if not overdue_items.is_empty():
-		lines.append("逾期待辦 %d 件，記得處理喔" % overdue_items.size())
-	return "\n".join(lines)
-
-
 func _prime_current_due_items() -> void:
 	var today := _today()
 	for reminder: Dictionary in get_all_reminders():
@@ -201,11 +183,6 @@ func _sort_reminders(left: Dictionary, right: Dictionary) -> bool:
 		String(right.get("title", "")),
 	]
 	return left_key < right_key
-
-
-func _display_title(reminder: Dictionary) -> String:
-	var time := "整日" if bool(reminder.get("all_day", false)) else String(reminder.get("due_time", ""))
-	return "%s %s" % [time, String(reminder.get("title", ""))]
 
 
 func _due_key(reminder: Dictionary) -> String:

@@ -35,6 +35,9 @@ $reminderSection = Read-Source 'scripts/task_reminder_section.gd'
 $reminderItem = Read-Source 'scripts/task_reminder_item.gd'
 $reminderTheme = Read-Source 'scripts/task_reminder_theme.gd'
 $reminderCoordinator = Read-Source 'scripts/task_reminder_coordinator.gd'
+$reminderPresentation = Read-Source 'scripts/task_reminder_presentation_coordinator.gd'
+$reminderBadge = Read-Source 'scripts/task_reminder_badge.gd'
+$reminderBadgeState = Read-Source 'scripts/task_reminder_badge_state.gd'
 $windowsActivator = Read-Source 'native/windows/src/windows_window_activator.cpp'
 $windowsExtension = Read-Source 'native/windows/windows_window_activator.gdextension'
 $releasePreparation = Read-Source 'tools/prepare_windows_release.ps1'
@@ -261,6 +264,14 @@ Assert-Architecture ($reminderPanel -notmatch 'ReminderStatus|OptionButton|in_pr
 	'Task reminder editing must not expose obsolete workflow states.'
 Assert-Architecture ($reminderCoordinator -notmatch 'Control|Container|Button|Label') `
 	'TaskReminderCoordinator must remain independent from presentation controls.'
+Assert-Architecture ($reminderCoordinator -notmatch 'startup_notice|_display_title') `
+	'TaskReminderCoordinator must not own reminder presentation text.'
+Assert-Architecture ($reminderPresentation -notmatch '\b(Control|Container|Button)\b|:\s*Label\b|Label\.new') `
+	'TaskReminderPresentationCoordinator must not depend on UI controls.'
+Assert-Architecture ($reminderBadge -notmatch 'TaskReminderCoordinator|today_count|overdue_count') `
+	'TaskReminderBadge must render a display state without reminder-domain rules.'
+Assert-Architecture ($reminderBadgeState -match 'class_name TaskReminderBadgeState') `
+	'Task reminder badge display state must be explicit and reusable.'
 Assert-Architecture ($reminderTheme -match 'class_name TaskReminderTheme') `
 	'Task reminder visual tokens must have one shared theme module.'
 Assert-Architecture ($main -match '(?s)populate_today_reminders\(menu, reminders\).*append_exit\(menu\)') `

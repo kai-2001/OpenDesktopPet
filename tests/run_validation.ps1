@@ -137,6 +137,23 @@ try {
 		throw 'Task reminder validation failed.'
 	}
 
+	$taskReminderBadgeLog = Join-Path $isolatedAppData 'task-reminder-badge-test.log'
+	$taskReminderBadgeOutput = & $GodotExe --headless --log-file $taskReminderBadgeLog --path $projectRoot --script 'res://tests/task_reminder_badge_test.gd' 2>&1
+	$taskReminderBadgeExitCode = $LASTEXITCODE
+	$taskReminderBadgeOutput | Write-Output
+	for ($attempt = 0; $attempt -lt 20 -and -not (Test-Path -LiteralPath $taskReminderBadgeLog); $attempt++) {
+		Start-Sleep -Milliseconds 50
+	}
+	$taskReminderBadgeLogOutput = if (Test-Path -LiteralPath $taskReminderBadgeLog) {
+		Get-Content -LiteralPath $taskReminderBadgeLog -Raw -Encoding UTF8
+	} else {
+		''
+	}
+	$taskReminderBadgeLogOutput | Write-Output
+	if ($taskReminderBadgeExitCode -ne 0 -or -not ($taskReminderBadgeLogOutput -match 'TASK_REMINDER_BADGE_TEST_OK')) {
+		throw 'Task reminder badge validation failed.'
+	}
+
     $ErrorActionPreference = 'Continue'
     $agentNotificationReceiverOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/local_agent_notification_receiver_test.gd' 2>&1
     $agentNotificationReceiverExitCode = $LASTEXITCODE
