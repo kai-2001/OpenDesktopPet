@@ -26,8 +26,17 @@ function Read-StopHookInput {
 	# Codex writes UTF-8 JSON to stdin. Windows PowerShell otherwise decodes
 	# redirected stdin with the active legacy console code page, which can turn
 	# Chinese assistant text into invalid JSON escape sequences.
-	[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
-	return [Console]::In.ReadToEnd()
+	$inputStream = [Console]::OpenStandardInput()
+	$memoryStream = New-Object System.IO.MemoryStream
+	$buffer = New-Object -TypeName byte[] -ArgumentList 4096
+	try {
+		while (($readCount = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+			$memoryStream.Write($buffer, 0, $readCount)
+		}
+		return [System.Text.Encoding]::UTF8.GetString($memoryStream.ToArray())
+	} finally {
+		$memoryStream.Dispose()
+	}
 }
 
 function Test-ProcessTree([scriptblock]$matchesProcess) {
@@ -110,6 +119,7 @@ try {
 	}
 	. $runtimeHelperPath
 	$eventJson = Read-StopHookInput
+	$eventJson = $eventJson.TrimStart([char]0xFEFF)
 	if ([string]::IsNullOrWhiteSpace($eventJson)) {
 		Write-HookLog 'ignored reason=missing-stdin'
 		exit 0

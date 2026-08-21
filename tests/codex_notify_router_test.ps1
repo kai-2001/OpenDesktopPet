@@ -37,19 +37,22 @@ function Receive-Notification([string]$eventJson, [bool]$shouldReceive) {
         $port = $udp.Client.LocalEndPoint.Port
 		Save-Runtime $port
 		$startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-		$startInfo.FileName = 'powershell.exe'
-		$startInfo.ArgumentList.Add('-NoProfile')
-		$startInfo.ArgumentList.Add('-ExecutionPolicy')
-		$startInfo.ArgumentList.Add('Bypass')
-		$startInfo.ArgumentList.Add('-File')
-		$startInfo.ArgumentList.Add($bridgePath)
+		$startInfo.FileName = (Get-Command powershell.exe).Source
+		$startInfo.Arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $bridgePath + '"'
 		$startInfo.UseShellExecute = $false
+		$startInfo.CreateNoWindow = $true
 		$startInfo.RedirectStandardInput = $true
 		$startInfo.RedirectStandardOutput = $true
 		$startInfo.RedirectStandardError = $true
+		$startInfo.EnvironmentVariables['USERPROFILE'] = $env:USERPROFILE
+		$startInfo.EnvironmentVariables['CODEX_HOME'] = $env:CODEX_HOME
+		$startInfo.EnvironmentVariables['TERM_PROGRAM'] = $env:TERM_PROGRAM
+		$startInfo.EnvironmentVariables['VSCODE_PID'] = $env:VSCODE_PID
+		$startInfo.EnvironmentVariables['OPEN_DESKTOP_PET_SKIP_PROCESS_TREE'] = $env:OPEN_DESKTOP_PET_SKIP_PROCESS_TREE
 		$process = [System.Diagnostics.Process]::Start($startInfo)
-		$process.StandardInput.Write($eventJson)
-		$process.StandardInput.Close()
+		$inputBytes = [System.Text.Encoding]::UTF8.GetBytes($eventJson)
+		$process.StandardInput.BaseStream.Write($inputBytes, 0, $inputBytes.Length)
+		$process.StandardInput.BaseStream.Close()
 		if (-not $process.WaitForExit(10000)) {
 			$process.Kill()
 			throw 'The Codex Stop-hook bridge timed out.'
@@ -87,7 +90,13 @@ try {
     $env:TERM_PROGRAM = 'vscode'
     $env:VSCODE_PID = '1234'
 
-	$vscodeEvent = '{"hook_event_name":"Stop","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","session_id":"vscode","turn_id":"1","last_assistant_message":"完成：中文測試「桌寵」"}'
+	$unicodeMessage = ([char]0x5b8c).ToString() + ([char]0x6210).ToString() +
+		([char]0xff1a).ToString() + ([char]0x4e2d).ToString() +
+		([char]0x6587).ToString() + ([char]0x6e2c).ToString() +
+		([char]0x8a66).ToString() + ([char]0x300c).ToString() +
+		([char]0x684c).ToString() + ([char]0x5bf5).ToString() +
+		([char]0x300d).ToString()
+	$vscodeEvent = '{"hook_event_name":"Stop","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","session_id":"vscode","turn_id":"1","last_assistant_message":"' + $unicodeMessage + '"}'
 	$payload = Receive-Notification $vscodeEvent $true
     Assert-Router ($payload.source -eq 'codex_vscode') 'VS Code Codex source was not classified.'
     Assert-Router ($payload.target_app -eq 'vscode') 'VS Code Codex target was not classified.'
