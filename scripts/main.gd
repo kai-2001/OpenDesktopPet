@@ -9,6 +9,10 @@ const PetInputControllerScript = preload("res://scripts/pet_input_controller.gd"
 const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const StatsWindowCoordinatorScript = preload("res://scripts/stats_window_coordinator.gd")
+const TaskReminderCoordinatorScript = preload("res://scripts/task_reminder_coordinator.gd")
+const TaskReminderPresentationCoordinatorScript = preload(
+	"res://scripts/task_reminder_presentation_coordinator.gd"
+)
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
 const CharacterEffectPreferencesScript = preload(
 	"res://scripts/character_effect_preferences.gd"
@@ -22,6 +26,10 @@ const DEFAULT_KEEP_SCREEN_ON := false
 const DEFAULT_FOCUS_MODE := false
 const AGENT_NOTIFICATION_DURATION_SECONDS := 60.0
 const AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3.0
+const STARTUP_DIALOGUE_DURATION_SECONDS := 5.0
+const STARTUP_REMINDER_DURATION_SECONDS := 8.0
+const REMINDERS_TAB_INDEX := 1
+const AGENT_TAB_INDEX := 3
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
 const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 
@@ -30,6 +38,7 @@ const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 @onready var bubble: PanelContainer = $SpeechBubble
 @onready var bubble_label: Label = $SpeechBubble/Margin/Label
 @onready var bubble_tail: Polygon2D = $SpeechTail
+@onready var task_reminder_badge: TaskReminderBadge = $TaskReminderBadge
 @onready var context_menu: PopupMenu = $ContextMenu
 var _stats_window: Window
 var _stats_tabs: TabContainer
@@ -113,6 +122,8 @@ var _gameplay_coordinator
 var _character_coordinator
 var _input_controller
 var _stats_window_coordinator
+var _task_reminder_coordinator
+var _task_reminder_presentation
 var _bubble_token := 0
 var _shutting_down := false
 var _idle_count := 0
@@ -123,6 +134,7 @@ var _last_state_message := "尚無紀錄"
 var _pet_interaction_polygon := PackedVector2Array()
 var _status_indicator: StatusIndicator
 var _tray_menu: PopupMenu
+var _today_reminder_ids: Dictionary = {}
 var _details_theme_mode := "light"
 var _keep_screen_on := DEFAULT_KEEP_SCREEN_ON
 var _focus_mode := DEFAULT_FOCUS_MODE
@@ -145,7 +157,7 @@ func _ready() -> void:
 		state,
 		pet,
 		_window_service,
-		Callable(self, "_is_speech_overlay_at"),
+		Callable(self, "_is_interactive_overlay_at"),
 		Callable(self, "_is_agent_notification_active"),
 		Callable(self, "_interrupt_autonomous_action")
 	)
@@ -164,6 +176,15 @@ func _ready() -> void:
 	# hidden until the native transparent window has been positioned and shaped.
 	pet.visible = false
 	state.configure_profile(pet.get_character_id())
+	_task_reminder_coordinator = TaskReminderCoordinatorScript.new()
+	_task_reminder_coordinator.initialize()
+	_task_reminder_presentation = TaskReminderPresentationCoordinatorScript.new()
+	_task_reminder_presentation.configure(_task_reminder_coordinator)
+	_task_reminder_coordinator.reminders_changed.connect(_on_reminders_changed)
+	_task_reminder_coordinator.reminder_due.connect(_on_reminder_due)
+	task_reminder_badge.pressed.connect(_open_task_reminders_from_badge)
+	task_reminder_badge.visibility_changed.connect(_refresh_interaction_polygon)
+	task_reminder_badge.resized.connect(_on_task_reminder_badge_resized)
 	_load_runtime_settings()
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
@@ -180,6 +201,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if _task_reminder_coordinator != null:
+		_task_reminder_coordinator.process(_delta)
 	if _agent_controller != null:
 		_agent_controller.poll()
 	_restore_from_system_minimize()
@@ -299,16 +322,20 @@ func _finish_window_setup() -> void:
 	# transparency, then reveal the already-loaded sprite in one complete frame.
 	await get_tree().process_frame
 	pet.visible = true
-	_say_dialogue("startup", "右鍵操作・雙擊摸摸", 5.0)
+	_show_startup_message()
+	_refresh_task_reminder_badge(true)
 
 
 func _is_pet_interactive_at(local_point: Vector2) -> bool:
-	if _is_speech_overlay_at(local_point):
+	if _is_interactive_overlay_at(local_point):
 		return true
 	return pet.contains_point(local_point)
 
 
-func _is_speech_overlay_at(local_point: Vector2) -> bool:
+func _is_interactive_overlay_at(local_point: Vector2) -> bool:
+	if task_reminder_badge.visible \
+			and task_reminder_badge.get_global_rect().has_point(local_point):
+		return true
 	if bubble.visible and bubble.get_global_rect().has_point(local_point):
 		return true
 	if bubble_tail.visible:
@@ -321,20 +348,35 @@ func _is_speech_overlay_at(local_point: Vector2) -> bool:
 
 func _apply_interaction_polygon(polygon: PackedVector2Array) -> void:
 	_pet_interaction_polygon = polygon
+	_position_task_reminder_badge()
 	_refresh_interaction_polygon()
 
 
 func _refresh_interaction_polygon() -> void:
-	var bubble_rect := bubble.get_global_rect()
-	var tail_points := PackedVector2Array()
-	for point: Vector2 in bubble_tail.polygon:
-		tail_points.append(bubble_tail.to_global(point))
+	var overlay_points := PackedVector2Array()
+	if bubble.visible:
+		var bubble_rect := bubble.get_global_rect()
+		overlay_points.append_array(PackedVector2Array([
+			bubble_rect.position,
+			Vector2(bubble_rect.end.x, bubble_rect.position.y),
+			bubble_rect.end,
+			Vector2(bubble_rect.position.x, bubble_rect.end.y),
+		]))
+	if bubble_tail.visible:
+		for point: Vector2 in bubble_tail.polygon:
+			overlay_points.append(bubble_tail.to_global(point))
+	if task_reminder_badge.visible:
+		var badge_rect := task_reminder_badge.get_global_rect()
+		overlay_points.append_array(PackedVector2Array([
+			badge_rect.position,
+			Vector2(badge_rect.end.x, badge_rect.position.y),
+			badge_rect.end,
+			Vector2(badge_rect.position.x, badge_rect.end.y),
+		]))
 	_window_service.apply_interaction_polygon(
 		get_window(),
 		_pet_interaction_polygon,
-		bubble.visible,
-		bubble_rect,
-		tail_points
+		overlay_points
 	)
 
 
@@ -678,6 +720,61 @@ func _show_state_message(key: String, fallback: String) -> void:
 	say(text, 6.0)
 
 
+func _on_reminders_changed() -> void:
+	_refresh_reminder_menus()
+	_refresh_task_reminder_badge()
+
+
+func _on_reminder_due(reminder: Dictionary) -> void:
+	if reminder.is_empty():
+		return
+	_refresh_task_reminder_badge(true)
+
+
+func _refresh_task_reminder_badge(pulse_overdue := false) -> void:
+	if _task_reminder_presentation == null:
+		task_reminder_badge.clear()
+		_refresh_interaction_polygon()
+		return
+	task_reminder_badge.present(
+		_task_reminder_presentation.badge_state(), pulse_overdue
+	)
+	_position_task_reminder_badge()
+	_refresh_interaction_polygon()
+
+
+func _position_task_reminder_badge() -> void:
+	if not task_reminder_badge.visible:
+		return
+	if _task_reminder_presentation == null:
+		return
+	task_reminder_badge.position = _task_reminder_presentation.badge_position(
+		pet.get_visual_bounds_in_canvas(),
+		get_viewport_rect().size,
+		task_reminder_badge.size
+	)
+
+
+func _open_task_reminders_from_badge() -> void:
+	call_deferred("_show_stats_window", REMINDERS_TAB_INDEX)
+
+
+func _on_task_reminder_badge_resized() -> void:
+	_position_task_reminder_badge()
+	_refresh_interaction_polygon()
+
+
+func _show_startup_message() -> void:
+	if _task_reminder_presentation != null:
+		var today_notice: String = _task_reminder_presentation.startup_message()
+		if not today_notice.is_empty():
+			say(today_notice, STARTUP_REMINDER_DURATION_SECONDS)
+			return
+	_say_dialogue(
+		"startup", "右鍵操作・雙擊摸摸", STARTUP_DIALOGUE_DURATION_SECONDS
+	)
+
+
 func _say_dialogue(key: String, fallback: String, seconds: float) -> void:
 	say(pet.get_dialogue(key, fallback), seconds)
 
@@ -694,13 +791,8 @@ func _show_wish_notice(action: String) -> void:
 
 
 func _setup_context_menu() -> void:
-	PetMenuBuilderScript.populate(
-		context_menu,
-		Callable(self, "_interaction_icon"),
-		Callable(self, "_interaction_label")
-	)
 	context_menu.id_pressed.connect(_on_context_action)
-	_refresh_ui(state.get_snapshot())
+	_rebuild_action_menu(context_menu)
 
 
 func _show_context_menu(at: Vector2i) -> void:
@@ -712,12 +804,7 @@ func _setup_status_indicator() -> void:
 	if not _window_service.has_status_indicator():
 		return
 	_tray_menu = PopupMenu.new()
-	PetMenuBuilderScript.populate(
-		_tray_menu,
-		Callable(self, "_interaction_icon"),
-		Callable(self, "_interaction_label")
-	)
-	_set_action_menu_level(_tray_menu)
+	_rebuild_action_menu(_tray_menu)
 	_tray_menu.id_pressed.connect(_on_context_action)
 	add_child(_tray_menu)
 	_status_indicator = StatusIndicator.new()
@@ -748,12 +835,50 @@ func _on_context_action(id: int) -> void:
 			_run_care_action(id)
 		6:
 			call_deferred("_show_stats_window")
+		PetMenuBuilderScript.REMINDER_VIEW_ALL_ITEM_ID:
+			call_deferred("_show_stats_window", REMINDERS_TAB_INDEX)
 		7:
 			# Let the native PopupMenu finish dispatching `id_pressed` before
 			# destroying either native window.
 			call_deferred("_request_shutdown")
 		22:
 			_recover_pet()
+		_:
+			if id < PetMenuBuilderScript.REMINDER_ITEM_ID_BASE:
+				return
+			var reminder_id: String = String(_today_reminder_ids.get(id, ""))
+			if not reminder_id.is_empty():
+				call_deferred(
+					"_show_stats_window", REMINDERS_TAB_INDEX, reminder_id
+				)
+
+
+func _rebuild_action_menu(menu: PopupMenu) -> void:
+	if not is_instance_valid(menu):
+		return
+	menu.clear()
+	PetMenuBuilderScript.populate(
+		menu,
+		Callable(self, "_interaction_icon"),
+		Callable(self, "_interaction_label")
+	)
+	var reminders: Array[Dictionary] = []
+	if _task_reminder_coordinator != null:
+		reminders = _task_reminder_coordinator.get_open_today_reminders()
+	PetMenuBuilderScript.populate_today_reminders(menu, reminders)
+	PetMenuBuilderScript.append_exit(menu)
+	_set_action_menu_level(menu)
+	for index: int in mini(reminders.size(), 4):
+		_today_reminder_ids[PetMenuBuilderScript.REMINDER_ITEM_ID_BASE + index] = (
+			String(reminders[index].get("id", ""))
+		)
+
+
+func _refresh_reminder_menus() -> void:
+	_today_reminder_ids.clear()
+	_rebuild_action_menu(context_menu)
+	if is_instance_valid(_tray_menu):
+		_rebuild_action_menu(_tray_menu)
 
 
 func _set_action_menu_level(menu: PopupMenu) -> void:
@@ -823,6 +948,7 @@ func _build_stats_window() -> void:
 	_care_action_buttons.clear()
 	_stats_window_coordinator = StatsWindowCoordinatorScript.new()
 	_stats_window_coordinator.theme_mode = _details_theme_mode
+	_stats_window_coordinator.reminder_coordinator = _task_reminder_coordinator
 	_stats_window_coordinator.last_state_message = _last_state_message
 	_stats_window_coordinator.codex_enabled = (
 		_agent_controller != null and _agent_controller.codex_enabled
@@ -1146,7 +1272,7 @@ func _on_stats_tab_changed(tab_index: int) -> void:
 	_refresh_stats_tab_buttons(tab_index)
 	if tab_index != _character_tab_index and _mask_effect_editing:
 		_cancel_mask_effect_editing()
-	if tab_index == 2 and _agent_controller != null:
+	if tab_index == AGENT_TAB_INDEX and _agent_controller != null:
 		_agent_controller.refresh_enabled_executable_paths_if_invalid()
 	if tab_index != _character_tab_index or _character_tab_loaded:
 		return
@@ -1660,9 +1786,17 @@ func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFl
 	return style
 
 
-func _show_stats_window() -> void:
+func _show_stats_window(
+	select_tab := -1, reminder_id := "", create_reminder := false
+) -> void:
 	if is_instance_valid(_stats_window):
 		_refresh_ui(state.get_snapshot())
+		if select_tab >= 0:
+			_select_stats_tab(select_tab)
+		if not reminder_id.is_empty() and _details_window_controller != null:
+			_details_window_controller.focus_reminder(reminder_id)
+		elif create_reminder and _details_window_controller != null:
+			_details_window_controller.start_new_reminder()
 		call_deferred("_bring_stats_window_forward")
 		return
 	_build_stats_window()
@@ -1682,6 +1816,12 @@ func _show_stats_window() -> void:
 	target.y = clampi(target.y, usable.position.y + 12, usable.end.y - _stats_window.size.y - 12)
 	_stats_window.position = target
 	_stats_window.show()
+	if select_tab >= 0:
+		_select_stats_tab(select_tab)
+	if not reminder_id.is_empty() and _details_window_controller != null:
+		_details_window_controller.focus_reminder(reminder_id)
+	elif create_reminder and _details_window_controller != null:
+		_details_window_controller.start_new_reminder()
 	call_deferred("_bring_stats_window_forward")
 
 
@@ -1705,7 +1845,8 @@ func _destroy_stats_window() -> void:
 	_cancel_mask_effect_editing()
 	if _stats_window_coordinator != null:
 		_stats_window_coordinator.destroy()
-	_stats_window_coordinator = null
+		_stats_window_coordinator = null
+	_details_window_controller = null
 	_stats_window = null
 	_stats_tabs = null
 	_stats_tab_buttons.clear()
@@ -2105,7 +2246,7 @@ func _rebuild_stats_window_after_theme_change(
 	_build_stats_window()
 	_stats_window.position = previous_position
 	_stats_window.size = previous_size
-	_select_stats_tab(1)
+	_select_stats_tab(2)
 	_stats_window.show()
 	_refresh_ui(state.get_snapshot())
 	call_deferred("_bring_stats_window_forward")

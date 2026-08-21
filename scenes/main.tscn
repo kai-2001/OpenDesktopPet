@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/pet_state.gd" id="2_state"]
 [ext_resource type="Script" path="res://scripts/pet_visual.gd" id="3_visual"]
+[ext_resource type="Script" path="res://scripts/task_reminder_badge.gd" id="4_reminder_badge"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -42,5 +43,15 @@ visible = false
 z_index = 99
 polygon = PackedVector2Array(128, 96, 152, 96, 140, 124)
 color = Color(0.953, 0.988, 0.996, 0.98)
+
+[node name="TaskReminderBadge" type="Button" parent="."]
+visible = false
+offset_left = 218.0
+offset_top = 92.0
+offset_right = 246.0
+offset_bottom = 120.0
+tooltip_text = "今日待辦"
+z_index = 101
+script = ExtResource("4_reminder_badge")
 
 [node name="ContextMenu" type="PopupMenu" parent="."]

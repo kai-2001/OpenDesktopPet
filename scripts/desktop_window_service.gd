@@ -78,20 +78,12 @@ func set_cursor_shape(shape: Input.CursorShape) -> void:
 func apply_interaction_polygon(
 	window: Window,
 	pet_polygon: PackedVector2Array,
-	bubble_visible: bool,
-	bubble_rect: Rect2,
-	tail_points: PackedVector2Array
+	interactive_overlay_points: PackedVector2Array
 ) -> void:
 	window.mouse_passthrough = false
-	if not bubble_visible:
+	if interactive_overlay_points.is_empty():
 		window.mouse_passthrough_polygon = pet_polygon
 		return
 	var combined_points := PackedVector2Array(pet_polygon)
-	combined_points.append_array(PackedVector2Array([
-		bubble_rect.position,
-		Vector2(bubble_rect.end.x, bubble_rect.position.y),
-		bubble_rect.end,
-		Vector2(bubble_rect.position.x, bubble_rect.end.y),
-	]))
-	combined_points.append_array(tail_points)
+	combined_points.append_array(interactive_overlay_points)
 	window.mouse_passthrough_polygon = Geometry2D.convex_hull(combined_points)

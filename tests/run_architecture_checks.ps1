@@ -30,6 +30,14 @@ $characterCoordinator = Read-Source 'scripts/character_pack_coordinator.gd'
 $agentController = Read-Source 'scripts/agent_integration_controller.gd'
 $agentRouter = Read-Source 'scripts/agent_notification_router.gd'
 $codexTrustService = Read-Source 'scripts/codex_hook_trust_service.gd'
+$reminderPanel = Read-Source 'scripts/task_reminder_panel.gd'
+$reminderSection = Read-Source 'scripts/task_reminder_section.gd'
+$reminderItem = Read-Source 'scripts/task_reminder_item.gd'
+$reminderTheme = Read-Source 'scripts/task_reminder_theme.gd'
+$reminderCoordinator = Read-Source 'scripts/task_reminder_coordinator.gd'
+$reminderPresentation = Read-Source 'scripts/task_reminder_presentation_coordinator.gd'
+$reminderBadge = Read-Source 'scripts/task_reminder_badge.gd'
+$reminderBadgeState = Read-Source 'scripts/task_reminder_badge_state.gd'
 $windowsActivator = Read-Source 'native/windows/src/windows_window_activator.cpp'
 $windowsExtension = Read-Source 'native/windows/windows_window_activator.gdextension'
 $releasePreparation = Read-Source 'tools/prepare_windows_release.ps1'
@@ -242,6 +250,32 @@ Assert-Architecture ($windowsActivator -notmatch 'powershell|cmd\.exe|CreateProc
 	'The native activator must not launch a shell or helper process.'
 Assert-Architecture ($main -match 'AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3\.0') `
 	'Codex notifications must use a three-second foreground duration.'
+Assert-Architecture ($reminderPanel -match 'TaskReminderSectionScript' -and $reminderPanel -match 'TaskReminderThemeScript') `
+	'Task reminders must compose cohesive section and theme modules.'
+Assert-Architecture ($reminderPanel -notmatch 'StyleBoxFlat\.new') `
+	'TaskReminderPanel must delegate visual tokens and styles to TaskReminderTheme.'
+Assert-Architecture ($reminderSection -match 'TaskReminderItemScript') `
+	'TaskReminderSection must delegate row interactions to TaskReminderItem.'
+Assert-Architecture ($reminderItem -notmatch '_coordinator') `
+	'TaskReminderItem must communicate through signals instead of depending on the coordinator.'
+Assert-Architecture ($reminderItem -notmatch 'CheckBox|in_progress|cancelled') `
+	'Task reminder rows must use explicit actions and the binary pending/completed state.'
+Assert-Architecture ($reminderPanel -notmatch 'ReminderStatus|OptionButton|in_progress|cancelled') `
+	'Task reminder editing must not expose obsolete workflow states.'
+Assert-Architecture ($reminderCoordinator -notmatch 'Control|Container|Button|Label') `
+	'TaskReminderCoordinator must remain independent from presentation controls.'
+Assert-Architecture ($reminderCoordinator -notmatch 'startup_notice|_display_title') `
+	'TaskReminderCoordinator must not own reminder presentation text.'
+Assert-Architecture ($reminderPresentation -notmatch '\b(Control|Container|Button)\b|:\s*Label\b|Label\.new') `
+	'TaskReminderPresentationCoordinator must not depend on UI controls.'
+Assert-Architecture ($reminderBadge -notmatch 'TaskReminderCoordinator|today_count|overdue_count') `
+	'TaskReminderBadge must render a display state without reminder-domain rules.'
+Assert-Architecture ($reminderBadgeState -match 'class_name TaskReminderBadgeState') `
+	'Task reminder badge display state must be explicit and reusable.'
+Assert-Architecture ($reminderTheme -match 'class_name TaskReminderTheme') `
+	'Task reminder visual tokens must have one shared theme module.'
+Assert-Architecture ($main -match '(?s)populate_today_reminders\(menu, reminders\).*append_exit\(menu\)') `
+	'Task reminders must be inserted before the final save-and-exit menu action.'
 Assert-Architecture ($windowsExtension -match 'windows\.debug\.x86_64') `
 	'The Windows GDExtension must provide an x64 debug library.'
 Assert-Architecture ($windowsExtension -match 'windows\.release\.x86_64') `
