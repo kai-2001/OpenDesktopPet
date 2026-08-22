@@ -23,6 +23,7 @@ signal agent_claude_app_enabled_toggled(enabled: bool)
 signal agent_claude_terminal_enabled_toggled(enabled: bool)
 signal agent_gemini_terminal_enabled_toggled(enabled: bool)
 signal agent_agy_terminal_enabled_toggled(enabled: bool)
+signal agent_pi_codex_enabled_toggled(enabled: bool)
 signal agent_port_changed(value: float)
 signal codex_trust_review_requested
 signal codex_trust_recheck_requested
@@ -63,6 +64,7 @@ var claude_app_enabled := false
 var claude_terminal_enabled := false
 var gemini_terminal_enabled := false
 var agy_terminal_enabled := false
+var pi_codex_enabled := false
 var agent_port := AgentIntegrationControllerScript.DEFAULT_PORT
 var vscode_executable_path := ""
 var codex_app_executable_path := ""
@@ -743,6 +745,15 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	)
 	content.add_child(_build_agent_row("Codex", terminal_toggle))
 
+	var pi_codex_toggle := SettingsToggleSwitchScript.new()
+	pi_codex_toggle.name = "PiCodexEnabledToggle"
+	pi_codex_toggle.tooltip_text = "開啟或關閉 Pi 中所有模型的通知"
+	pi_codex_toggle.configure(theme_mode, pi_codex_enabled)
+	pi_codex_toggle.toggled.connect(
+		func(value: bool) -> void: agent_pi_codex_enabled_toggled.emit(value)
+	)
+	content.add_child(_build_agent_row("Pi", pi_codex_toggle))
+
 	var opencode_toggle := SettingsToggleSwitchScript.new()
 	opencode_toggle.name = "TerminalOpenCodeEnabledToggle"
 	opencode_toggle.tooltip_text = "開啟或關閉終端機中的 OpenCode 通知"
@@ -810,6 +821,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		"codex_app_enabled_toggle": codex_app_toggle,
 		"opencode_app_enabled_toggle": opencode_app_toggle,
 		"terminal_codex_enabled_toggle": terminal_toggle,
+		"pi_codex_enabled_toggle": pi_codex_toggle,
 		"terminal_opencode_enabled_toggle": opencode_toggle,
 		"gemini_terminal_enabled_toggle": gemini_terminal_toggle,
 		"agy_terminal_enabled_toggle": agy_terminal_toggle,

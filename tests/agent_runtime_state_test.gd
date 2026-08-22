@@ -30,6 +30,7 @@ func _run() -> void:
 
 	var controller = ControllerScript.new()
 	controller.codex_app_enabled = true
+	controller.pi_codex_enabled = true
 	controller.port = 49381
 	_assert_true(controller._start_receiver(), "runtime owner starts its UDP receiver")
 	_assert_true(controller._write_runtime_state(), "runtime registration is written")
@@ -48,6 +49,10 @@ func _run() -> void:
 	_assert_true(
 		bool(enabled_targets.get("codex_app", false)),
 		"runtime registration records the active Codex App target"
+	)
+	_assert_true(
+		bool(enabled_targets.get("pi_codex_terminal", false)),
+		"runtime registration records the active Pi target"
 	)
 	_assert_true(
 		not FileAccess.file_exists(legacy_codex_flag),

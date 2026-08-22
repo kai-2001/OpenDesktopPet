@@ -18,6 +18,7 @@ func _run() -> void:
 	_assert_equal(RouterScript.normalize_agent("agy"), "agy")
 	_assert_equal(RouterScript.normalize_agent("gemini_cli"), "gemini")
 	_assert_equal(RouterScript.normalize_agent("codex_vscode"), "codex")
+	_assert_equal(RouterScript.normalize_agent("pi"), "pi")
 	_assert_equal(
 		RouterScript.normalize_target_app("opencode-desktop"),
 		RouterScript.TARGET_OPENCODE_APP
@@ -42,6 +43,7 @@ func _run() -> void:
 		"claude_app": false,
 		"gemini_terminal": true,
 		"agy_terminal": true,
+		"pi_codex_terminal": true,
 	}
 	_assert_true(
 		RouterScript.is_notification_enabled(
@@ -85,6 +87,12 @@ func _run() -> void:
 		),
 		"Antigravity CLI terminal route is enabled"
 	)
+	_assert_true(
+		RouterScript.is_notification_enabled(
+			"pi", "codex", RouterScript.TARGET_TERMINAL, enabled_by_key
+		),
+		"Pi terminal route is enabled"
+	)
 
 	var controller = ControllerScript.new()
 	controller.claude_app_enabled = true
@@ -103,6 +111,19 @@ func _run() -> void:
 	_assert_true(
 		String(_received_notifications[0].message).contains("發生錯誤"),
 		"agent-error should emit an error notification"
+	)
+	controller.pi_codex_enabled = true
+	controller._handle_notification({
+		"type": "agent-turn-complete",
+		"source": "pi",
+		"agent": "pi",
+		"target_app": RouterScript.TARGET_TERMINAL,
+		"event_id": "pi:test:complete",
+	})
+	_assert_equal(_received_notifications.size(), 2)
+	_assert_true(
+		String(_received_notifications[1].message).contains("Pi"),
+		"Pi completion should identify the Pi source"
 	)
 	print("AGENT_NOTIFICATION_ROUTER_TEST_OK")
 	quit(0)

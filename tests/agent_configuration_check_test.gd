@@ -5,16 +5,19 @@ const ControllerScript = preload("res://scripts/agent_integration_controller.gd"
 var _test_root := ""
 var _previous_user_profile := ""
 var _previous_codex_home := ""
+var _previous_pi_agent_dir := ""
 
 
 func _init() -> void:
 	_previous_user_profile = OS.get_environment("USERPROFILE")
 	_previous_codex_home = OS.get_environment("CODEX_HOME")
+	_previous_pi_agent_dir = OS.get_environment("PI_CODING_AGENT_DIR")
 	_test_root = ProjectSettings.globalize_path(
 		"user://agent-configuration-check-" + str(Time.get_ticks_msec())
 	)
 	OS.set_environment("USERPROFILE", _test_root)
 	OS.set_environment("CODEX_HOME", _test_root.path_join(".codex"))
+	OS.set_environment("PI_CODING_AGENT_DIR", _test_root.path_join(".pi/agent"))
 	call_deferred("_run")
 
 
@@ -23,6 +26,7 @@ func _run() -> void:
 	var integration_home := _test_root.path_join(".open-desktop-pet")
 	var claude_home := _test_root.path_join(".claude")
 	var gemini_home := _test_root.path_join(".gemini")
+	var pi_extension_path := _test_root.path_join(".pi/agent/extensions/open-desktop-pet.ts")
 	var controller = ControllerScript.new()
 	_assert_true(not controller.is_codex_configured(), "Codex starts invalid")
 	_assert_true(not controller.is_copilot_configured(), "Copilot starts invalid")
@@ -30,6 +34,7 @@ func _run() -> void:
 	_assert_true(not controller.is_claude_code_configured(), "Claude Code starts invalid")
 	_assert_true(not controller.is_gemini_cli_configured(), "Gemini CLI starts invalid")
 	_assert_true(not controller.is_antigravity_cli_configured(), "Antigravity CLI starts invalid")
+	_assert_true(not controller.is_pi_configured(), "Pi starts invalid")
 
 	_make_directory(codex_home)
 	_make_directory(integration_home)
@@ -121,6 +126,18 @@ func _run() -> void:
 	_write(gemini_home.path_join("config/hooks.json"), "{\"open-desktop-pet\":{\"Stop\":[]}}")
 	_assert_true(not controller.is_antigravity_cli_configured(), "Antigravity CLI hook drift is detected")
 
+	_write(integration_home.path_join("open_desktop_pet_pi_installed.txt"), "OpenDesktopPet Pi notification extension")
+	_make_directory(pi_extension_path.get_base_dir())
+	_write(
+		pi_extension_path,
+		"/* OpenDesktopPet Pi notification extension */\n"
+			+ "pi.on(\"agent_settled\", async () => {})\n"
+			+ "const target = \"pi_codex_terminal\""
+	)
+	_assert_true(controller.is_pi_configured(), "Pi extension is detected")
+	_write(pi_extension_path, "// replaced")
+	_assert_true(not controller.is_pi_configured(), "Pi extension drift is detected")
+
 	_cleanup()
 	print("AGENT_CONFIGURATION_CHECK_TEST_OK")
 	quit(0)
@@ -153,5 +170,6 @@ func _fail(message: String) -> void:
 func _cleanup() -> void:
 	OS.set_environment("USERPROFILE", _previous_user_profile)
 	OS.set_environment("CODEX_HOME", _previous_codex_home)
+	OS.set_environment("PI_CODING_AGENT_DIR", _previous_pi_agent_dir)
 	if not _test_root.is_empty() and DirAccess.dir_exists_absolute(_test_root):
 		DirAccess.remove_absolute(_test_root)

@@ -29,6 +29,8 @@ $inputController = Read-Source 'scripts/pet_input_controller.gd'
 $characterCoordinator = Read-Source 'scripts/character_pack_coordinator.gd'
 $agentController = Read-Source 'scripts/agent_integration_controller.gd'
 $agentRouter = Read-Source 'scripts/agent_notification_router.gd'
+$piExtension = Read-Source 'tools/pi_agent_notify.ts'
+$piInstaller = Read-Source 'tools/install_pi_integration.ps1'
 $codexTrustService = Read-Source 'scripts/codex_hook_trust_service.gd'
 $reminderPanel = Read-Source 'scripts/task_reminder_panel.gd'
 $reminderSection = Read-Source 'scripts/task_reminder_section.gd'
@@ -184,6 +186,20 @@ Assert-Architecture ($agentController -match 'agy_terminal_enabled') `
 	'Codex integration must keep Antigravity CLI terminal state separate.'
 Assert-Architecture ($agentController -match '_run_antigravity_cli_configuration_tool') `
 	'Codex integration must configure Antigravity CLI through its installer.'
+Assert-Architecture ($agentController -match 'pi_codex_enabled') `
+	'Agent integration must keep Pi state separate.'
+Assert-Architecture ($agentController -match '_run_pi_configuration_tool') `
+	'Agent integration must configure Pi through its installer.'
+Assert-Architecture ($agentController -match 'pi_codex_terminal') `
+	'Agent integration must publish a separate Pi runtime target.'
+Assert-Architecture ($piExtension -match 'agent_settled') `
+	'Pi notifications must use the settled-agent lifecycle event.'
+Assert-Architecture ($piExtension -match 'model_provider') `
+	'Pi notifications must include the selected model provider.'
+Assert-Architecture ($piExtension -notmatch 'openai-codex') `
+	'Pi notifications must support all Pi model providers.'
+Assert-Architecture ($piInstaller -match 'PI_CODING_AGENT_DIR') `
+	'Pi installer must honor the configured Pi agent directory.'
 Assert-Architecture ($agentRouter -match 'gemini_terminal') `
 	'Agent notification routing must define a Gemini CLI terminal target.'
 Assert-Architecture ($agentRouter -match 'agy_terminal') `
@@ -232,6 +248,10 @@ Assert-Architecture ($main -notmatch '_reopen_codex_trust_dialog') `
 	'Opening Codex Hook review must not immediately reopen the blocking trust dialog.'
 Assert-Architecture ($releasePreparation -match 'codex_hook_review\.ps1') `
 	'Windows releases must include the Codex Hook review helper.'
+Assert-Architecture ($releasePreparation -match 'install_pi_integration\.ps1') `
+	'Windows releases must include the Pi integration installer.'
+Assert-Architecture ($releasePreparation -match 'pi_agent_notify\.ts') `
+	'Windows releases must include the Pi notification extension.'
 Assert-Architecture ($agentController -notmatch 'func _normalize_agent|func _target_display_name') `
 	'Codex integration must not own cross-Agent display and normalization rules.'
 Assert-Architecture ($agentController -match 'ClassDB\.instantiate\("WindowsWindowActivator"\)') `

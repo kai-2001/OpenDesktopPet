@@ -11,6 +11,7 @@ $testTemp = Join-Path $testRoot 'Temporary Logs'
 $originalUserProfile = $env:USERPROFILE
 $originalAppData = $env:APPDATA
 $originalTemp = $env:TEMP
+$originalPiAgentDir = $env:PI_CODING_AGENT_DIR
 
 function Assert-Uninstaller([bool]$condition, [string]$message) {
     if (-not $condition) {
@@ -28,6 +29,7 @@ try {
     $env:USERPROFILE = $testProfile
     $env:APPDATA = $testAppData
     $env:TEMP = $testTemp
+    $env:PI_CODING_AGENT_DIR = Join-Path $testProfile '.pi\agent'
 
     foreach ($installerName in @(
         'install_codex_integration.ps1',
@@ -35,7 +37,8 @@ try {
         'install_opencode_integration.ps1',
         'install_claude_code_integration.ps1',
         'install_gemini_cli_integration.ps1',
-        'install_antigravity_cli_integration.ps1'
+        'install_antigravity_cli_integration.ps1',
+        'install_pi_integration.ps1'
     )) {
         & (Join-Path $toolsPath $installerName) | Out-Null
         if (-not $?) {
@@ -93,6 +96,8 @@ try {
         'Integration-only uninstall did not remove the Copilot hook.'
     Assert-Uninstaller (-not (Test-Path -LiteralPath (Join-Path $testProfile '.config\opencode\plugins\open-desktop-pet.js'))) `
         'Integration-only uninstall did not remove the OpenCode plugin.'
+    Assert-Uninstaller (-not (Test-Path -LiteralPath (Join-Path $testProfile '.pi\agent\extensions\open-desktop-pet.ts'))) `
+        'Integration-only uninstall did not remove the Pi extension.'
     Assert-Uninstaller ($claudeConfig -notmatch 'claude_code_notify\.ps1') `
         'Integration-only uninstall did not remove the Claude Code hook.'
     Assert-Uninstaller ($geminiConfig -notmatch 'gemini_cli_notify\.ps1') `
@@ -133,12 +138,17 @@ try {
         'Release preparation does not include the uninstaller script.'
 	Assert-Uninstaller ($releasePreparation -match 'open_desktop_pet_runtime\.ps1') `
 		'Release preparation does not include the shared runtime helper.'
+    Assert-Uninstaller ($releasePreparation -match 'install_pi_integration\.ps1') `
+        'Release preparation does not include the Pi integration installer.'
+    Assert-Uninstaller ($releasePreparation -match 'pi_agent_notify\.ts') `
+        'Release preparation does not include the Pi notification extension.'
 
     Write-Output 'OPEN_DESKTOP_PET_UNINSTALLER_TEST_OK'
 } finally {
     $env:USERPROFILE = $originalUserProfile
     $env:APPDATA = $originalAppData
     $env:TEMP = $originalTemp
+    $env:PI_CODING_AGENT_DIR = $originalPiAgentDir
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force
     }

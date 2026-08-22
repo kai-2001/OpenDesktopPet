@@ -40,7 +40,8 @@ $integrationHomeFileNames = @(
     'open_desktop_pet_opencode_installed.txt',
     'open_desktop_pet_claude_code_installed.txt',
     'open_desktop_pet_gemini_cli_installed.txt',
-    'open_desktop_pet_antigravity_cli_installed.txt'
+    'open_desktop_pet_antigravity_cli_installed.txt',
+    'open_desktop_pet_pi_installed.txt'
 )
 $codexHomeFileNames = @(
 	'open_desktop_pet_notify.ps1',
@@ -109,7 +110,8 @@ function Invoke-IntegrationUninstallers {
         [pscustomobject]@{ Name = 'OpenCode'; FileName = 'install_opencode_integration.ps1' },
         [pscustomobject]@{ Name = 'Claude Code'; FileName = 'install_claude_code_integration.ps1' },
         [pscustomobject]@{ Name = 'Gemini CLI'; FileName = 'install_gemini_cli_integration.ps1' },
-        [pscustomobject]@{ Name = 'Antigravity CLI'; FileName = 'install_antigravity_cli_integration.ps1' }
+        [pscustomobject]@{ Name = 'Antigravity CLI'; FileName = 'install_antigravity_cli_integration.ps1' },
+        [pscustomobject]@{ Name = 'Pi'; FileName = 'install_pi_integration.ps1' }
     )
     foreach ($installer in $installers) {
         $installerPath = Join-Path $PSScriptRoot $installer.FileName

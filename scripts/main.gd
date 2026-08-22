@@ -68,6 +68,7 @@ var _agent_claude_app_enabled_toggle: Button
 var _agent_claude_terminal_enabled_toggle: Button
 var _agent_gemini_terminal_enabled_toggle: Button
 var _agent_agy_terminal_enabled_toggle: Button
+var _agent_pi_codex_enabled_toggle: Button
 var _agent_port_spin_box: SpinBox
 var _agent_status_label: Label
 var _codex_setup_progress_bar: ProgressBar
@@ -986,6 +987,9 @@ func _build_stats_window() -> void:
 	_stats_window_coordinator.agy_terminal_enabled = (
 		_agent_controller != null and _agent_controller.agy_terminal_enabled
 	)
+	_stats_window_coordinator.pi_codex_enabled = (
+		_agent_controller != null and _agent_controller.pi_codex_enabled
+	)
 	_stats_window_coordinator.agent_port = (
 		_agent_controller.port
 		if _agent_controller != null
@@ -1093,6 +1097,9 @@ func _build_stats_window() -> void:
 	_agent_agy_terminal_enabled_toggle = (
 		agent_refs["agy_terminal_enabled_toggle"] as Button
 	)
+	_agent_pi_codex_enabled_toggle = (
+		agent_refs["pi_codex_enabled_toggle"] as Button
+	)
 	_vscode_executable_line_edit = (
 		agent_refs["vscode_executable_line_edit"] as LineEdit
 	)
@@ -1192,6 +1199,9 @@ func _connect_details_window_signals() -> void:
 	)
 	_details_window_controller.agent_agy_terminal_enabled_toggled.connect(
 		_on_agy_terminal_enabled_toggled
+	)
+	_details_window_controller.agent_pi_codex_enabled_toggled.connect(
+		_on_pi_codex_enabled_toggled
 	)
 	_details_window_controller.agent_port_changed.connect(_on_agent_port_changed)
 	_details_window_controller.codex_trust_review_requested.connect(
@@ -1771,6 +1781,11 @@ func _update_agent_enabled_toggles() -> void:
 			"set_enabled_state",
 			_agent_controller != null and _agent_controller.agy_terminal_enabled
 		)
+	if is_instance_valid(_agent_pi_codex_enabled_toggle):
+		_agent_pi_codex_enabled_toggle.call(
+			"set_enabled_state",
+			_agent_controller != null and _agent_controller.pi_codex_enabled
+		)
 
 
 func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
@@ -1873,6 +1888,7 @@ func _destroy_stats_window() -> void:
 	_agent_claude_terminal_enabled_toggle = null
 	_agent_gemini_terminal_enabled_toggle = null
 	_agent_agy_terminal_enabled_toggle = null
+	_agent_pi_codex_enabled_toggle = null
 	_agent_port_spin_box = null
 	_agent_status_label = null
 	_codex_setup_progress_bar = null
@@ -2173,6 +2189,18 @@ func _on_agy_terminal_enabled_toggled(enabled: bool) -> void:
 	if _agent_controller == null:
 		return
 	_agent_controller.set_agy_terminal_enabled(enabled)
+	if enabled:
+		_agent_controller.refresh_executable_paths_if_invalid(
+			[AgentIntegrationControllerScript.TARGET_TERMINAL]
+		)
+	_apply_agent_control_state()
+	call_deferred("_apply_agent_control_state")
+
+
+func _on_pi_codex_enabled_toggled(enabled: bool) -> void:
+	if _agent_controller == null:
+		return
+	_agent_controller.set_pi_codex_enabled(enabled)
 	if enabled:
 		_agent_controller.refresh_executable_paths_if_invalid(
 			[AgentIntegrationControllerScript.TARGET_TERMINAL]

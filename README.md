@@ -11,7 +11,8 @@
 - 餵食、喝水、工作和摸摸互動，以及可喚醒、逐步恢復體力的睡眠系統
 - JSON 自動存檔，離線期間照顧狀態與親密進度凍結
 - 可公開散佈的通用預設角色
-- 支援Codex Pets素材 
+- 支援 Codex Pets 素材
+- Agent 通知整合：Codex、OpenCode、Claude Code、Gemini CLI、Antigravity CLI、Copilot 與 Pi
 - 遊戲內匯入、更新、切換與刪除角色包
 - 與 Git 完全隔離的私人角色包
 

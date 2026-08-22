@@ -16,6 +16,8 @@ static func normalize_agent(value: String) -> String:
 	var candidate := value.to_lower()
 	if candidate.contains("copilot"):
 		return "copilot"
+	if candidate == "pi" or candidate.contains("pi-codex"):
+		return "pi"
 	if candidate.contains("opencode"):
 		return "opencode"
 	if candidate.contains("claude"):
@@ -44,6 +46,8 @@ static func normalize_target_app(value: String) -> String:
 static func display_name(source: String, agent: String) -> String:
 	if source == "copilot" or agent == "copilot":
 		return "Copilot"
+	if source == "pi" or source == "pi_codex" or agent == "pi":
+		return "Pi"
 	if source == "opencode" or agent == "opencode":
 		return "OpenCode"
 	if source == "claude" or agent == "claude":
@@ -70,6 +74,8 @@ static func target_display_name(target_app: String) -> String:
 
 
 static func notification_key(source: String, agent: String, target_app: String) -> String:
+	if source == "pi" or source == "pi_codex" or agent == "pi":
+		return "pi_codex_terminal"
 	if source == "copilot" or agent == "copilot":
 		return "copilot"
 	if source == "opencode" or agent == "opencode":

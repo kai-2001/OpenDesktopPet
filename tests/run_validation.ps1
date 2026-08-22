@@ -57,6 +57,10 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
 	throw 'Antigravity CLI notification bridge checks failed.'
 }
+& (Join-Path $PSScriptRoot 'pi_integration_installer_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+	throw 'Pi integration installer checks failed.'
+}
 & (Join-Path $PSScriptRoot 'open_desktop_pet_uninstaller_test.ps1')
 if ($LASTEXITCODE -ne 0) {
 	throw 'OpenDesktopPet uninstaller checks failed.'

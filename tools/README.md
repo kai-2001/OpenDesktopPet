@@ -1,8 +1,8 @@
 # Agent 通知橋接器
 
 `codex_stop_notify.ps1`、`vscode_agent_notify.ps1`、`opencode_notify.ps1`、
-`claude_code_notify.ps1`、`gemini_cli_notify.ps1` 與 `antigravity_cli_notify.ps1` 是 Open Desktop Pet 的 Windows 本機通知橋接器。Codex App、VS Code Codex、Codex CLI、VS Code Copilot、終端機 OpenCode、Claude Code、Gemini CLI 與 Antigravity CLI
-共用桌寵的一個 `127.0.0.1` UDP 通訊埠；橋接器會先判斷來源與目標屬地，
+`claude_code_notify.ps1`、`gemini_cli_notify.ps1` 與 `antigravity_cli_notify.ps1` 是 Open Desktop Pet 的 Windows 本機通知橋接器；`pi_agent_notify.ts` 是 Pi 的 TypeScript extension。Codex App、VS Code Codex、Codex CLI、VS Code Copilot、終端機 OpenCode、Claude Code、Gemini CLI、Antigravity CLI 與 Pi
+共用桌寵的一個 `127.0.0.1` UDP 通訊埠；Pi extension 與其他橋接器都會先判斷來源與目標屬地，
 桌寵再統一處理氣泡與視窗切換。
 
 桌寵內開啟「Agent 通知」後，橋接器會將 Agent 的完成、等待或錯誤狀態
@@ -55,6 +55,30 @@ VS Code 或 Codex，並依 Codex 提示檢閱及信任新的 hook。
 若尚未信任、內容已變更或被停用，開關不會顯示為成功；桌寵會顯示引導視窗，
 由使用者開啟 Codex CLI、輸入 `/hooks` 並在 Codex 的官方審查頁面完成確認。
 回到桌寵按「重新檢查」後，只有 Codex 回報 Hook 已啟用且為 `trusted`，才會真正開啟通知。
+
+## 安裝 Pi extension
+
+Pi 沒有像 Codex CLI 那樣的 `hooks.json` Stop Hook；Pi 目前是 terminal coding harness，整合方式是 TypeScript extension，一份 extension 可處理所有 provider 與模型。
+桌寵會將 `pi_agent_notify.ts` 安裝到：
+
+```text
+%USERPROFILE%\.pi\agent\extensions\open-desktop-pet.ts
+```
+
+若設定 `PI_CODING_AGENT_DIR`，則會安裝到該資料夾的 `extensions` 子資料夾。
+extension 使用 Pi 的 `agent_settled` 事件，等重試、壓縮及 queued follow-up 都完成後才通知，
+並只傳送完成或錯誤狀態、session ID、工作目錄與模型識別，不傳送回答、提示詞或程式碼。
+安裝後重新啟動 Pi，或在 Pi 內執行 `/reload`：
+
+```powershell
+.\install_pi_integration.ps1
+```
+
+解除安裝：
+
+```powershell
+.\install_pi_integration.ps1 -Uninstall
+```
 
 ## 安裝 VS Code Copilot user hook
 
@@ -153,7 +177,7 @@ bridge 只送出完成或權限等待狀態，不會把回答或完整對話內�
 .\install_gemini_cli_integration.ps1 -Uninstall
 ```
 
-安裝或解除安裝後請重新啟動 VS Code、Codex、OpenCode、Claude Code／Claude Desktop 或 Gemini CLI。
+安裝或解除安裝後請重新啟動 VS Code、Codex、OpenCode、Claude Code／Claude Desktop、Gemini CLI 或 Pi。
 
 ## 安裝 Antigravity CLI hooks
 
@@ -189,7 +213,7 @@ Uninstall-OpenDesktopPet.cmd
 
 解除安裝器會讓使用者選擇：
 
-1. **只移除 Agent 通知整合與開機啟動**：撤回 Codex、Copilot、OpenCode、Claude Code、Gemini CLI 與 Antigravity CLI 的桌寵 hook，保留角色包、存檔與桌寵設定。
+1. **只移除 Agent 通知整合與開機啟動**：撤回 Codex、Copilot、OpenCode、Claude Code、Gemini CLI、Antigravity CLI 與 Pi 的桌寵整合，保留角色包、存檔與桌寵設定。
 2. **完整移除**：除了上述整合，也會刪除 `%USERPROFILE%\.open-desktop-pet`、Godot 的桌寵資料（`ui_settings.cfg`、`profiles`、`character_packs`）及桌寵診斷記錄。
 
 也可在 PowerShell 直接指定模式：
@@ -236,7 +260,10 @@ tools/
 ├─ gemini_cli_notify.ps1
 ├─ Install-Antigravity-CLI-Integration.cmd
 ├─ install_antigravity_cli_integration.ps1
-└─ antigravity_cli_notify.ps1
+├─ antigravity_cli_notify.ps1
+├─ Install-Pi-Integration.cmd
+├─ install_pi_integration.ps1
+└─ pi_agent_notify.ts
 ```
 
 若已有建置好的 EXE，可以用以下指令準備發布資料夾：

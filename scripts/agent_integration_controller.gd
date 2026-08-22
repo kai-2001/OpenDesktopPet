@@ -18,6 +18,10 @@ const OPENCODE_INSTALL_MARKER := "open_desktop_pet_opencode_installed.txt"
 const CLAUDE_CODE_INSTALL_MARKER := "open_desktop_pet_claude_code_installed.txt"
 const GEMINI_CLI_INSTALL_MARKER := "open_desktop_pet_gemini_cli_installed.txt"
 const AGY_INSTALL_MARKER := "open_desktop_pet_antigravity_cli_installed.txt"
+const PI_INSTALL_MARKER := "open_desktop_pet_pi_installed.txt"
+const PI_EXTENSION_FILE_NAME := "open-desktop-pet.ts"
+const PI_EXTENSION_MARKER := "OpenDesktopPet Pi notification extension"
+const LEGACY_PI_EXTENSION_MARKER := "OpenDesktopPet Pi Codex notification extension"
 const CODEX_HOOK_CONFIG_FILE_NAME := "hooks.json"
 const CODEX_STOP_SCRIPT_FILE_NAME := "codex_stop_notify.ps1"
 const CODEX_HOOK_REVIEW_TOOL_FILE_NAME := "codex_hook_review.ps1"
@@ -66,6 +70,7 @@ var claude_app_enabled := false
 var claude_terminal_enabled := false
 var gemini_terminal_enabled := false
 var agy_terminal_enabled := false
+var pi_codex_enabled := false
 var port := DEFAULT_PORT
 var executable_path := ""
 var codex_app_executable_path := ""
@@ -138,6 +143,9 @@ func load_settings() -> void:
 		)
 		agy_terminal_enabled = bool(
 			config.get_value("agy_terminal", "enabled", false)
+		)
+		pi_codex_enabled = bool(
+			config.get_value("pi_codex_terminal", "enabled", false)
 		)
 		port = normalize_port(int(config.get_value("codex", "port", DEFAULT_PORT)))
 		executable_path = _normalize_executable_path(String(config.get_value(
@@ -362,6 +370,16 @@ func set_agy_terminal_enabled(value: bool) -> void:
 	_persist_agent_state()
 
 
+func set_pi_codex_enabled(value: bool) -> void:
+	if value and DisplayServer.get_name() != "headless" \
+			and not _ensure_pi_configuration():
+		pi_codex_enabled = false
+		_persist_agent_state()
+		return
+	pi_codex_enabled = value
+	_persist_agent_state()
+
+
 func set_codex_app_executable_path(value: String) -> void:
 	codex_app_executable_path = _normalize_executable_path(value)
 	_save_settings()
@@ -397,7 +415,8 @@ func refresh_enabled_executable_paths_if_invalid() -> void:
 	if codex_app_enabled:
 		targets.append(TARGET_CODEX_APP)
 	if terminal_codex_enabled or terminal_opencode_enabled \
-			or gemini_terminal_enabled or agy_terminal_enabled:
+			or gemini_terminal_enabled or agy_terminal_enabled \
+			or pi_codex_enabled:
 		targets.append(TARGET_TERMINAL)
 	if vscode_opencode_enabled:
 		targets.append(TARGET_VSCODE)
@@ -516,7 +535,7 @@ func is_any_enabled() -> bool:
 		or terminal_opencode_enabled or vscode_opencode_enabled \
 		or opencode_app_enabled or copilot_enabled \
 		or claude_vscode_enabled or claude_app_enabled or claude_terminal_enabled \
-		or gemini_terminal_enabled or agy_terminal_enabled
+		or gemini_terminal_enabled or agy_terminal_enabled or pi_codex_enabled
 
 
 func is_running() -> bool:
@@ -666,6 +685,24 @@ func is_antigravity_cli_configured() -> bool:
 		if handler is Dictionary and String(handler.get("command", "")) == expected_command:
 			return true
 	return false
+
+
+func is_pi_configured() -> bool:
+	var integration_home := _integration_home_path()
+	var extension_path := _pi_extension_path()
+	if integration_home.is_empty() or extension_path.is_empty():
+		return false
+	if not FileAccess.file_exists(integration_home.path_join(PI_INSTALL_MARKER)):
+		return false
+	if not FileAccess.file_exists(extension_path):
+		return false
+	var extension_text := _read_text_file(extension_path)
+	return (
+		extension_text.contains(PI_EXTENSION_MARKER)
+		or extension_text.contains(LEGACY_PI_EXTENSION_MARKER)
+	) \
+		and extension_text.contains('pi.on("agent_settled"') \
+		and extension_text.contains('"pi_codex_terminal"')
 
 
 func _expected_antigravity_cli_hook_command() -> String:
@@ -882,6 +919,15 @@ func _ensure_antigravity_cli_configuration() -> bool:
 	return false
 
 
+func _ensure_pi_configuration() -> bool:
+	if is_pi_configured():
+		return true
+	if _run_pi_configuration_tool() and is_pi_configured():
+		return true
+	configuration_failed.emit("Pi")
+	return false
+
+
 func _persist_agent_state() -> void:
 	_save_settings()
 	_refresh_runtime_registration()
@@ -919,6 +965,9 @@ func _ensure_enabled_configurations() -> void:
 		changed = true
 	if agy_terminal_enabled and not _ensure_antigravity_cli_configuration():
 		agy_terminal_enabled = false
+		changed = true
+	if pi_codex_enabled and not _ensure_pi_configuration():
+		pi_codex_enabled = false
 		changed = true
 	if changed:
 		_save_settings()
@@ -1173,6 +1222,7 @@ func _handle_notification(notification: Dictionary) -> void:
 		"claude_app": claude_app_enabled,
 		"gemini_terminal": gemini_terminal_enabled,
 		"agy_terminal": agy_terminal_enabled,
+		"pi_codex_terminal": pi_codex_enabled,
 	}
 	if not AgentNotificationRouterScript.is_notification_enabled(
 			source, agent, target_app, enabled_by_key
@@ -1242,6 +1292,7 @@ func _save_settings() -> void:
 	config.set_value("claude_code_terminal", "enabled", claude_terminal_enabled)
 	config.set_value("gemini_terminal", "enabled", gemini_terminal_enabled)
 	config.set_value("agy_terminal", "enabled", agy_terminal_enabled)
+	config.set_value("pi_codex_terminal", "enabled", pi_codex_enabled)
 	config.save(UI_SETTINGS_PATH)
 
 
@@ -1308,6 +1359,25 @@ func _gemini_home_path() -> String:
 	if user_profile.is_empty():
 		return ""
 	return user_profile.path_join(".gemini")
+
+
+func _pi_agent_home_path() -> String:
+	var configured_home := OS.get_environment("PI_CODING_AGENT_DIR").strip_edges()
+	var user_profile := _user_profile_path()
+	if configured_home.is_empty():
+		return "" if user_profile.is_empty() else user_profile.path_join(".pi/agent")
+	if configured_home == "~":
+		return user_profile
+	if configured_home.begins_with("~/") or configured_home.begins_with("~\\"):
+		return user_profile.path_join(configured_home.substr(2))
+	return configured_home.simplify_path()
+
+
+func _pi_extension_path() -> String:
+	var agent_home := _pi_agent_home_path()
+	if agent_home.is_empty():
+		return ""
+	return agent_home.path_join("extensions").path_join(PI_EXTENSION_FILE_NAME)
 
 
 func _integration_home_path() -> String:
@@ -1392,6 +1462,7 @@ func _write_runtime_state() -> bool:
 			"claude_app": claude_app_enabled,
 			"gemini_terminal": gemini_terminal_enabled,
 			"agy_terminal": agy_terminal_enabled,
+			"pi_codex_terminal": pi_codex_enabled,
 		},
 		"executable_paths": {
 			"codex_app": codex_app_executable_path,
@@ -1655,6 +1726,23 @@ func _run_gemini_cli_configuration_tool() -> bool:
 
 func _run_antigravity_cli_configuration_tool() -> bool:
 	var installer_path := _tool_path("install_antigravity_cli_integration.ps1")
+	if not FileAccess.file_exists(installer_path):
+		return false
+	var output: Array = []
+	var exit_code := OS.execute("powershell.exe", [
+		"-NoProfile",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-WindowStyle",
+		"Hidden",
+		"-File",
+		installer_path,
+	], output, true, false)
+	return exit_code == 0
+
+
+func _run_pi_configuration_tool() -> bool:
+	var installer_path := _tool_path("install_pi_integration.ps1")
 	if not FileAccess.file_exists(installer_path):
 		return false
 	var output: Array = []

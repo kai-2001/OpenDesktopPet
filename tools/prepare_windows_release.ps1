@@ -56,6 +56,9 @@ foreach ($fileName in @(
     'Install-Antigravity-CLI-Integration.cmd',
     'install_antigravity_cli_integration.ps1',
     'antigravity_cli_notify.ps1',
+    'Install-Pi-Integration.cmd',
+    'install_pi_integration.ps1',
+    'pi_agent_notify.ts',
     'README.md'
 )) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $fileName) -Destination (Join-Path $toolsOutput $fileName) -Force

@@ -26,6 +26,7 @@ var claude_app_enabled := false
 var claude_terminal_enabled := false
 var gemini_terminal_enabled := false
 var agy_terminal_enabled := false
+var pi_codex_enabled := false
 var agent_port := AgentIntegrationControllerScript.DEFAULT_PORT
 var codex_executable_path := ""
 var codex_app_executable_path := ""
@@ -119,6 +120,7 @@ func build(owner: Node) -> Dictionary:
 	details_controller.claude_terminal_enabled = claude_terminal_enabled
 	details_controller.gemini_terminal_enabled = gemini_terminal_enabled
 	details_controller.agy_terminal_enabled = agy_terminal_enabled
+	details_controller.pi_codex_enabled = pi_codex_enabled
 	details_controller.agent_port = agent_port
 	details_controller.vscode_executable_path = codex_executable_path
 	details_controller.codex_app_executable_path = codex_app_executable_path
