@@ -43,6 +43,7 @@ func focus_reminder(reminder_id: String) -> void:
 	var reminder: Dictionary = _coordinator.get_reminder(reminder_id)
 	if reminder.is_empty():
 		return
+	_hide_form()
 	var status := String(reminder.get("status", "todo"))
 	var due_date := String(reminder.get("due_date", ""))
 	if status == "done":
@@ -56,7 +57,6 @@ func focus_reminder(reminder_id: String) -> void:
 	]:
 		if section.focus_reminder(reminder_id):
 			break
-	_show_edit_form(reminder)
 
 
 func show_new_form() -> void:

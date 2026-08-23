@@ -49,7 +49,6 @@ static func populate_today_reminders(
 		return
 	menu.add_separator()
 	menu.add_item("今日待辦", REMINDER_VIEW_ALL_ITEM_ID)
-	menu.set_item_disabled(menu.item_count - 1, true)
 	for index: int in mini(reminders.size(), 4):
 		var reminder: Dictionary = reminders[index]
 		var time := "整日" if bool(reminder.get("all_day", false)) else String(reminder.get("due_time", ""))

@@ -59,8 +59,8 @@ func focus_reminder(reminder_id: String) -> bool:
 		for child: Node in _list.get_children():
 			if child is TaskReminderItem and String(child.reminder.get("id", "")) == reminder_id:
 				child.expand()
-				child.grab_focus()
-			return true
+				break
+		return true
 	return false
 
 

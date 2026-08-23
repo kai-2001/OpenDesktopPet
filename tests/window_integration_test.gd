@@ -1,5 +1,6 @@
 extends SceneTree
 
+const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
 
 var _failures := 0
@@ -94,6 +95,22 @@ func _init() -> void:
 	_assert_true(
 		is_instance_valid(main._stats_window) and main._stats_tabs.current_tab == 1,
 		"clicking the task reminder badge opens the reminders tab"
+	)
+	main._on_context_action(PetMenuBuilderScript.REMINDER_ITEM_ID_BASE)
+	await process_frame
+	await process_frame
+	var reminder_panel = main._details_window_controller._task_reminder_panel
+	_assert_true(
+		not reminder_panel._form_panel.visible,
+		"context-menu reminder navigation does not open the edit form"
+	)
+	var focused_item = reminder_panel._today_section._list.get_child(0)
+	var completion_action := focused_item.find_child(
+		"ReminderCompletionAction", true, false
+	) as Button
+	_assert_true(
+		completion_action != null and completion_action.is_visible_in_tree(),
+		"context-menu reminder navigation expands the selected today item"
 	)
 	main._task_reminder_coordinator.set_status(
 		String(today_reminder.get("id", "")), "done"

@@ -238,6 +238,10 @@ func _assert_context_menu_today_section_visibility() -> void:
 		menu.get_item_index(PetMenuBuilderScript.REMINDER_VIEW_ALL_ITEM_ID) == 1,
 		"today section keeps the details shortcut"
 	)
+	_assert_true(
+		not menu.is_item_disabled(menu.get_item_index(PetMenuBuilderScript.REMINDER_VIEW_ALL_ITEM_ID)),
+		"today section shortcut is clickable"
+	)
 	menu.queue_free()
 
 
