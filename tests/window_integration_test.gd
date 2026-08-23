@@ -60,6 +60,23 @@ func _init() -> void:
 		"today reminder replaces the normal startup bubble"
 	)
 	_assert_true(main.task_reminder_badge.visible, "today reminder displays the compact badge")
+	var now := Time.get_datetime_dict_from_system(false)
+	var due_time := "%02d:%02d" % [now.hour, now.minute]
+	var timed_reminder: Dictionary = main._task_reminder_coordinator.create_reminder(
+		"時間到整合測試", Time.get_date_string_from_system(false), due_time, false
+	)
+	main._on_reminder_due(timed_reminder)
+	await process_frame
+	_assert_true(main.bubble.visible, "timed reminder opens the real speech bubble")
+	_assert_equal(
+		main.bubble_label.text,
+		"・%s 時間到整合測試" % due_time,
+		"timed reminder speech bubble uses the compact bullet format"
+	)
+	main._task_reminder_coordinator.set_status(
+		String(timed_reminder.get("id", "")), "done"
+	)
+	await process_frame
 	var badge_center: Vector2 = main.task_reminder_badge.get_global_rect().get_center()
 	_assert_true(
 		main._is_interactive_overlay_at(badge_center),

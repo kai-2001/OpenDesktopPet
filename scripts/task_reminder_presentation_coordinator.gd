@@ -13,7 +13,7 @@ func configure(value) -> void:
 func badge_state() -> TaskReminderBadgeState:
 	if reminder_coordinator == null:
 		return TaskReminderBadgeStateScript.new()
-	var today_count: int = reminder_coordinator.get_open_today_reminders().size()
+	var today_count: int = reminder_coordinator.get_due_open_today_reminders().size()
 	var overdue_count: int = reminder_coordinator.get_overdue_reminders().size()
 	var label := _count_label(today_count)
 	var tooltip := _tooltip_text(today_count, overdue_count)
@@ -34,13 +34,23 @@ func badge_state() -> TaskReminderBadgeState:
 func startup_message() -> String:
 	if reminder_coordinator == null:
 		return ""
-	var today_items: Array[Dictionary] = reminder_coordinator.get_open_today_reminders()
+	var today_items: Array[Dictionary] = reminder_coordinator.get_due_open_today_reminders()
 	if today_items.is_empty():
 		return ""
 	var lines: Array[String] = ["今天有 %d 件待辦" % today_items.size()]
 	for reminder: Dictionary in today_items.slice(0, mini(today_items.size(), 2)):
 		lines.append("・%s" % _display_title(reminder))
 	return "\n".join(lines)
+
+
+func due_message(reminder: Dictionary) -> String:
+	if reminder.is_empty() or bool(reminder.get("all_day", false)):
+		return ""
+	var title := String(reminder.get("title", "")).strip_edges()
+	var due_time := String(reminder.get("due_time", "")).strip_edges()
+	if title.is_empty() or due_time.is_empty():
+		return ""
+	return "・%s %s" % [due_time, title]
 
 
 func badge_position(

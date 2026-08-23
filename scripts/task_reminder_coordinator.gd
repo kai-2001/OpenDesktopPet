@@ -43,6 +43,14 @@ func get_open_today_reminders() -> Array[Dictionary]:
 	return result
 
 
+func get_due_open_today_reminders() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for reminder: Dictionary in get_today_reminders():
+		if _is_open(reminder) and _is_due_now(reminder):
+			result.append(reminder)
+	return result
+
+
 func get_upcoming_reminders(limit := -1) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var today := _today()

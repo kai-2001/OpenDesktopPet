@@ -11,7 +11,20 @@ const TaskReminderThemeScript = preload("res://scripts/task_reminder_theme.gd")
 
 var _failures := 0
 var _requested_status := ""
+var _due_count := 0
 const TEST_PATH := "user://test_runs/task_reminder_test.json"
+const FUTURE_TEST_PATH := "user://test_runs/task_reminder_future.json"
+
+
+class FakeTimeCoordinator extends TaskReminderCoordinatorScript:
+	var fake_date := ""
+	var fake_time := ""
+
+	func _today() -> String:
+		return fake_date
+
+	func _current_time() -> String:
+		return fake_time
 
 
 func _init() -> void:
@@ -59,6 +72,62 @@ func _run() -> void:
 	_assert_true(
 		presentation.startup_message().contains("測試今天的待辦"),
 		"startup presentation contains the reminder title"
+	)
+	_assert_equal(
+		presentation.due_message(created),
+		"",
+		"all-day reminder does not gain a timed due message"
+	)
+
+	var future_repository = TaskReminderRepositoryScript.new()
+	future_repository.save_path = FUTURE_TEST_PATH
+	var future_coordinator = FakeTimeCoordinator.new()
+	future_coordinator.repository = future_repository
+	future_coordinator.fake_date = today
+	future_coordinator.fake_time = "10:00"
+	future_coordinator.initialize()
+	var future_timed := future_coordinator.create_reminder(
+		"尚未到時間的待辦", today, "11:00", false
+	)
+	_assert_true(not future_timed.is_empty(), "future timed reminder can be created")
+	_assert_equal(
+		future_coordinator.get_open_today_reminders().size(),
+		1,
+		"future timed reminder remains visible in today's list"
+	)
+	_assert_true(
+		future_coordinator.get_due_open_today_reminders().is_empty(),
+		"future timed reminder is not due before its time"
+	)
+	var future_presentation := TaskReminderPresentationCoordinatorScript.new()
+	future_presentation.configure(future_coordinator)
+	future_coordinator.reminder_due.connect(_capture_due)
+	_assert_equal(
+		future_presentation.startup_message(),
+		"",
+		"future timed reminder does not show a startup notification"
+	)
+	_assert_true(
+		not future_presentation.badge_state().visible,
+		"future timed reminder does not show the reminder badge"
+	)
+	future_coordinator.fake_time = "11:00"
+	_assert_equal(
+		future_coordinator.get_due_open_today_reminders().size(),
+		1,
+		"timed reminder becomes due at its configured time"
+	)
+	_assert_true(
+		not future_presentation.startup_message().is_empty(),
+		"due timed reminder can show a startup notification"
+	)
+	future_coordinator.process(15.0)
+	_assert_equal(_due_count, 1, "timed reminder emits its due notification")
+	var due_message := future_presentation.due_message(future_timed)
+	_assert_equal(
+		due_message,
+		"・11:00 尚未到時間的待辦",
+		"timed reminder provides a concise speech-bubble message"
 	)
 
 	var reopened = TaskReminderCoordinatorScript.new()
@@ -173,14 +242,19 @@ func _assert_context_menu_today_section_visibility() -> void:
 
 
 func _cleanup() -> void:
-	for suffix: String in ["", ".tmp", ".backup"]:
-		var path := TEST_PATH + suffix
-		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	for test_path: String in [TEST_PATH, FUTURE_TEST_PATH]:
+		for suffix: String in ["", ".tmp", ".backup"]:
+			var path := test_path + suffix
+			if FileAccess.file_exists(path):
+				DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _capture_requested_status(_id: String, status: String) -> void:
 	_requested_status = status
+
+
+func _capture_due(_reminder: Dictionary) -> void:
+	_due_count += 1
 
 
 func _assert_true(condition: bool, label: String) -> void:

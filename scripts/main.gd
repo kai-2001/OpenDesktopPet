@@ -28,6 +28,7 @@ const AGENT_NOTIFICATION_DURATION_SECONDS := 60.0
 const AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3.0
 const STARTUP_DIALOGUE_DURATION_SECONDS := 5.0
 const STARTUP_REMINDER_DURATION_SECONDS := 8.0
+const TASK_REMINDER_NOTIFICATION_DURATION_SECONDS := 8.0
 const REMINDERS_TAB_INDEX := 1
 const AGENT_TAB_INDEX := 3
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
@@ -730,6 +731,12 @@ func _on_reminder_due(reminder: Dictionary) -> void:
 	if reminder.is_empty():
 		return
 	_refresh_task_reminder_badge(true)
+	if bool(reminder.get("all_day", false)) \
+			or _task_reminder_presentation == null:
+		return
+	var message: String = _task_reminder_presentation.due_message(reminder)
+	if not message.is_empty():
+		say(message, TASK_REMINDER_NOTIFICATION_DURATION_SECONDS)
 
 
 func _refresh_task_reminder_badge(pulse_overdue := false) -> void:
