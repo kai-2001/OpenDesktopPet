@@ -172,6 +172,11 @@ func load_settings() -> void:
 	enabled = codex_enabled
 	_save_settings()
 	_ensure_enabled_configurations()
+	# AppX packages can be replaced by Windows Update while the saved
+	# executable path still points at the previous package version. Refresh
+	# enabled targets during startup so notifications never become clickable
+	# only after the user toggles the integration off and on again.
+	refresh_enabled_executable_paths_if_invalid()
 	_refresh_runtime_registration()
 
 
@@ -473,17 +478,23 @@ func _start_executable_path_detection(targets: Array[String]) -> void:
 func _detect_invalid_executable_paths(path_snapshot: Dictionary) -> Dictionary:
 	var detected_paths := {}
 	for target: String in path_snapshot.keys():
-		if target == TARGET_VSCODE:
-			detected_paths[target] = detect_vscode_executable()
-		elif target == TARGET_CODEX_APP:
-			detected_paths[target] = detect_codex_app_executable()
-		elif target == TARGET_TERMINAL:
-			detected_paths[target] = detect_terminal_executable()
-		elif target == TARGET_OPENCODE_APP:
-			detected_paths[target] = detect_opencode_app_executable()
-		elif target == TARGET_CLAUDE_APP:
-			detected_paths[target] = detect_claude_app_executable()
+		detected_paths[target] = _detect_executable_path(target)
 	return detected_paths
+
+
+func _detect_executable_path(target: String) -> String:
+	match target:
+		TARGET_VSCODE:
+			return detect_vscode_executable()
+		TARGET_CODEX_APP:
+			return detect_codex_app_executable()
+		TARGET_TERMINAL:
+			return detect_terminal_executable()
+		TARGET_OPENCODE_APP:
+			return detect_opencode_app_executable()
+		TARGET_CLAUDE_APP:
+			return detect_claude_app_executable()
+	return ""
 
 
 func _poll_executable_path_detection() -> void:
@@ -518,6 +529,7 @@ func _apply_detected_executable_paths(
 			changed = true
 	if changed:
 		_save_settings()
+		_publish_runtime_if_running()
 		state_changed.emit()
 
 
@@ -1550,6 +1562,17 @@ func _remove_legacy_bridge_state() -> void:
 
 func _focus_target(target_app: String, agent := "") -> bool:
 	var target_path := _target_executable_path(target_app)
+	# A notification can arrive while the startup path scan is still running.
+	# Resolve the requested target synchronously on click so the first click is
+	# enough even during the Windows logon/AppX startup race.
+	if not _has_valid_executable_path(target_path):
+		var detected_path := _detect_executable_path(target_app)
+		if _has_valid_executable_path(detected_path):
+			_set_executable_path_for_target(target_app, detected_path)
+			_save_settings()
+			_publish_runtime_if_running()
+			state_changed.emit()
+			target_path = detected_path
 	if not _has_valid_executable_path(target_path) or _window_activator == null:
 		return false
 	if target_app == TARGET_VSCODE:

@@ -258,6 +258,10 @@ Assert-Architecture ($agentController -match 'ClassDB\.instantiate\("WindowsWind
 	'Codex focus must use the in-process Windows GDExtension.'
 Assert-Architecture ($agentController -match 'focus_executable') `
 	'Codex focus must verify native window activation.'
+Assert-Architecture ($agentController -match '(?s)func load_settings\(\).*?refresh_enabled_executable_paths_if_invalid\(\)') `
+	'Agent executable paths must be refreshed when enabled integrations load at startup.'
+Assert-Architecture ($agentController -match '(?s)func _focus_target\(.*?_detect_executable_path\(target_app\)') `
+	'Agent focus must recover an invalid executable path on click.'
 Assert-Architecture ($agentController -notmatch 'SetForegroundWindow|AppActivate|WindowsForegroundAppMonitor') `
 	'Codex runtime integration must not launch a PowerShell foreground helper.'
 Assert-Architecture ($windowsActivator -match 'QueryFullProcessImageNameW') `
