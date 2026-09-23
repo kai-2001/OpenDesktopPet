@@ -3,6 +3,7 @@
 #include <gdextension_interface.h>
 #include <godot_cpp/godot.hpp>
 
+#include "windows_display_recovery_monitor.h"
 #include "windows_window_activator.h"
 
 using namespace godot;
@@ -12,6 +13,7 @@ void initialize_open_desktop_pet_windows(ModuleInitializationLevel p_level) {
 		return;
 	}
 	GDREGISTER_CLASS(WindowsWindowActivator);
+	GDREGISTER_CLASS(WindowsDisplayRecoveryMonitor);
 }
 
 void uninitialize_open_desktop_pet_windows(ModuleInitializationLevel p_level) {

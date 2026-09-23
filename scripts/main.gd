@@ -14,6 +14,7 @@ const TaskReminderPresentationCoordinatorScript = preload(
 	"res://scripts/task_reminder_presentation_coordinator.gd"
 )
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
+const DisplayRecoveryControllerScript = preload("res://scripts/display_recovery_controller.gd")
 const CharacterEffectPreferencesScript = preload(
 	"res://scripts/character_effect_preferences.gd"
 )
@@ -198,6 +199,9 @@ func _ready() -> void:
 	_setup_agent_integration()
 	_setup_autostart_service()
 	_setup_idle_behavior()
+	var display_recovery_controller: Node = DisplayRecoveryControllerScript.new()
+	display_recovery_controller.name = "DisplayRecoveryController"
+	add_child(display_recovery_controller)
 	_last_user_activity_ms = Time.get_ticks_msec()
 	call_deferred("_finish_window_setup")
 
