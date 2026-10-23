@@ -178,8 +178,10 @@ Assert-Architecture ($agentController -notmatch 'func _write_bridge_files') `
 	'Agent notifications must not write duplicate bridge flag files.'
 Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match 'Get-OpenDesktopPetRuntime') `
 	'Codex notifications must read the shared runtime registration.'
-Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match "hook_event_name -ne 'Stop'") `
+Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match "'Stop' \{\s*\`$eventType = 'agent-turn-complete'") `
 	'Codex notifications must be driven by the completed-chat Stop hook.'
+Assert-Architecture ((Read-Source 'tools/install_codex_integration.ps1') -match "Matcher = '\^request_user_input") `
+	'The Codex PreToolUse hook must stay limited to the question tools.'
 Assert-Architecture ((Read-Source 'tools/install_codex_integration.ps1') -match 'Remove-LegacyNotifyIntegration') `
 	'Codex Stop-hook installation must remove the obsolete notify integration.'
 Assert-Architecture ($agentController -match 'agy_terminal_enabled') `
@@ -238,8 +240,10 @@ Assert-Architecture ($agentController -match 'CODEX_SETUP_SETTINGS_SECTION.*pend
 	'Pending Codex notification setup must survive closing the review window or restarting the pet.'
 Assert-Architecture ($agentController -match '(?s)is_trusted\(status\).*_set_codex_target_enabled\(target, true\).*codex_trust_ready\.emit') `
 	'Every successful Codex trust check must enable the requested target and report success.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match '& \$codexExecutable --no-alt-screen') `
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "(?s)\`$reviewArguments = @\('--no-alt-screen'\).*& \`$codexExecutable @reviewArguments") `
 	'Codex Hook review must launch the interactive Codex TUI.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "\`$reviewArguments \+= '--no-daemon'") `
+	'Codex Hook review must bypass the Desktop CLI background server when supported.'
 Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -notmatch "--no-alt-screen '/hooks'") `
 	'Codex Hook review must not submit /hooks as an Agent prompt.'
 Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match [regex]::Escape('.vscode\extensions')) `

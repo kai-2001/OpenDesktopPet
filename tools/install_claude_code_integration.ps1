@@ -13,7 +13,9 @@ $installedRuntimeHelper = Join-Path $integrationHome 'open_desktop_pet_runtime.p
 $sourceRuntimeHelper = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
 $installMarker = Join-Path $integrationHome 'open_desktop_pet_claude_code_installed.txt'
 $markerText = 'OpenDesktopPet Claude Code notification hook'
-$hookEvents = @('Stop', 'Notification', 'StopFailure')
+# PreToolUse is only listed so reinstalling removes an earlier AskUserQuestion
+# hook; Notification already reports unanswered questions after a short delay.
+$hookEvents = @('Stop', 'Notification', 'StopFailure', 'PreToolUse')
 
 function New-EmptySettings {
     return [pscustomobject]@{

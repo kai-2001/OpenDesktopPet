@@ -266,7 +266,11 @@ try {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
     [void]$udp.Send($bytes, $bytes.Length, $notifyHost, $notifyPort)
     $udp.Dispose()
-    Write-NotifyLog ("sent type={0} target={1} port={2}" -f $eventType, $target.target_app, $notifyPort)
+    Write-NotifyLog (
+        "sent type={0} hook={1} notification={2} target={3} port={4}" -f
+        $eventType, $hookEvent, [string]$event.notification_type,
+        $target.target_app, $notifyPort
+    )
 } catch {
     Write-NotifyLog ("failed error-type={0} message={1}" -f $_.Exception.GetType().Name, $_.Exception.Message)
 }

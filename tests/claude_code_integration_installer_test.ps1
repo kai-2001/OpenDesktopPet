@@ -26,6 +26,9 @@ try {
     ],
     "SessionStart": [
       {"hooks": [{"type": "command", "command": "powershell.exe -File C:\\Tools\\existing-start.ps1"}]}
+    ],
+    "PreToolUse": [
+      {"matcher": "AskUserQuestion", "hooks": [{"type": "command", "command": "powershell.exe -File C:\\Users\\test\\.open-desktop-pet\\claude_code_notify.ps1"}]}
     ]
   }
 }
@@ -43,6 +46,8 @@ try {
         'Claude installer did not add exactly one Notification hook.'
     Assert-Installer (($failureCommands | Where-Object { $_ -like '*claude_code_notify.ps1*' }).Count -eq 1) `
         'Claude installer did not add exactly one StopFailure hook.'
+    Assert-Installer ($null -eq $settings.hooks.PreToolUse) `
+        'Claude installer must remove the earlier AskUserQuestion PreToolUse hook.'
     Assert-Installer ($settings.hooks.SessionStart[0].hooks.command -like '*existing-start.ps1*') `
         'Claude installer removed an unrelated hook.'
     Assert-Installer (Test-Path -LiteralPath (Join-Path $testRoot '.open-desktop-pet\claude_code_notify.ps1')) `
@@ -62,6 +67,8 @@ try {
         'Claude uninstall did not remove the Notification hook.'
     Assert-Installer ($null -eq $uninstalled.hooks.StopFailure) `
         'Claude uninstall did not remove the StopFailure hook.'
+    Assert-Installer ($null -eq $uninstalled.hooks.PreToolUse) `
+        'Claude uninstall did not remove the PreToolUse hook.'
 
     Write-Output 'CLAUDE_CODE_INTEGRATION_INSTALLER_TEST_OK'
 }

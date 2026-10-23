@@ -24,6 +24,13 @@ $legacyNotifyBridge = Join-Path $codexHome 'open_desktop_pet_notify.ps1'
 $legacyPreviousNotify = Join-Path $codexHome 'open_desktop_pet_previous_notify.json'
 $stopBridgeFileName = [IO.Path]::GetFileName($installedStopBridge)
 $legacyBridgeFileName = [IO.Path]::GetFileName($legacyNotifyBridge)
+# One bridge serves every event. Codex runs these hooks synchronously, so the
+# PreToolUse matcher must stay limited to the question tools.
+$hookEvents = @(
+	[pscustomobject]@{ Name = 'Stop'; Matcher = $null },
+	[pscustomobject]@{ Name = 'PermissionRequest'; Matcher = $null },
+	[pscustomobject]@{ Name = 'PreToolUse'; Matcher = '^request_user_input(_async)?$' }
+)
 
 function Save-HookConfig($config) {
 	$tempPath = "$hookConfigPath.open-desktop-pet.tmp"
@@ -65,12 +72,18 @@ function Test-IsOpenDesktopPetHandler($handler) {
 		$windowsCommand -like "*$stopBridgeFileName*"
 }
 
-function Remove-OpenDesktopPetStopHook($config) {
-	if ($null -eq $config.hooks -or $null -eq $config.hooks.PSObject.Properties['Stop']) {
+function Remove-OpenDesktopPetHooks($config) {
+	foreach ($hookEvent in $hookEvents) {
+		Remove-OpenDesktopPetHook $config $hookEvent.Name
+	}
+}
+
+function Remove-OpenDesktopPetHook($config, [string]$eventName) {
+	if ($null -eq $config.hooks -or $null -eq $config.hooks.PSObject.Properties[$eventName]) {
 		return
 	}
 	$remainingGroups = @()
-	foreach ($group in @($config.hooks.Stop)) {
+	foreach ($group in @($config.hooks.$eventName)) {
 		if ($null -eq $group.PSObject.Properties['hooks']) {
 			$remainingGroups += $group
 			continue
@@ -85,9 +98,9 @@ function Remove-OpenDesktopPetStopHook($config) {
 		}
 	}
 	if ($remainingGroups.Count -eq 0) {
-		$config.hooks.PSObject.Properties.Remove('Stop')
+		$config.hooks.PSObject.Properties.Remove($eventName)
 	} else {
-		$config.hooks | Add-Member -MemberType NoteProperty -Name Stop `
+		$config.hooks | Add-Member -MemberType NoteProperty -Name $eventName `
 			-Value $remainingGroups -Force
 	}
 }
@@ -285,7 +298,7 @@ if ($Uninstall) {
 	if (Test-Path -LiteralPath $hookConfigPath) {
 		try {
 			$hookConfig = Get-HookConfig
-			Remove-OpenDesktopPetStopHook $hookConfig
+			Remove-OpenDesktopPetHooks $hookConfig
 			Save-HookConfig $hookConfig
 		} catch {
 			Write-Warning 'Could not update existing Codex hook config; leaving it unchanged.'
@@ -297,7 +310,7 @@ if ($Uninstall) {
 			Remove-Item -LiteralPath $path -Force
 		}
 	}
-	Write-Output "Removed Codex Stop hook: $hookConfigPath"
+	Write-Output "Removed Codex hooks: $hookConfigPath"
 	exit 0
 }
 
@@ -313,24 +326,30 @@ Copy-Item -LiteralPath $sourceRuntimeHelper -Destination $installedRuntimeHelper
 $windowsCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' +
 	$installedStopBridge + '"'
 $hookConfig = Get-HookConfig
-Remove-OpenDesktopPetStopHook $hookConfig
-$existingStopGroups = if ($null -ne $hookConfig.hooks.PSObject.Properties['Stop']) {
-	@($hookConfig.hooks.Stop)
-} else {
-	@()
+Remove-OpenDesktopPetHooks $hookConfig
+foreach ($hookEvent in $hookEvents) {
+	$eventName = $hookEvent.Name
+	$existingGroups = if ($null -ne $hookConfig.hooks.PSObject.Properties[$eventName]) {
+		@($hookConfig.hooks.$eventName)
+	} else {
+		@()
+	}
+	$handler = [pscustomobject]@{
+		type = 'command'
+		command = $windowsCommand
+		commandWindows = $windowsCommand
+		timeout = 5
+	}
+	$group = [pscustomobject]@{ hooks = @($handler) }
+	if ($null -ne $hookEvent.Matcher) {
+		$group | Add-Member -MemberType NoteProperty -Name matcher -Value $hookEvent.Matcher
+	}
+	$hookConfig.hooks | Add-Member -MemberType NoteProperty -Name $eventName `
+		-Value (@($existingGroups) + @($group)) -Force
 }
-$stopHandler = [pscustomobject]@{
-	type = 'command'
-	command = $windowsCommand
-	commandWindows = $windowsCommand
-	timeout = 5
-}
-$stopGroup = [pscustomobject]@{ hooks = @($stopHandler) }
-$hookConfig.hooks | Add-Member -MemberType NoteProperty -Name Stop `
-	-Value (@($existingStopGroups) + @($stopGroup)) -Force
 Save-HookConfig $hookConfig
 Set-Content -LiteralPath $installMarker -Value '1' -Encoding ASCII
 
-Write-Output "Codex Stop hook installed: $hookConfigPath"
+Write-Output "Codex Stop, PermissionRequest, and PreToolUse hooks installed: $hookConfigPath"
 Write-Output "Notification bridge: $installedStopBridge"
-Write-Output 'Restart Codex or VS Code, then review and trust the hook when prompted.'
+Write-Output 'Restart Codex or VS Code, then review and trust the hooks when prompted.'

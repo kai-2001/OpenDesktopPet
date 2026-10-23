@@ -185,11 +185,22 @@ function Get-HookStatus([string]$codexExecutable, [string]$cwd) {
 			return @{ status = 'missing'; message = 'Codex returned no hook configuration.' }
 		}
 		$hooks = @($entries[0].hooks)
-		$hook = $hooks | Where-Object {
+		# Stop, PermissionRequest and PreToolUse share one bridge; notifications
+		# are only complete when every one of them is enabled and trusted.
+		$petHooks = @($hooks | Where-Object {
 			[string]$_.command -like "*$stopBridgeFileName*"
-		} | Select-Object -First 1
-		if ($null -eq $hook) {
+		})
+		if ($petHooks.Count -eq 0) {
 			return @{ status = 'missing'; message = 'The Open Desktop Pet Stop hook was not found.' }
+		}
+		$hook = $petHooks | Where-Object { -not [bool]$_.enabled } | Select-Object -First 1
+		if ($null -eq $hook) {
+			$hook = $petHooks | Where-Object {
+				([string]$_.trustStatus).ToLowerInvariant() -ne 'trusted'
+			} | Select-Object -First 1
+		}
+		if ($null -eq $hook) {
+			$hook = $petHooks[0]
 		}
 		$trustStatus = ([string]$hook.trustStatus).ToLowerInvariant()
 		if (-not [bool]$hook.enabled) {
@@ -272,22 +283,35 @@ if ($Action -eq 'Review') {
 	} catch {
 		# A custom title is optional; the review must still open.
 	}
-	Write-Host 'Open Desktop Pet installed a Codex Stop hook.'
+	Write-Host 'Open Desktop Pet installed Codex Stop, PermissionRequest, and PreToolUse hooks.'
 	Write-Host 'Recommended: choose 1. Review hooks.' -ForegroundColor Cyan
-	Write-Host 'Option 1 opens the hook list; it does not trust the hook yet.'
-	Write-Host 'In the hook list, select Stop and press Enter.'
-	Write-Host 'Set the Open Desktop Pet hook checkbox to [x]. [ ] is not trusted.'
+	Write-Host 'Option 1 opens the hook list; it does not trust the hooks yet.'
+	Write-Host 'In the hook list, select each of Stop, PermissionRequest, and PreToolUse and press Enter.'
+	Write-Host 'Set each Open Desktop Pet hook checkbox to [x]. [ ] is not trusted.'
 	Write-Host 'Press Esc to return. If the review screen is still open, press Esc again.'
 	Write-Host 'Option 2 trusts every pending hook; option 3 leaves notifications disabled.'
 	Write-Host 'After trusting, return to Open Desktop Pet and check the notification status.'
 	Write-Host ''
 	$reviewExitCode = 1
+	# The Codex Desktop CLI defaults to a shared background server whose
+	# package it does not ship, so its interactive review exits at once.
+	# Older CLIs lack --no-daemon, so only pass it when the CLI offers it.
+	$reviewArguments = @('--no-alt-screen')
+	if ((& $codexExecutable --help 2>&1 | Out-String) -match '--no-daemon') {
+		$reviewArguments += '--no-daemon'
+	}
 	try {
-		& $codexExecutable --no-alt-screen
+		& $codexExecutable @reviewArguments
 		$reviewExitCode = $LASTEXITCODE
 	} finally {
 		$reviewMutex.ReleaseMutex()
 		$reviewMutex.Dispose()
+	}
+	if ($reviewExitCode -ne 0) {
+		# Keep the window open so a Codex start-up error stays readable.
+		Write-Host ''
+		Write-Host "Codex exited with code $reviewExitCode. Press Enter to close." -ForegroundColor Yellow
+		[void](Read-Host)
 	}
 	exit $reviewExitCode
 }

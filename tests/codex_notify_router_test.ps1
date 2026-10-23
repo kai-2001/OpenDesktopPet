@@ -96,7 +96,7 @@ try {
 		([char]0x8a66).ToString() + ([char]0x300c).ToString() +
 		([char]0x684c).ToString() + ([char]0x5bf5).ToString() +
 		([char]0x300d).ToString()
-	$vscodeEvent = '{"hook_event_name":"Stop","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","session_id":"vscode","turn_id":"1","last_assistant_message":"' + $unicodeMessage + '"}'
+	$vscodeEvent = '{"hook_event_name":"Stop","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","session_id":"vscode","turn_id":"1","transcript_path":"C:\\Users\\test\\.codex\\sessions\\rollout-vscode.jsonl","last_assistant_message":"' + $unicodeMessage + '"}'
 	$payload = Receive-Notification $vscodeEvent $true
     Assert-Router ($payload.source -eq 'codex_vscode') 'VS Code Codex source was not classified.'
     Assert-Router ($payload.target_app -eq 'vscode') 'VS Code Codex target was not classified.'
@@ -110,14 +110,30 @@ try {
 
     $env:TERM_PROGRAM = ''
     $env:VSCODE_PID = ''
-	$appEvent = '{"hook_event_name":"Stop","cwd":"C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app","session_id":"app","turn_id":"1"}'
+	$appEvent = '{"hook_event_name":"Stop","cwd":"C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app","session_id":"app","turn_id":"1","transcript_path":"C:\\Users\\test\\.codex\\sessions\\rollout-app.jsonl"}'
     Receive-Notification $appEvent $false | Out-Null
 	$script:enabledTargets.codex_app = $true
     $payload = Receive-Notification $appEvent $true
     Assert-Router ($payload.source -eq 'codex_app') 'Codex App source was not classified.'
     Assert-Router ($payload.target_app -eq 'codex_app') 'Codex App target was not classified.'
 
-	$terminalEvent = '{"hook_event_name":"Stop","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","session_id":"terminal","turn_id":"1"}'
+	# Codex App background forks are ephemeral and must not look like a finished reply.
+	$ephemeralForkEvent = '{"hook_event_name":"Stop","cwd":"C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app","session_id":"background-fork","turn_id":"1","transcript_path":null}'
+	Receive-Notification $ephemeralForkEvent $false | Out-Null
+
+	$questionEvent = '{"hook_event_name":"PreToolUse","cwd":"C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app","session_id":"app","turn_id":"2","tool_name":"request_user_input_async","tool_use_id":"call_question","tool_input":{},"transcript_path":"C:\\Users\\test\\.codex\\sessions\\rollout-app.jsonl"}'
+	$payload = Receive-Notification $questionEvent $true
+	Assert-Router ($payload.type -eq 'approval-requested') 'A Codex question must be reported as waiting for the user.'
+	Assert-Router ($payload.event_id -like '*:input:call_question') 'Each Codex question needs its own event id.'
+
+	$otherToolEvent = '{"hook_event_name":"PreToolUse","cwd":"C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app","session_id":"app","turn_id":"2","tool_name":"exec_command","tool_use_id":"call_exec","tool_input":{},"transcript_path":"C:\\Users\\test\\.codex\\sessions\\rollout-app.jsonl"}'
+	Receive-Notification $otherToolEvent $false | Out-Null
+
+	$permissionEvent = '{"hook_event_name":"PermissionRequest","cwd":"C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app","session_id":"app","turn_id":"3","tool_name":"exec_command","tool_input":{},"transcript_path":"C:\\Users\\test\\.codex\\sessions\\rollout-app.jsonl"}'
+	$payload = Receive-Notification $permissionEvent $true
+	Assert-Router ($payload.type -eq 'approval-requested') 'A Codex permission request must be reported as waiting for the user.'
+
+	$terminalEvent = '{"hook_event_name":"Stop","cwd":"C:\\Apache24\\htdocs\\OpenDesktopPet","session_id":"terminal","turn_id":"1","transcript_path":"C:\\Users\\test\\.codex\\sessions\\rollout-terminal.jsonl"}'
     Receive-Notification $terminalEvent $false | Out-Null
 	$script:enabledTargets.codex_terminal = $true
     $payload = Receive-Notification $terminalEvent $true

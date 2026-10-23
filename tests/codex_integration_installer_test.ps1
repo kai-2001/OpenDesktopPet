@@ -23,9 +23,9 @@ function Test-StartsWithJsonObject([string]$path) {
 	return $bytes.Length -gt 0 -and $bytes[0] -eq 0x7B
 }
 
-function Get-DesktopPetHandlers($config) {
+function Get-DesktopPetHandlers($config, [string]$eventName = 'Stop') {
 	$handlers = @()
-	foreach ($group in @($config.hooks.Stop)) {
+	foreach ($group in @($config.hooks.$eventName)) {
 		$handlers += @($group.hooks | Where-Object {
 			[string]$_.command -like '*codex_stop_notify.ps1*' -or
 			[string]$_.commandWindows -like '*codex_stop_notify.ps1*'
@@ -91,6 +91,13 @@ try {
 	Assert-Installer (
 		Test-Path -LiteralPath (Join-Path $integrationHome 'codex_stop_notify.ps1')
 	) 'The installer did not copy the Stop-hook bridge.'
+	Assert-Installer (@(Get-DesktopPetHandlers $installedHooks 'PermissionRequest').Count -eq 1) `
+		'The installer must add exactly one OpenDesktopPet PermissionRequest handler.'
+	Assert-Installer (@(Get-DesktopPetHandlers $installedHooks 'PreToolUse').Count -eq 1) `
+		'The installer must add exactly one OpenDesktopPet PreToolUse handler.'
+	$questionGroup = @($installedHooks.hooks.PreToolUse)[0]
+	Assert-Installer ($questionGroup.matcher -eq '^request_user_input(_async)?$') `
+		'The PreToolUse hook must only match the Codex question tools.'
 
 	& $installerPath | Out-Null
 	$reinstalledHooksText = Get-Content -LiteralPath $hooksPath -Raw -Encoding UTF8
@@ -164,6 +171,10 @@ sandbox = "elevated"
 		'Uninstall must remove only the OpenDesktopPet Stop handler.'
 	Assert-Installer (@($uninstalledHooks.hooks.Stop).Count -eq 1) `
 		'Uninstall must preserve unrelated Stop groups.'
+	Assert-Installer ($null -eq $uninstalledHooks.hooks.PSObject.Properties['PermissionRequest']) `
+		'Uninstall must remove the OpenDesktopPet PermissionRequest hook.'
+	Assert-Installer ($null -eq $uninstalledHooks.hooks.PSObject.Properties['PreToolUse']) `
+		'Uninstall must remove the OpenDesktopPet PreToolUse hook.'
 	Assert-Installer (@($uninstalledHooks.hooks.SessionStart).Count -eq 1) `
 		'Uninstall must preserve other hook events.'
 	Assert-Installer (-not (

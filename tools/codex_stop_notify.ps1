@@ -2,8 +2,8 @@ $ErrorActionPreference = 'SilentlyContinue'
 
 # OpenDesktopPet runtime schema v1
 # Codex Stop-hook bridge. Codex owns the hook lifecycle; this file only
-# classifies the host and translates one completed chat turn to the shared
-# OpenDesktopPet runtime payload.
+# classifies the host and translates a completed chat turn, or a turn waiting
+# for the user's answer, to the shared OpenDesktopPet runtime payload.
 $notifyHost = '127.0.0.1'
 $integrationHome = Join-Path $env:USERPROFILE '.open-desktop-pet'
 $runtimeHelperPath = Join-Path $integrationHome 'open_desktop_pet_runtime.ps1'
@@ -11,6 +11,8 @@ if (-not (Test-Path -LiteralPath $runtimeHelperPath)) {
 	$runtimeHelperPath = Join-Path $PSScriptRoot 'open_desktop_pet_runtime.ps1'
 }
 $logPath = Join-Path $env:TEMP 'OpenDesktopPet-codex-stop-hook.log'
+# Keep in sync with the PreToolUse matcher in install_codex_integration.ps1.
+$userInputToolPattern = '^request_user_input(_async)?$'
 
 function Write-HookLog([string]$message) {
 	try {
@@ -126,8 +128,38 @@ try {
 	}
 
 	$event = ConvertFrom-Json -InputObject $eventJson
-	if ($null -eq $event -or [string]$event.hook_event_name -ne 'Stop') {
-		Write-HookLog 'ignored reason=unsupported-event'
+	$hookEvent = if ($null -eq $event) { '' } else { [string]$event.hook_event_name }
+	# Stop means the turn finished. PermissionRequest and the question tools
+	# mean Codex is blocked on the user; the hook stays silent so Codex keeps
+	# its own approval and question flow.
+	$eventType = ''
+	$eventSuffix = ''
+	switch ($hookEvent) {
+		'Stop' {
+			$eventType = 'agent-turn-complete'
+		}
+		'PermissionRequest' {
+			$eventType = 'approval-requested'
+			$eventSuffix = ':permission:' + [string]$event.tool_name
+		}
+		'PreToolUse' {
+			if ([string]$event.tool_name -match $userInputToolPattern) {
+				$eventType = 'approval-requested'
+				$eventSuffix = ':input:' + [string]$event.tool_use_id
+			}
+		}
+	}
+	if ([string]::IsNullOrWhiteSpace($eventType)) {
+		Write-HookLog ('ignored reason=unsupported-event hook={0} tool={1}' -f $hookEvent, [string]$event.tool_name)
+		exit 0
+	}
+
+	# Codex Desktop forks an ephemeral background thread after each user turn
+	# (for example ambient suggestions). Its Stop hook arrives seconds later,
+	# often while the next real turn is still running. Ephemeral threads have
+	# no rollout file, so a missing transcript marks a turn the user never saw.
+	if ([string]::IsNullOrWhiteSpace([string]$event.transcript_path)) {
+		Write-HookLog ('ignored reason=ephemeral-thread session={0}' -f [string]$event.session_id)
 		exit 0
 	}
 
@@ -139,8 +171,8 @@ try {
 	$target = Get-CodexTarget $event
 	$isEnabled = Test-OpenDesktopPetRuntimeEnabled -Runtime $runtime -Target $target.runtime_target
 	Write-HookLog (
-		'event hook={0} cwd={1} source={2} target={3} enabled={4}' -f
-		[string]$event.hook_event_name, [string]$event.cwd,
+		'event hook={0} cwd={1} session={2} source={3} target={4} enabled={5}' -f
+		[string]$event.hook_event_name, [string]$event.cwd, [string]$event.session_id,
 		$target.source, $target.target_app, $isEnabled
 	)
 	if (-not $isEnabled) {
@@ -150,14 +182,14 @@ try {
 	$notifyPort = Get-OpenDesktopPetRuntimePort -Runtime $runtime
 	$payload = [ordered]@{
 		schema_version = 1
-		type = 'agent-turn-complete'
+		type = $eventType
 		source = $target.source
 		agent = 'codex'
 		target_app = $target.target_app
 		target_platform = $target.target_app
 		target_executable = $target.target_executable
-		event_id = 'codex:{0}:{1}:{2}' -f (
-			$target.target_app, [string]$event.session_id, [string]$event.turn_id
+		event_id = 'codex:{0}:{1}:{2}{3}' -f (
+			$target.target_app, [string]$event.session_id, [string]$event.turn_id, $eventSuffix
 		)
 		thread_id = [string]$event.session_id
 		turn_id = [string]$event.turn_id
@@ -169,7 +201,7 @@ try {
 	$bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
 	[void]$udp.Send($bytes, $bytes.Length, $notifyHost, $notifyPort)
 	$udp.Dispose()
-	Write-HookLog ('sent status=agent-turn-complete port={0}' -f $notifyPort)
+	Write-HookLog ('sent status={0} port={1}' -f $eventType, $notifyPort)
 } catch {
 	Write-HookLog (
 		'failed error-type={0} message={1}' -f
