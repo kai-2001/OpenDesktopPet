@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
 # OpenDesktopPet runtime schema v1
+# OpenDesktopPet bridge revision: 1
 # Claude Code hook bridge for OpenDesktopPet.
 # Claude Code CLI, the VS Code extension, and Claude Desktop Code sessions
 # share the same user hook configuration. This bridge classifies the local

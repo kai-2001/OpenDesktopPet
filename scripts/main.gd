@@ -15,6 +15,7 @@ const TaskReminderPresentationCoordinatorScript = preload(
 )
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
 const DisplayRecoveryControllerScript = preload("res://scripts/display_recovery_controller.gd")
+const UpdateCheckCoordinatorScript = preload("res://scripts/update_check_coordinator.gd")
 const CharacterEffectPreferencesScript = preload(
 	"res://scripts/character_effect_preferences.gd"
 )
@@ -58,6 +59,11 @@ var _focus_mode_check_box: CheckBox
 var _keep_screen_on_check_box: CheckBox
 var _autostart_check_box: CheckBox
 var _settings_feedback: Label
+var _update_auto_check_box: CheckBox
+var _update_status_label: Label
+var _update_check_button: Button
+var _update_release_page_button: Button
+var _update_skip_button: Button
 var _agent_codex_enabled_toggle: Button
 var _agent_codex_app_enabled_toggle: Button
 var _agent_terminal_codex_enabled_toggle: Button
@@ -130,6 +136,7 @@ var _task_reminder_presentation
 var _bubble_token := 0
 var _shutting_down := false
 var _idle_count := 0
+var _idle_behavior_timer: Timer
 var _last_user_activity_ms := 0
 var _known_unlocked_actions: Dictionary = {}
 var _unlock_tracking_ready := false
@@ -142,6 +149,7 @@ var _details_theme_mode := "light"
 var _keep_screen_on := DEFAULT_KEEP_SCREEN_ON
 var _focus_mode := DEFAULT_FOCUS_MODE
 var _agent_controller: AgentIntegrationController
+var _update_check_coordinator
 var _details_window_controller
 var _agent_notification_active := false
 var _active_agent_target_app := AgentIntegrationControllerScript.TARGET_VSCODE
@@ -197,6 +205,7 @@ func _ready() -> void:
 	_setup_context_menu()
 	_setup_status_indicator()
 	_setup_agent_integration()
+	_setup_update_check()
 	_setup_autostart_service()
 	_setup_idle_behavior()
 	var display_recovery_controller: Node = DisplayRecoveryControllerScript.new()
@@ -420,6 +429,9 @@ func _setup_agent_integration() -> void:
 	_agent_controller.codex_unavailable.connect(_handle_codex_unavailable)
 	_agent_controller.codex_trust_required.connect(_handle_codex_trust_required)
 	_agent_controller.codex_trust_ready.connect(_handle_codex_trust_ready)
+	_agent_controller.codex_trust_refresh_required.connect(
+		_handle_codex_trust_refresh_required
+	)
 	_agent_controller.state_changed.connect(_refresh_agent_settings_ui)
 	_agent_controller.executable_path_detection_started.connect(
 		_on_executable_path_detection_started
@@ -428,6 +440,62 @@ func _setup_agent_integration() -> void:
 		_on_executable_path_detection_finished
 	)
 	_agent_controller.load_settings()
+
+
+func _setup_update_check() -> void:
+	_update_check_coordinator = UpdateCheckCoordinatorScript.new()
+	_update_check_coordinator.name = "UpdateCheckCoordinator"
+	_update_check_coordinator.state_changed.connect(_refresh_update_ui)
+	_update_check_coordinator.update_found.connect(_on_update_found)
+	add_child(_update_check_coordinator)
+
+
+func _on_update_found(version: String) -> void:
+	say("有新版本 v%s，可以到詳細面板的「設定」頁前往下載。" % version, 8.0)
+
+
+func _refresh_update_ui() -> void:
+	if _update_check_coordinator == null:
+		return
+	if is_instance_valid(_update_auto_check_box):
+		_update_auto_check_box.set_pressed_no_signal(
+			_update_check_coordinator.auto_check_enabled
+		)
+	if is_instance_valid(_update_status_label):
+		_update_status_label.text = _update_check_coordinator.status_text()
+	var checking: bool = (
+		_update_check_coordinator.state == UpdateCheckCoordinatorScript.STATE_CHECKING
+	)
+	if is_instance_valid(_update_check_button):
+		_update_check_button.disabled = checking
+	var has_update: bool = _update_check_coordinator.has_update()
+	if is_instance_valid(_update_release_page_button):
+		_update_release_page_button.visible = has_update
+	if is_instance_valid(_update_skip_button):
+		_update_skip_button.visible = has_update
+
+
+func _on_update_auto_check_toggled(enabled: bool) -> void:
+	if _update_check_coordinator != null:
+		_update_check_coordinator.set_auto_check_enabled(enabled)
+
+
+func _on_update_check_requested() -> void:
+	if _update_check_coordinator != null:
+		_update_check_coordinator.check_now()
+
+
+func _on_update_release_page_requested() -> void:
+	if _update_check_coordinator == null:
+		return
+	var url: String = _update_check_coordinator.release_page_url()
+	if not url.is_empty():
+		OS.shell_open(url)
+
+
+func _on_update_skip_requested() -> void:
+	if _update_check_coordinator != null:
+		_update_check_coordinator.skip_latest_version()
 
 
 func _handle_agent_configuration_failed(target_name: String) -> void:
@@ -445,6 +513,24 @@ func _handle_codex_unavailable(target_name: String, _message: String) -> void:
 func _handle_codex_trust_required(
 	target_name: String, status: String, message: String
 ) -> void:
+	_show_codex_trust_instructions(
+		"你正在開啟「%s Codex」通知。三種 Codex 共用同一組桌寵 Hook 信任。" % target_name,
+		target_name, status, message
+	)
+
+
+func _handle_codex_trust_refresh_required(
+	target_name: String, status: String, message: String
+) -> void:
+	_show_codex_trust_instructions(
+		"桌寵已更新 Codex 通知 Hook，Codex 需要重新信任後才會繼續通知。",
+		target_name, status, message
+	)
+
+
+func _show_codex_trust_instructions(
+	intro: String, target_name: String, status: String, message: String
+) -> void:
 	_apply_agent_control_state()
 	if not is_instance_valid(_codex_trust_dialog):
 		say("%s 的 Codex Hook 尚待信任，請開啟 Hook 審查。" % target_name, 8.0)
@@ -453,7 +539,7 @@ func _handle_codex_trust_required(
 	if status == CodexHookTrustService.STATUS_UNAVAILABLE:
 		status_hint += "\n這台電腦找不到可用的 Codex 執行核心，請先安裝或更新 Codex。"
 	_codex_trust_dialog.dialog_text = (
-		"你正在開啟「%s Codex」通知。三種 Codex 共用同一組桌寵 Hook 信任。"
+		"%s"
 		+ "\n\n%s\n\n"
 		+ "不需另外安裝 CLI；桌寵會使用 Codex Desktop、VS Code 擴充功能或"
 		+ "獨立 CLI 所提供的 Codex 核心。\n\n"
@@ -466,7 +552,7 @@ func _handle_codex_trust_required(
 		+ "5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n"
 		+ "6. 回到桌寵，按「我已信任，檢查通知」。\n\n"
 		+ "選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。"
-	) % [target_name, status_hint]
+	) % [intro, status_hint]
 	_codex_trust_dialog.popup_centered(Vector2i(700, 540))
 
 
@@ -919,6 +1005,7 @@ func _single_click_reaction() -> void:
 
 func _setup_idle_behavior() -> void:
 	var timer := Timer.new()
+	timer.name = "IdleBehaviorTimer"
 	timer.wait_time = randf_range(10.0, 16.0)
 	timer.one_shot = true
 	timer.timeout.connect(func() -> void:
@@ -931,6 +1018,7 @@ func _setup_idle_behavior() -> void:
 		timer.start()
 	)
 	add_child(timer)
+	_idle_behavior_timer = timer
 	timer.start()
 
 
@@ -1062,6 +1150,12 @@ func _build_stats_window() -> void:
 	_keep_screen_on_check_box = settings_refs["keep_screen_on_check_box"] as CheckBox
 	_autostart_check_box = settings_refs["autostart_check_box"] as CheckBox
 	_settings_feedback = settings_refs["settings_feedback"] as Label
+	_update_auto_check_box = settings_refs["update_auto_check_box"] as CheckBox
+	_update_status_label = settings_refs["update_status_label"] as Label
+	_update_check_button = settings_refs["update_check_button"] as Button
+	_update_release_page_button = settings_refs["update_release_page_button"] as Button
+	_update_skip_button = settings_refs["update_skip_button"] as Button
+	_refresh_update_ui()
 	var agent_refs: Dictionary = refs["agent_refs"]
 	_agent_port_spin_box = agent_refs["agent_port_spin_box"] as SpinBox
 	_agent_status_label = agent_refs["agent_status_label"] as Label
@@ -1240,6 +1334,14 @@ func _connect_details_window_signals() -> void:
 	_details_window_controller.autostart_toggled.connect(_on_autostart_toggled)
 	_details_window_controller.keep_screen_on_toggled.connect(_on_keep_screen_on_toggled)
 	_details_window_controller.focus_mode_toggled.connect(_on_focus_mode_toggled)
+	_details_window_controller.update_auto_check_toggled.connect(
+		_on_update_auto_check_toggled
+	)
+	_details_window_controller.update_check_requested.connect(_on_update_check_requested)
+	_details_window_controller.update_release_page_requested.connect(
+		_on_update_release_page_requested
+	)
+	_details_window_controller.update_skip_requested.connect(_on_update_skip_requested)
 	_details_window_controller.visual_scale_previewed.connect(_on_visual_scale_previewed)
 	_details_window_controller.visual_scale_changed.connect(_on_visual_scale_changed)
 	_details_window_controller.character_selected.connect(_on_character_selected)
@@ -1888,6 +1990,11 @@ func _destroy_stats_window() -> void:
 	_visual_scale_value_label = null
 	_focus_mode_check_box = null
 	_keep_screen_on_check_box = null
+	_update_auto_check_box = null
+	_update_status_label = null
+	_update_check_button = null
+	_update_release_page_button = null
+	_update_skip_button = null
 	_agent_codex_enabled_toggle = null
 	_agent_codex_app_enabled_toggle = null
 	_agent_terminal_codex_enabled_toggle = null

@@ -113,6 +113,15 @@ try {
 		throw 'Codex Hook trust service validation failed.'
 	}
 
+	$ErrorActionPreference = 'Continue'
+	$updateCheckOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/update_check_test.gd' 2>&1
+	$updateCheckExitCode = $LASTEXITCODE
+	$ErrorActionPreference = $previousErrorActionPreference
+	$updateCheckOutput | Write-Output
+	if ($updateCheckExitCode -ne 0 -or -not ($updateCheckOutput -match 'UPDATE_CHECK_TEST_OK')) {
+		throw 'Update check validation failed.'
+	}
+
     $ErrorActionPreference = 'Continue'
     $gameplayOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/gameplay_state_test.gd' 2>&1
     $gameplayExitCode = $LASTEXITCODE

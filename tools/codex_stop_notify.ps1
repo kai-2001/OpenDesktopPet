@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
 # OpenDesktopPet runtime schema v1
+# OpenDesktopPet bridge revision: 1
 # Codex Stop-hook bridge. Codex owns the hook lifecycle; this file only
 # classifies the host and translates a completed chat turn, or a turn waiting
 # for the user's answer, to the shared OpenDesktopPet runtime payload.

@@ -313,6 +313,16 @@ Assert-Architecture ($releasePreparation -match [regex]::Escape('open_desktop_pe
 Assert-Architecture ($exportPresets -match 'exclude_filter=.*tmp/\*') `
 	'The public export must exclude local temporary and test artifacts.'
 
+$updateCoordinator = Read-Source 'scripts/update_check_coordinator.gd'
+Assert-Architecture ($main -notmatch 'HTTPRequest') `
+	'main.gd must delegate network requests to UpdateCheckCoordinator.'
+Assert-Architecture ($updateCoordinator -match 'auto_check", false\)') `
+	'Automatic update checks must stay opt-in.'
+Assert-Architecture ($updateCoordinator -match 'max_redirects = 0') `
+	'Update checks must not follow redirects to other hosts.'
+Assert-Architecture ($main -match 'release_page_url\(\)' -and $main -notmatch 'html_url') `
+	'The release page must be rebuilt from the version, never taken from the response.'
+
 & git -C $projectRoot diff --check
 if ($LASTEXITCODE -ne 0) {
 	throw 'git diff --check failed.'

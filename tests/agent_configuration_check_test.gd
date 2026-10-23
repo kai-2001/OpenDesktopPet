@@ -40,10 +40,40 @@ func _run() -> void:
 	_make_directory(integration_home)
 	_write(integration_home.path_join("open_desktop_pet_runtime.ps1"), "# OpenDesktopPet runtime schema v1")
 	_write(codex_home.path_join("open_desktop_pet_codex_installed.txt"), "1")
+	_assert_true(
+		ControllerScript.bridge_revision("# OpenDesktopPet bridge revision: 12") == 12,
+		"Bridge revision is parsed"
+	)
+	_assert_true(
+		ControllerScript.bridge_revision("# OpenDesktopPet runtime schema v1") == 0,
+		"A bridge without a revision counts as revision 0"
+	)
+	var shipped_codex_revision := ControllerScript.bridge_revision(
+		_read(ProjectSettings.globalize_path("res://tools/codex_stop_notify.ps1"))
+	)
+	_assert_true(shipped_codex_revision > 0, "The shipped Codex bridge carries a revision")
 	_write(integration_home.path_join("codex_stop_notify.ps1"), "# OpenDesktopPet runtime schema v1")
 	_write(
 		codex_home.path_join("hooks.json"),
 		"{\"hooks\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"commandWindows\":\"powershell.exe -File codex_stop_notify.ps1\"}]}]}}"
+	)
+	_assert_true(
+		not controller.is_codex_configured(),
+		"An outdated Codex bridge must be reinstalled"
+	)
+	_write(
+		integration_home.path_join("codex_stop_notify.ps1"),
+		"# OpenDesktopPet runtime schema v1\n# OpenDesktopPet bridge revision: %d" % (
+			shipped_codex_revision + 1
+		)
+	)
+	_assert_true(
+		controller.is_codex_configured(),
+		"A newer Codex bridge must not be downgraded"
+	)
+	_write(
+		integration_home.path_join("codex_stop_notify.ps1"),
+		"# OpenDesktopPet runtime schema v1\n# OpenDesktopPet bridge revision: %d" % shipped_codex_revision
 	)
 	_assert_true(controller.is_codex_configured(), "Codex valid files are detected")
 	_write(codex_home.path_join("hooks.json"), "{\"hooks\":{\"Stop\":[]}}")
@@ -79,6 +109,14 @@ func _run() -> void:
 	_write(
 		claude_home.path_join("settings.json"),
 		"{\"hooks\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"claude_code_notify.ps1\"}]}]}}"
+	)
+	_assert_true(
+		not controller.is_claude_code_configured(),
+		"An outdated Claude Code bridge must be reinstalled"
+	)
+	_write(
+		integration_home.path_join("claude_code_notify.ps1"),
+		_read(ProjectSettings.globalize_path("res://tools/claude_code_notify.ps1"))
 	)
 	_assert_true(controller.is_claude_code_configured(), "Claude Code hook is detected")
 	_write(claude_home.path_join("settings.json"), "{\"hooks\":{}}")
@@ -154,6 +192,16 @@ func _write(path: String, text: String) -> void:
 		return
 	file.store_string(text)
 	file.close()
+
+
+func _read(path: String) -> String:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		_fail("could not read " + path)
+		return ""
+	var text := file.get_as_text()
+	file.close()
+	return text
 
 
 func _assert_true(value: bool, message: String) -> void:

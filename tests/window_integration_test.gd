@@ -13,6 +13,14 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	await process_frame
+	# The idle timer starts a random autonomous action 10-16 s after launch.
+	# Every check below drives actions explicitly, so a timer firing mid-check
+	# would race them (busy-state and window-size assertions failed that way).
+	if main._idle_behavior_timer == null:
+		_assert_true(false, "main exposes its idle behavior timer")
+		quit(1)
+		return
+	main._idle_behavior_timer.stop()
 
 	_assert_true(
 		not bool(ProjectSettings.get_setting("display/window/size/no_focus", true)),
@@ -177,12 +185,15 @@ func _init() -> void:
 	)
 	_assert_true(main.pet.contains_point(Vector2(140, 190)), "pet center is interactive")
 	_assert_true(not main.pet.contains_point(Vector2(5, 5)), "transparent corner is not interactive")
+	_assert_true(not main.pet.is_busy(), "pet is idle before the autonomous action check")
 	main.pet.play_action("pet")
-	await process_frame
+	# play_action marks the action busy synchronously. Checking before the next
+	# frame keeps unrelated frame-time events out of this request-ID check.
 	_assert_true(
 		main.pet.is_busy() and main.pet._active_request_id == 0,
 		"autonomous action runs without a care request ID"
 	)
+	await process_frame
 	main._run_care_action(3)
 	await process_frame
 	_assert_true(

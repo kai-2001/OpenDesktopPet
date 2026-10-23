@@ -12,6 +12,7 @@ const RUNTIME_FILE_NAME := "open_desktop_pet_runtime.json"
 const RUNTIME_HELPER_FILE_NAME := "open_desktop_pet_runtime.ps1"
 const RUNTIME_SCHEMA_VERSION := 1
 const RUNTIME_BRIDGE_MARKER := "OpenDesktopPet runtime schema v1"
+const BRIDGE_REVISION_PATTERN := "OpenDesktopPet bridge revision:\\s*(\\d+)"
 const CODEX_INSTALL_MARKER := "open_desktop_pet_codex_installed.txt"
 const COPILOT_INSTALL_MARKER := "open_desktop_pet_copilot_installed.txt"
 const OPENCODE_INSTALL_MARKER := "open_desktop_pet_opencode_installed.txt"
@@ -24,6 +25,8 @@ const PI_EXTENSION_MARKER := "OpenDesktopPet Pi notification extension"
 const LEGACY_PI_EXTENSION_MARKER := "OpenDesktopPet Pi Codex notification extension"
 const CODEX_HOOK_CONFIG_FILE_NAME := "hooks.json"
 const CODEX_STOP_SCRIPT_FILE_NAME := "codex_stop_notify.ps1"
+const COPILOT_NOTIFY_TOOL_FILE_NAME := "vscode_agent_notify.ps1"
+const PI_EXTENSION_TOOL_FILE_NAME := "pi_agent_notify.ts"
 const CODEX_HOOK_REVIEW_TOOL_FILE_NAME := "codex_hook_review.ps1"
 const CODEX_SETUP_SETTINGS_SECTION := "codex_setup"
 const COPILOT_HOOK_CONFIG_FILE_NAME := "open-desktop-pet.json"
@@ -53,6 +56,7 @@ signal configuration_failed(target_name: String)
 signal codex_unavailable(target_name: String, message: String)
 signal codex_trust_required(target_name: String, status: String, message: String)
 signal codex_trust_ready(target_name: String, target_app: String)
+signal codex_trust_refresh_required(target_name: String, status: String, message: String)
 signal executable_path_detection_started(targets: Array)
 signal executable_path_detection_finished(targets: Array)
 
@@ -565,6 +569,10 @@ func is_codex_configured() -> bool:
 		integration_home, integration_home.path_join(CODEX_STOP_SCRIPT_FILE_NAME)
 	):
 		return false
+	if not _is_bridge_current(
+		integration_home.path_join(CODEX_STOP_SCRIPT_FILE_NAME), CODEX_STOP_SCRIPT_FILE_NAME
+	):
+		return false
 	return _has_codex_stop_hook(
 		_read_text_file(codex_home.path_join(CODEX_HOOK_CONFIG_FILE_NAME))
 	)
@@ -607,6 +615,10 @@ func is_copilot_configured() -> bool:
 		integration_home, integration_home.path_join(COPILOT_NOTIFY_SCRIPT_FILE_NAME)
 	):
 		return false
+	if not _is_bridge_current(
+		integration_home.path_join(COPILOT_NOTIFY_SCRIPT_FILE_NAME), COPILOT_NOTIFY_TOOL_FILE_NAME
+	):
+		return false
 	var hook_config := _user_profile_path().path_join(
 		".copilot/hooks/%s" % COPILOT_HOOK_CONFIG_FILE_NAME
 	)
@@ -624,6 +636,10 @@ func is_opencode_configured() -> bool:
 		return false
 	if not _has_runtime_bridge_support(
 		integration_home, integration_home.path_join(OPENCODE_NOTIFY_SCRIPT_FILE_NAME)
+	):
+		return false
+	if not _is_bridge_current(
+		integration_home.path_join(OPENCODE_NOTIFY_SCRIPT_FILE_NAME), OPENCODE_NOTIFY_SCRIPT_FILE_NAME
 	):
 		return false
 	var plugin_path := _user_profile_path().path_join(
@@ -645,6 +661,11 @@ func is_claude_code_configured() -> bool:
 		integration_home, integration_home.path_join(CLAUDE_CODE_NOTIFY_SCRIPT_FILE_NAME)
 	):
 		return false
+	if not _is_bridge_current(
+		integration_home.path_join(CLAUDE_CODE_NOTIFY_SCRIPT_FILE_NAME),
+		CLAUDE_CODE_NOTIFY_SCRIPT_FILE_NAME
+	):
+		return false
 	var settings_text := _read_text_file(
 		_claude_home_path().path_join(CLAUDE_CODE_SETTINGS_FILE_NAME)
 	)
@@ -660,6 +681,11 @@ func is_gemini_cli_configured() -> bool:
 		return false
 	if not _has_runtime_bridge_support(
 		integration_home, integration_home.path_join(GEMINI_CLI_NOTIFY_SCRIPT_FILE_NAME)
+	):
+		return false
+	if not _is_bridge_current(
+		integration_home.path_join(GEMINI_CLI_NOTIFY_SCRIPT_FILE_NAME),
+		GEMINI_CLI_NOTIFY_SCRIPT_FILE_NAME
 	):
 		return false
 	var settings_text := _read_text_file(
@@ -678,6 +704,10 @@ func is_antigravity_cli_configured() -> bool:
 		return false
 	if not _has_runtime_bridge_support(
 		integration_home, integration_home.path_join(AGY_NOTIFY_SCRIPT_FILE_NAME)
+	):
+		return false
+	if not _is_bridge_current(
+		integration_home.path_join(AGY_NOTIFY_SCRIPT_FILE_NAME), AGY_NOTIFY_SCRIPT_FILE_NAME
 	):
 		return false
 	var hooks_text := _read_text_file(
@@ -707,6 +737,8 @@ func is_pi_configured() -> bool:
 	if not FileAccess.file_exists(integration_home.path_join(PI_INSTALL_MARKER)):
 		return false
 	if not FileAccess.file_exists(extension_path):
+		return false
+	if not _is_bridge_current(extension_path, PI_EXTENSION_TOOL_FILE_NAME):
 		return false
 	var extension_text := _read_text_file(extension_path)
 	return (
@@ -809,9 +841,34 @@ func _poll_codex_setup() -> void:
 			state_changed.emit()
 
 
+func _start_codex_upgrade_trust_check() -> void:
+	var target := TARGET_VSCODE
+	var target_name := "VS Code"
+	if codex_app_enabled:
+		target = TARGET_CODEX_APP
+		target_name = "ChatGPT"
+	elif terminal_codex_enabled and not codex_enabled:
+		target = TARGET_TERMINAL
+		target_name = "終端機"
+	_start_codex_setup("upgrade", target, target_name)
+
+
 func _finish_codex_status_check(
 	mode: String, target: String, target_name: String, status: Dictionary
 ) -> void:
+	if mode == "upgrade":
+		# Enabled targets stay on: they already worked before the bridge
+		# update, and the review only has to restore trust for the new hooks.
+		if not _codex_hook_trust_service.is_trusted(status):
+			_pending_codex_target = target
+			_pending_codex_target_name = target_name
+			_persist_agent_state()
+			codex_trust_refresh_required.emit(
+				target_name,
+				String(status.get("status", "")),
+				String(status.get("message", ""))
+			)
+		return
 	if _codex_hook_trust_service.is_trusted(status):
 		_clear_pending_codex_enable()
 		_set_codex_target_enabled(target, true)
@@ -846,6 +903,24 @@ func _has_runtime_bridge_support(integration_home: String, bridge_path: String) 
 	return helper_text.contains(RUNTIME_BRIDGE_MARKER) and bridge_text.contains(
 		RUNTIME_BRIDGE_MARKER
 	)
+
+
+# Upgrading the pet ships newer bridges in tools/, but configured agents keep
+# running the copy installed under the user profile. A lower installed revision
+# makes the agent count as unconfigured so startup reinstalls it. An equal or
+# higher revision is kept, so an older pet build never downgrades a bridge.
+func _is_bridge_current(installed_path: String, tool_file_name: String) -> bool:
+	var shipped_revision := bridge_revision(_read_text_file(_tool_path(tool_file_name)))
+	return bridge_revision(_read_text_file(installed_path)) >= shipped_revision
+
+
+static func bridge_revision(text: String) -> int:
+	var pattern := RegEx.new()
+	pattern.compile(BRIDGE_REVISION_PATTERN)
+	var found := pattern.search(text)
+	if found == null:
+		return 0
+	return int(found.get_string(1))
 
 
 func _set_codex_target_enabled(target: String, value: bool) -> void:
@@ -951,12 +1026,17 @@ func _ensure_enabled_configurations() -> void:
 		return
 	var changed := false
 	if codex_enabled or codex_app_enabled or terminal_codex_enabled:
+		var codex_was_configured := is_codex_configured()
 		if not _ensure_codex_configuration("Codex"):
 			codex_enabled = false
 			codex_app_enabled = false
 			terminal_codex_enabled = false
 			enabled = false
 			changed = true
+		elif not codex_was_configured:
+			# Reinstalling rewrites hooks.json; Codex drops trust whenever a
+			# hook definition changes, so confirm it before notifications fail.
+			_start_codex_upgrade_trust_check()
 	if copilot_enabled and not _ensure_copilot_configuration():
 		copilot_enabled = false
 		changed = true

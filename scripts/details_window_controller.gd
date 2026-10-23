@@ -5,6 +5,7 @@ const AgentIntegrationControllerScript = preload("res://scripts/agent_integratio
 const SettingsToggleSwitchScript = preload("res://scripts/settings_toggle_switch.gd")
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const TaskReminderPanelScript = preload("res://scripts/task_reminder_panel.gd")
+const UpdateCheckServiceScript = preload("res://scripts/update_check_service.gd")
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 
 signal care_action_requested(action: String)
@@ -35,6 +36,10 @@ signal claude_app_executable_path_changed(path: String)
 signal autostart_toggled(enabled: bool)
 signal keep_screen_on_toggled(enabled: bool)
 signal focus_mode_toggled(enabled: bool)
+signal update_auto_check_toggled(enabled: bool)
+signal update_check_requested
+signal update_release_page_requested
+signal update_skip_requested
 signal visual_scale_previewed(value: float)
 signal visual_scale_changed(value: float)
 signal character_selected(index: int)
@@ -469,6 +474,9 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 	settings_content.add_child(settings_feedback)
 	if not autostart_supported:
 		settings_feedback.text = "目前平台不支援 Windows 開機啟動設定。"
+	settings_content.add_child(HSeparator.new())
+
+	var update_refs := _build_update_section(settings_content)
 
 	var settings_close_button := Button.new()
 	settings_close_button.text = "關閉詳細面板"
@@ -485,6 +493,88 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 		"keep_screen_on_check_box": keep_screen_on_check_box,
 		"autostart_check_box": autostart_check_box,
 		"settings_feedback": settings_feedback,
+		"update_auto_check_box": update_refs["auto_check_box"],
+		"update_status_label": update_refs["status_label"],
+		"update_check_button": update_refs["check_button"],
+		"update_release_page_button": update_refs["release_page_button"],
+		"update_skip_button": update_refs["skip_button"],
+	}
+
+
+func _build_update_section(settings_content: VBoxContainer) -> Dictionary:
+	var update_title_row := HBoxContainer.new()
+	update_title_row.add_theme_constant_override("separation", 12)
+	var update_title: Label = _new_label(
+		"版本更新", 16, _details_color("#30383c", "#d4d4d4")
+	)
+	update_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	update_title_row.add_child(update_title)
+	update_title_row.add_child(_new_label(
+		"目前版本 v%s" % UpdateCheckServiceScript.current_version(),
+		14,
+		_details_color("#68747a", "#9da1a6")
+	))
+	settings_content.add_child(update_title_row)
+
+	var auto_check_box := CheckBox.new()
+	auto_check_box.text = "自動檢查新版本（每天最多一次）"
+	auto_check_box.add_theme_font_size_override("font_size", 16)
+	_style_checkbox(auto_check_box)
+	auto_check_box.custom_minimum_size = Vector2(0, 40)
+	auto_check_box.toggled.connect(
+		func(enabled: bool) -> void: update_auto_check_toggled.emit(enabled)
+	)
+	settings_content.add_child(auto_check_box)
+
+	var privacy_hint: Label = _new_label(
+		"預設關閉。檢查時只會向 GitHub 查詢最新的版本號，不會傳送你的設定、存檔、"
+			+ "角色、Agent 資料或任何識別資訊；GitHub 仍會看到你的 IP 位址。"
+			+ "桌寵只會開啟本專案的 GitHub 下載頁，不會自行下載或安裝。",
+		13,
+		_details_color("#68747a", "#9da1a6")
+	)
+	privacy_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	settings_content.add_child(privacy_hint)
+
+	var status_label: Label = _new_label(
+		"尚未檢查。", 14, _details_color("#238b9d", "#4fc1ff")
+	)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	settings_content.add_child(status_label)
+
+	var button_row := HBoxContainer.new()
+	button_row.add_theme_constant_override("separation", 8)
+	var check_button := Button.new()
+	check_button.text = "立即檢查"
+	check_button.custom_minimum_size = Vector2(110, 38)
+	_apply_secondary_button_style(check_button)
+	check_button.pressed.connect(func() -> void: update_check_requested.emit())
+	button_row.add_child(check_button)
+	var release_page_button := Button.new()
+	release_page_button.text = "前往下載頁"
+	release_page_button.custom_minimum_size = Vector2(110, 38)
+	release_page_button.visible = false
+	_apply_primary_button_style(release_page_button)
+	release_page_button.pressed.connect(
+		func() -> void: update_release_page_requested.emit()
+	)
+	button_row.add_child(release_page_button)
+	var skip_button := Button.new()
+	skip_button.text = "略過這個版本"
+	skip_button.custom_minimum_size = Vector2(110, 38)
+	skip_button.visible = false
+	_apply_secondary_button_style(skip_button)
+	skip_button.pressed.connect(func() -> void: update_skip_requested.emit())
+	button_row.add_child(skip_button)
+	settings_content.add_child(button_row)
+	settings_content.add_child(HSeparator.new())
+
+	return {
+		"auto_check_box": auto_check_box,
+		"status_label": status_label,
+		"check_button": check_button,
+		"release_page_button": release_page_button,
+		"skip_button": skip_button,
 	}
 
 
