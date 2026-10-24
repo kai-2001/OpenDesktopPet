@@ -328,6 +328,17 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	_assert_true(main._stats_window.visible, "details window opens on first request")
+	main._select_stats_tab(0)
+	await process_frame
+	await process_frame
+	var status_page := main._stats_tabs.get_child(0) as ScrollContainer
+	var status_needed := (status_page.get_child(0) as Control).get_combined_minimum_size().y
+	_assert_true(
+		main._stats_window.size == main.DEFAULT_STATS_SIZE
+			and status_needed <= status_page.size.y,
+		"the status tab fits the default details window without scrolling "
+			+ "(needed=%.0f visible=%.0f)" % [status_needed, status_page.size.y]
+	)
 	main._select_stats_tab(2)
 	await process_frame
 	_assert_true(

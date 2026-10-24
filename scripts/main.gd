@@ -1276,7 +1276,6 @@ func _connect_details_window_signals() -> void:
 	)
 	_details_window_controller.auto_feeder_buy_requested.connect(_on_auto_feeder_buy_requested)
 	_details_window_controller.auto_feeder_toggled.connect(_on_auto_feeder_toggled)
-	_details_window_controller.close_requested.connect(_destroy_stats_window)
 	_details_window_controller.target_fps_selected.connect(_on_target_fps_selected)
 	_details_window_controller.details_theme_selected.connect(_on_details_theme_selected)
 	_details_window_controller.agent_codex_enabled_toggled.connect(

@@ -12,7 +12,6 @@ const TARGET_FPS_OPTIONS := [15, 30, 60]
 signal care_action_requested(action: String)
 signal auto_feeder_buy_requested
 signal auto_feeder_toggled(enabled: bool)
-signal close_requested
 signal target_fps_selected(index: int)
 signal details_theme_selected(index: int)
 signal agent_codex_enabled_toggled(enabled: bool)
@@ -192,13 +191,6 @@ func build_status_tab(tabs: TabContainer) -> Dictionary:
 		action_grid.add_child(action_button)
 		care_action_buttons[action] = action_button
 	content.add_child(action_grid)
-	content.add_child(HSeparator.new())
-
-	var close_button := Button.new()
-	close_button.text = "關閉詳細狀態"
-	close_button.custom_minimum_size.y = 40
-	close_button.pressed.connect(func() -> void: close_requested.emit())
-	content.add_child(close_button)
 
 	return {
 		"stats_status": stats_status,
@@ -559,12 +551,6 @@ func build_settings_tab(tabs: TabContainer) -> Dictionary:
 
 	var update_refs := _build_update_section(settings_content)
 
-	var settings_close_button := Button.new()
-	settings_close_button.text = "關閉詳細面板"
-	settings_close_button.custom_minimum_size.y = 42
-	settings_close_button.pressed.connect(func() -> void: close_requested.emit())
-	settings_content.add_child(settings_close_button)
-
 	return {
 		"fps_option_button": fps_option_button,
 		"details_theme_option_button": details_theme_option_button,
@@ -648,7 +634,6 @@ func _build_update_section(settings_content: VBoxContainer) -> Dictionary:
 	skip_button.pressed.connect(func() -> void: update_skip_requested.emit())
 	button_row.add_child(skip_button)
 	settings_content.add_child(button_row)
-	settings_content.add_child(HSeparator.new())
 
 	return {
 		"auto_check_box": auto_check_box,
@@ -973,12 +958,6 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		AgentIntegrationControllerScript.TARGET_TERMINAL:
 			terminal_controls["summary"] as Label,
 	}
-
-	var vscode_close_button := Button.new()
-	vscode_close_button.text = "關閉詳細面板"
-	vscode_close_button.custom_minimum_size.y = 42
-	vscode_close_button.pressed.connect(func() -> void: close_requested.emit())
-	content.add_child(vscode_close_button)
 
 	return {
 		"agent_port_spin_box": port_spin_box,
