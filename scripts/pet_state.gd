@@ -493,10 +493,13 @@ func is_auto_feeder_paused() -> bool:
 
 
 ## 每 10 分鐘檢查一次。某項第一次低於門檻只先記下；下一次檢查時仍低於門檻、
-## 中間也沒有手動照顧，才自動處理。水分優先，其次飽食，最後體力。
+## 中間也沒有手動照顧，才自動處理。同時到期的項目依水分、飽食、體力的順序
+## 連續處理，前一個動畫播完才做下一個；睡覺放在最後。
 func _run_auto_feeder() -> void:
 	if not is_auto_feeder_active() or _sleeping or _action_busy:
 		return
+	if not is_auto_feeder_paused():
+		_auto_feeder_paused_notified = false
 	var due: Array[String] = []
 	for need: String in ["thirst", "hunger", "energy"]:
 		if float(data[need]) >= AUTO_FEEDER_TRIGGER_BELOW:
@@ -506,38 +509,45 @@ func _run_auto_feeder() -> void:
 		else:
 			_auto_feeder_pending[need] = true
 	for need: String in due:
+		# 前一個動畫播放期間玩家可能已經手動照顧，或開始了別的動作。
+		if not bool(_auto_feeder_pending[need]) \
+				or float(data[need]) >= AUTO_FEEDER_TRIGGER_BELOW:
+			continue
+		if _sleeping or _action_busy:
+			return
 		if need == "energy":
 			# 睡覺會播放睡眠動畫，專注模式時延到關閉後再處理。
 			if auto_care_quiet:
 				continue
-			_auto_sleep()
+			await _auto_sleep()
 			return
 		if is_auto_feeder_paused():
+			# 只暫停花錢的餵食和喝水；睡覺不花錢，仍要繼續處理體力。
 			if not _auto_feeder_paused_notified:
 				_auto_feeder_paused_notified = true
 				_request_message("auto_feeder_paused", "金幣不夠了，自動餵食器先休息囉。")
 				emit_changed()
-			return
-		_auto_feeder_paused_notified = false
+			continue
 		if auto_care_quiet:
 			_apply_auto_refill(need)
 			continue
-		# 有動畫時一次只處理一項，其他的留到下一次檢查。
-		_auto_refill(need)
-		return
+		if not await _auto_refill(need):
+			return
 
 
-func _auto_refill(need: String) -> void:
+## 回傳是否成功；桌寵正在忙而無法播放時回傳 false。
+func _auto_refill(need: String) -> bool:
 	var request_id := _begin_action("eat" if need == "hunger" else "drink")
 	if request_id <= 0:
-		return
+		return false
 	var played: bool = await _wait_for_action_result(request_id)
 	if not played:
-		# 桌寵正在忙時不扣金幣，保留記錄，下一次檢查再試。
+		# 不扣金幣，保留記錄，下一次檢查再試。
 		_action_busy = false
 		emit_changed()
-		return
+		return false
 	_apply_auto_refill(need)
+	return true
 
 
 func _apply_auto_refill(need: String) -> void:

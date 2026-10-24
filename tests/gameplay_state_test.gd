@@ -510,6 +510,35 @@ func _test_auto_feeder(state: Node) -> void:
 	state.set_auto_feeder_enabled(true)
 	state.data.thirst = 80.0
 
+	state.data.coins = 50
+	state.data.thirst = 30.0
+	state.data.hunger = 30.0
+	state.data.energy = 30.0
+	state._run_auto_feeder()
+	await state._run_auto_feeder()
+	_assert_equal(state.data.thirst, 100.0, "several due needs are handled in one check: water first")
+	_assert_equal(state.data.hunger, 100.0, "several due needs are handled in one check: food next")
+	_assert_true(state.is_sleeping(), "several due needs are handled in one check: sleep last")
+	_assert_equal(state.data.coins, 48, "each consecutive refill costs one coin")
+	state._end_sleep("user")
+
+	state.data.coins = state.AUTO_FEEDER_COIN_RESERVE
+	state.data.thirst = 30.0
+	state.data.hunger = 30.0
+	state.data.energy = 30.0
+	state._run_auto_feeder()
+	state._run_auto_feeder()
+	var sleep_deadline := Time.get_ticks_msec() + 3000
+	while not state.is_sleeping() and Time.get_ticks_msec() < sleep_deadline:
+		await process_frame
+	_assert_true(state.is_sleeping(), "running out of coins still lets the feeder start free sleep")
+	_assert_near(state.data.thirst, 30.0, "running out of coins pauses paid refills")
+	state._end_sleep("user")
+	state.data.coins = 50
+	state.data.thirst = 80.0
+	state.data.hunger = 80.0
+	state.data.energy = 30.0
+
 	state.data.mood = 60.0
 	state.data.xp = 0
 	await state._auto_sleep()
