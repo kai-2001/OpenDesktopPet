@@ -180,10 +180,29 @@ func _init() -> void:
 	state.data.wish_expires_at = state._now() + 60
 	state.data.mood = 50.0
 	state.data.affection = 0
+	state.data.last_wish_affection_date = ""
 	var suffix: String = state._complete_wish("feed")
 	_assert_true(not suffix.is_empty(), "matching active wish should complete")
 	_assert_near(state.data.mood, 75.0, "a completed wish is the main mood refill")
-	_assert_equal(state.data.affection, 0, "wishes never grant affection")
+	_assert_equal(state.data.affection, 1, "the first wish of the day grants one affection")
+	_assert_true(suffix.contains("親密"), "the wish message mentions the affection reward")
+	state.data.wish_action = "water"
+	state.data.wish_expires_at = state._now() + 60
+	suffix = state._complete_wish("water")
+	_assert_equal(state.data.affection, 1, "later wishes the same day grant no affection")
+	_assert_true(not suffix.contains("親密"), "a same-day wish message omits affection")
+	var today: String = state.clock.local_date()
+	var today_unix := Time.get_unix_time_from_datetime_string(today)
+	state.data.last_wish_affection_date = Time.get_date_string_from_unix_time(today_unix - 86400)
+	state.data.wish_action = "pet"
+	state.data.wish_expires_at = state._now() + 60
+	state._complete_wish("pet")
+	_assert_equal(state.data.affection, 2, "a new day grants wish affection again")
+	state.data.last_wish_affection_date = Time.get_date_string_from_unix_time(today_unix + 86400)
+	state.data.wish_action = "pet"
+	state.data.wish_expires_at = state._now() + 60
+	state._complete_wish("pet")
+	_assert_equal(state.data.affection, 2, "a clock set back a day grants no extra wish affection")
 
 	state.data.visual_scale = 1.0
 	state.set_visual_scale(1.1)
@@ -354,7 +373,9 @@ func _test_companion_and_progression_rules(state: Node) -> void:
 	state.data.erase("total_companion_days")
 	state.data.erase("longest_companion_streak")
 	state.data.erase("bond_progress")
+	state.data.erase("last_wish_affection_date")
 	state._normalize_loaded_data()
+	_assert_equal(state.data.last_wish_affection_date, "", "old saves receive an empty wish affection date")
 	_assert_equal(state.data.last_companion_date, "", "old saves receive an empty companion date")
 	_assert_equal(state.data.companion_streak, 0, "old saves receive a zero companion streak")
 	_assert_equal(state.data.total_companion_days, 0, "old saves receive a zero companion total")

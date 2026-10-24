@@ -50,6 +50,8 @@ const DEFAULT_DATA := {
 	"wish_expires_at": 0,
 	"next_wish_at": 0,
 	"wish_intro_seen": false,
+	# 最後一次因完成願望獲得親密的本地日期；每天最多 +1。
+	"last_wish_affection_date": "",
 	"wish_notice_version": 0,
 	"last_pet_reward_at": 0,
 	"visual_scale": PetVisualScaleScript.DEFAULT_VALUE,
@@ -447,7 +449,24 @@ func _complete_wish(action: String) -> String:
 	# Wishes are the main way to restore mood.
 	data.mood = _limit(data.mood + 25.0)
 	_add_xp(2)
+	if _grant_daily_wish_affection():
+		return "\n願望完成！心情大幅提升，親密度和 XP 也增加了。"
 	return "\n願望完成！心情大幅提升，XP 也增加了。"
+
+
+# Wishes are the game's only quests, so the first one completed each local day
+# also grants affection. Later wishes that day only refill mood and XP, which
+# keeps affection a long-term value.
+func _grant_daily_wish_affection() -> bool:
+	var today := clock.local_date()
+	var today_number := _date_to_day_number(today)
+	var last_number := _date_to_day_number(String(data.last_wish_affection_date))
+	# A clock set back to an earlier day must not grant a second reward.
+	if today_number < 0 or (last_number >= 0 and today_number <= last_number):
+		return false
+	data.last_wish_affection_date = today
+	_add_affection(1)
+	return true
 
 
 func _update_wish() -> void:
@@ -784,6 +803,10 @@ func _normalize_loaded_data() -> void:
 	):
 		data.last_companion_date = ""
 		data.companion_streak = 0
+
+	data.last_wish_affection_date = String(data.get("last_wish_affection_date", ""))
+	if _date_to_day_number(data.last_wish_affection_date) < 0:
+		data.last_wish_affection_date = ""
 
 	data.coins = maxi(int(data.coins), 0)
 	data.level = maxi(int(data.level), 1)
