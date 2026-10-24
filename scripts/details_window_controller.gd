@@ -273,6 +273,9 @@ func _build_auto_feeder_row() -> Dictionary:
 	var toggle := SettingsToggleSwitchScript.new()
 	toggle.name = "AutoFeederToggle"
 	toggle.configure(theme_mode, false)
+	# Narrower than the settings default so owning the feeder does not make the
+	# header wrap sooner than the buy button did.
+	toggle.custom_minimum_size = Vector2(80, 34)
 	toggle.visible = false
 	toggle.toggled.connect(func(value: bool) -> void: auto_feeder_toggled.emit(value))
 	row.add_child(toggle)

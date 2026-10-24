@@ -2591,16 +2591,18 @@ func _refresh_auto_feeder_ui(snapshot: Dictionary) -> void:
 		)
 		_set_auto_feeder_status("", "")
 		return
+	# The switch already shows on/off; only "paused" needs a word, because the
+	# switch reads on while the feeder is not actually working.
 	if not enabled:
 		_auto_feeder_toggle.tooltip_text = "開啟後會自動照顧飽食、水分與體力。"
-		_set_auto_feeder_status("已關閉", "開啟後會自動照顧飽食、水分與體力。")
+		_set_auto_feeder_status("", "")
 	elif bool(snapshot.get("auto_feeder_paused", false)):
 		var paused_text := "金幣只剩 %d 枚，已暫停；賺到更多金幣後會恢復運作。" % coins
 		_auto_feeder_toggle.tooltip_text = paused_text
 		_set_auto_feeder_status("已暫停", paused_text)
 	else:
 		_auto_feeder_toggle.tooltip_text = "自動餵食器運作中。"
-		_set_auto_feeder_status("運作中", "自動餵食器運作中。")
+		_set_auto_feeder_status("", "")
 
 
 func _set_auto_feeder_status(text: String, tooltip: String) -> void:
