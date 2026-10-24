@@ -42,6 +42,7 @@ const DEFAULT_DATA := {
 	"companion_streak": 0,
 	"total_companion_days": 0,
 	"longest_companion_streak": 0,
+	# 舊版的親密自然累積進度，已不再使用；保留欄位讓舊存檔讀寫一致。
 	"bond_progress": 0.0,
 	"last_seen": 0,
 	"last_decay_at": 0,
@@ -155,9 +156,8 @@ func pet() -> void:
 	var rewarded := now >= int(data.last_pet_reward_at) + PET_REWARD_COOLDOWN_SECONDS
 	if rewarded:
 		data.last_pet_reward_at = now
-		data.mood = _limit(data.mood + 8.0)
+		data.mood = _limit(data.mood + 10.0)
 		data.care += 1
-		_add_affection(1)
 		_add_xp(1)
 	else:
 		data.mood = _limit(data.mood + 1.0)
@@ -175,8 +175,8 @@ func feed() -> void:
 		_request_message("feed_full", "肚子已經很飽了，晚點再吃吧。")
 		return
 
-	if data.coins < 2:
-		_request_message("feed_no_coins", "需要 2 枚金幣，先去工作吧。")
+	if data.coins < 3:
+		_request_message("feed_no_coins", "需要 3 枚金幣，先去工作吧。")
 		return
 
 	var request_id := _begin_action("eat")
@@ -190,18 +190,12 @@ func feed() -> void:
 		_abort_action("feed_failed", "餵食動畫無法播放，沒有扣除金幣。")
 		return
 
-	var hunger_before := float(data.hunger)
-	var affection_reward := _care_affection_reward(hunger_before)
-
-	data.coins -= 2
-	data.hunger = _limit(hunger_before + 20.0)
-	data.mood = _limit(float(data.mood) + 4.0)
+	data.coins -= 3
+	data.hunger = _limit(float(data.hunger) + 20.0)
+	data.mood = _limit(float(data.mood) + 3.0)
 	data.care += 1
 
-	if affection_reward > 0:
-		_add_affection(affection_reward)
-
-	_add_xp(2)
+	_add_xp(1)
 
 	_finish_action(
 		"feed_complete",
@@ -234,17 +228,10 @@ func water() -> void:
 		_abort_action("water_failed", "喝水動畫無法播放，沒有扣除金幣。")
 		return
 
-	# 記錄喝水前的口渴度。
-	var thirst_before := float(data.thirst)
-	var affection_reward := _care_affection_reward(thirst_before)
-
 	data.coins -= 1
-	data.thirst = _limit(thirst_before + 25.0)
-	data.mood = _limit(float(data.mood) + 2.0)
+	data.thirst = _limit(float(data.thirst) + 25.0)
+	data.mood = _limit(float(data.mood) + 3.0)
 	data.care += 1
-
-	if affection_reward > 0:
-		_add_affection(affection_reward)
 
 	_add_xp(1)
 
@@ -264,7 +251,6 @@ func sleep() -> void:
 		_abort_action("sleep_failed", "睡覺動畫無法播放。")
 		return
 	if float(data.energy) >= 100.0:
-		data.mood = _limit(float(data.mood) + 4.0)
 		_finish_action(
 			"sleep_full",
 			"雖然很有精神，還是舒服地瞇了一會。" + _complete_wish("sleep")
@@ -283,15 +269,15 @@ func work() -> void:
 		_request_message("action_busy", "先等目前的動作完成～")
 		return
 
-	if data.energy < 18.0:
+	if data.energy < 20.0:
 		_request_message("work_tired", "太累了，先睡一下吧。")
 		return
 
-	if data.hunger < 8.0:
+	if data.hunger < 10.0:
 		_request_message("work_hungry", "肚子太餓了，吃飽再工作吧。")
 		return
 
-	if data.thirst < 10.0:
+	if data.thirst < 15.0:
 		_request_message("work_thirsty", "太渴了，喝水後再工作吧。")
 		return
 
@@ -346,10 +332,9 @@ func _end_sleep(reason: String) -> void:
 	_action_busy = false
 	sleep_ended.emit(reason)
 	if natural:
-		data.mood = _limit(float(data.mood) + 4.0)
-		var affection_reward := _care_affection_reward(_sleep_energy_before)
-		if affection_reward > 0:
-			_add_affection(affection_reward)
+		data.mood = _limit(float(data.mood) + 3.0)
+		# Only a real rest earns XP, not topping up an almost-full energy bar.
+		if _sleep_energy_before < 70.0:
 			_add_xp(1)
 		_request_message(
 			"sleep_recovered",
@@ -367,9 +352,9 @@ func _end_sleep(reason: String) -> void:
 func _apply_work_result() -> int:
 	var coin_reward := _work_coin_reward()
 
-	data.energy = _limit(float(data.energy) - 18.0)
-	data.hunger = _limit(float(data.hunger) - 8.0)
-	data.thirst = _limit(float(data.thirst) - 10.0)
+	data.energy = _limit(float(data.energy) - 20.0)
+	data.hunger = _limit(float(data.hunger) - 10.0)
+	data.thirst = _limit(float(data.thirst) - 15.0)
 	data.coins += coin_reward
 
 	_add_xp(5)
@@ -459,10 +444,10 @@ func _complete_wish(action: String) -> String:
 	data.wish_action = ""
 	data.wish_expires_at = 0
 	data.next_wish_at = _now() + randi_range(WISH_MIN_SECONDS, WISH_MAX_SECONDS)
-	data.mood = _limit(data.mood + 5.0)
-	_add_affection(2)
+	# Wishes are the main way to restore mood.
+	data.mood = _limit(data.mood + 25.0)
 	_add_xp(2)
-	return "\n願望完成！親密度和 XP 額外提升。"
+	return "\n願望完成！心情大幅提升，XP 也增加了。"
 
 
 func _update_wish() -> void:
@@ -499,7 +484,7 @@ func _choose_wish() -> String:
 	if data.energy <= 70.0:
 		weighted.append({"action": "sleep", "weight": 12 + int(70.0 - data.energy)})
 	weighted.append({"action": "pet", "weight": 12 + int(100.0 - data.mood)})
-	if data.energy >= 35.0 and data.hunger >= 20.0 and data.thirst >= 20.0:
+	if data.energy >= 40.0 and data.hunger >= 20.0 and data.thirst >= 30.0:
 		weighted.append({"action": "work", "weight": 12})
 	var total := 0
 	for candidate: Dictionary in weighted:
@@ -522,7 +507,7 @@ func _wish_is_sensible(action: String) -> bool:
 		"sleep":
 			return true
 		"work":
-			return data.energy >= 18.0 and data.hunger >= 8.0 and data.thirst >= 10.0
+			return data.energy >= 20.0 and data.hunger >= 10.0 and data.thirst >= 15.0
 		_:
 			return true
 
@@ -627,6 +612,9 @@ func _update_companion_record(date_override := "") -> bool:
 
 	data.last_companion_date = today
 
+	# 親密是長期養成數值：每天第一次陪伴 +1。
+	_add_affection(1)
+
 	return true
 
 
@@ -671,35 +659,6 @@ func _condition_tier() -> int:
 	return 3 # 良好
 
 
-func _care_affection_reward(value_before: float) -> int:
-	if value_before < 25.0:
-		return 2
-
-	if value_before < 70.0:
-		return 1
-
-	return 0
-
-
-func _apply_bond_progress() -> void:
-	match _condition_tier():
-		3:
-			# 三項需求都至少 80，每 10 分鐘累積 1 點。
-			data.bond_progress = float(data.bond_progress) + 1.0
-
-		2:
-			# 最低需求介於 50～79，每 10 分鐘累積 0.5 點。
-			data.bond_progress = float(data.bond_progress) + 0.5
-
-		_:
-			# 狀態不佳或危急時，不會自動增加親密度。
-			pass
-
-	while float(data.bond_progress) >= 12.0:
-		data.bond_progress = float(data.bond_progress) - 12.0
-		_add_affection(1)
-
-
 func _work_coin_reward() -> int:
 	# 體力占工作效率 60%，心情占 40%。
 	var efficiency := (
@@ -707,11 +666,11 @@ func _work_coin_reward() -> int:
 		+ float(data.mood) * 0.4
 	) / 100.0
 
-	# 工作收入最低 5 枚、最高 9 枚。
+	# 工作收入最低 8 枚、最高 12 枚，遠高於工作造成的消耗。
 	return clampi(
-		roundi(5.0 + efficiency * 4.0),
-		5,
-		9
+		roundi(8.0 + efficiency * 4.0),
+		8,
+		12
 	)
 
 func _add_affection(amount: int) -> void:
@@ -724,6 +683,8 @@ func _add_xp(amount: int) -> void:
 		data.xp -= data.level * 20
 		data.level += 1
 		data.mood = _limit(data.mood + 12.0)
+		# 親密是長期養成數值：每升一級 +1。
+		_add_affection(1)
 		_request_message("level_up", "升級了！現在是第 %d 級。" % data.level)
 
 
@@ -755,23 +716,21 @@ func _apply_elapsed_decay(now: int, maximum_intervals: int) -> bool:
 		return false
 
 	for _interval in intervals:
-		# 每 10 分鐘的自然衰減。
-		data.hunger = _limit(float(data.hunger) - 2.0)
-		data.thirst = _limit(float(data.thirst) - 3.0)
-		data.energy = _limit(float(data.energy) - 0.5)
+		# 每 10 分鐘的自然衰減，以程式開著的時間計算。從 100 歸零約需：
+		# 水分 2.8 天、飽食 5.8 天、體力 3.5 天。
+		data.hunger = _limit(float(data.hunger) - 0.12)
+		data.thirst = _limit(float(data.thirst) - 0.25)
+		data.energy = _limit(float(data.energy) - 0.2)
 
 		var lowest := _lowest_need()
 
 		# 至少一項需求嚴重不足。
 		if lowest < 20.0:
-			data.mood = _limit(float(data.mood) - 2.0)
+			data.mood = _limit(float(data.mood) - 1.0)
 
 		# 至少一項需求不佳。
 		elif lowest < 50.0:
-			data.mood = _limit(float(data.mood) - 1.0)
-
-		# 根據整體照顧狀態累積親密成長。
-		_apply_bond_progress()
+			data.mood = _limit(float(data.mood) - 0.5)
 
 	data.last_decay_at = (
 		now

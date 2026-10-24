@@ -139,18 +139,26 @@ func _init() -> void:
 	state.data.last_decay_at = now - 1200
 	var decayed: bool = state._apply_elapsed_decay(now, 48)
 	_assert_true(decayed, "elapsed decay should run")
-	_assert_equal(state.data.hunger, 76.0, "two hunger decay intervals")
-	_assert_equal(state.data.thirst, 74.0, "two thirst decay intervals")
+	_assert_near(state.data.hunger, 79.76, "two hunger decay intervals")
+	_assert_near(state.data.thirst, 79.5, "two thirst decay intervals")
+	_assert_near(state.data.energy, 79.6, "two energy decay intervals")
+	_assert_near(state.data.mood, 80.0, "mood holds while every need stays at 50 or above")
 	_assert_equal(state.data.last_decay_at, now, "decay timestamp should retain no remainder")
+	_test_mood_decay_tiers(state)
 
 	state.data.hunger = 50.0
+	state.data.mood = 80.0
+	state.data.xp = 0
 	state.data.coins = 20
 	var feed_started := Time.get_ticks_msec()
 	await state.feed()
 	var feed_elapsed := Time.get_ticks_msec() - feed_started
 	_assert_true(feed_elapsed >= 1150, "feed must wait for the real visual animation")
-	_assert_equal(state.data.coins, 18, "successful feed coin cost")
+	_assert_equal(state.data.coins, 17, "successful feed coin cost")
 	_assert_equal(state.data.hunger, 70.0, "successful feed result")
+	_assert_near(state.data.mood, 83.0, "feeding adds the shared care mood bonus")
+	_assert_equal(state.data.xp, 1, "feeding grants the same XP as drinking")
+	_assert_equal(state.data.affection, 0, "care actions never grant affection")
 	_assert_true(not state.is_action_busy(), "state must unlock after visual completion")
 	_assert_true(not visual.is_busy(), "visual must be idle after completion")
 
@@ -170,9 +178,12 @@ func _init() -> void:
 
 	state.data.wish_action = "feed"
 	state.data.wish_expires_at = state._now() + 60
+	state.data.mood = 50.0
+	state.data.affection = 0
 	var suffix: String = state._complete_wish("feed")
 	_assert_true(not suffix.is_empty(), "matching active wish should complete")
-	_assert_equal(state.data.affection, 3, "care plus wish affection reward")
+	_assert_near(state.data.mood, 75.0, "a completed wish is the main mood refill")
+	_assert_equal(state.data.affection, 0, "wishes never grant affection")
 
 	state.data.visual_scale = 1.0
 	state.set_visual_scale(1.1)
@@ -249,6 +260,7 @@ func _test_companion_and_progression_rules(state: Node) -> void:
 	state.data.companion_streak = 0
 	state.data.total_companion_days = 0
 	state.data.longest_companion_streak = 0
+	state.data.affection = 0
 	_assert_true(
 		state._update_companion_record("2028-02-28"),
 		"first companion date creates a record"
@@ -280,37 +292,59 @@ func _test_companion_and_progression_rules(state: Node) -> void:
 		"moving the system date backwards does not overwrite the record"
 	)
 	_assert_equal(state.data.last_companion_date, "2028-03-03", "backdated record is ignored")
-
-	_assert_equal(state._care_affection_reward(24.9), 2, "critical care grants two affection")
-	_assert_equal(state._care_affection_reward(25.0), 1, "medium care grants one affection")
-	_assert_equal(state._care_affection_reward(69.9), 1, "care reward upper middle boundary")
-	_assert_equal(state._care_affection_reward(70.0), 0, "healthy care grants no affection")
+	_assert_equal(
+		state.data.affection, 4,
+		"each distinct companion day grants one affection; repeats and backdating grant none"
+	)
 
 	state.data.energy = 0.0
 	state.data.mood = 0.0
-	_assert_equal(state._work_coin_reward(), 5, "work reward has a five-coin floor")
+	_assert_equal(state._work_coin_reward(), 8, "work reward has an eight-coin floor")
 	state.data.energy = 100.0
 	state.data.mood = 100.0
-	_assert_equal(state._work_coin_reward(), 9, "work reward has a nine-coin ceiling")
+	_assert_equal(state._work_coin_reward(), 12, "work reward has a twelve-coin ceiling")
 	state.data.energy = 50.0
 	state.data.mood = 50.0
-	_assert_equal(state._work_coin_reward(), 7, "average condition earns seven coins")
+	_assert_equal(state._work_coin_reward(), 10, "average condition earns ten coins")
 
-	state.data.hunger = 80.0
-	state.data.thirst = 80.0
-	state.data.energy = 80.0
-	state.data.bond_progress = 11.0
+	state.data.energy = 100.0
+	state.data.hunger = 100.0
+	state.data.thirst = 100.0
+	state.data.coins = 0
+	var earned: int = state._apply_work_result()
+	_assert_equal(state.data.energy, 80.0, "work costs twenty energy")
+	_assert_equal(state.data.hunger, 90.0, "work costs ten fullness")
+	_assert_equal(state.data.thirst, 85.0, "work costs fifteen hydration")
+	_assert_equal(state.data.coins, earned, "work pays its coin reward")
+	state.data.energy = 20.0
+	state.data.hunger = 10.0
+	state.data.thirst = 15.0
+	_assert_true(state._wish_is_sensible("work"), "a work wish holds exactly at the work minimums")
+	state.data.thirst = 14.9
+	_assert_true(not state._wish_is_sensible("work"), "a work wish is dropped below the hydration minimum")
+
+	state.data.level = 1
+	state.data.xp = 19
 	state.data.affection = 0
-	state._apply_bond_progress()
-	_assert_equal(state.data.bond_progress, 0.0, "good condition converts twelve bond points")
-	_assert_equal(state.data.affection, 1, "bond conversion grants affection")
-	state.data.hunger = 50.0
-	state.data.thirst = 80.0
-	state.data.energy = 80.0
-	state.data.bond_progress = 11.5
-	state._apply_bond_progress()
-	_assert_equal(state.data.bond_progress, 0.0, "normal condition adds half a bond point")
-	_assert_equal(state.data.affection, 2, "half-point bond conversion grants affection")
+	state._add_xp(1)
+	_assert_equal(state.data.level, 2, "XP threshold levels up")
+	_assert_equal(state.data.affection, 1, "each level up grants one affection")
+	state.data.xp = 0
+	state._add_xp(40 + 60)
+	_assert_equal(state.data.level, 4, "a large XP gain can level up more than once")
+	_assert_equal(state.data.affection, 3, "every gained level grants its own affection")
+
+	state.data.mood = 50.0
+	state.data.xp = 0
+	state._sleeping = true
+	state._sleep_energy_before = 69.0
+	state._end_sleep("natural")
+	_assert_near(state.data.mood, 53.0, "waking naturally adds the shared care mood bonus")
+	_assert_equal(state.data.xp, 1, "a real rest below seventy energy grants XP")
+	state._sleeping = true
+	state._sleep_energy_before = 70.0
+	state._end_sleep("natural")
+	_assert_equal(state.data.xp, 1, "topping up seventy or more energy grants no XP")
 	state.data.affection = 100
 	state._add_affection(2)
 	_assert_equal(state.data.affection, 100, "affection remains capped at one hundred")
@@ -341,7 +375,6 @@ func _test_offline_freeze() -> void:
 	frozen_data.energy = 44.0
 	frozen_data.mood = 45.0
 	frozen_data.affection = 12
-	frozen_data.bond_progress = 7.5
 	frozen_data.last_decay_at = old_timestamp
 	frozen_data.last_companion_date = Time.get_date_string_from_system(false)
 	var file := FileAccess.open(OFFLINE_SAVE_PATH, FileAccess.WRITE)
@@ -360,7 +393,6 @@ func _test_offline_freeze() -> void:
 	_assert_equal(frozen_state.data.energy, 44.0, "offline time does not decay energy")
 	_assert_equal(frozen_state.data.mood, 45.0, "offline time does not decay mood")
 	_assert_equal(frozen_state.data.affection, 12, "offline time does not grant affection")
-	_assert_equal(frozen_state.data.bond_progress, 7.5, "offline time freezes bond progress")
 	_assert_true(
 		int(frozen_state.data.last_decay_at) > old_timestamp,
 		"resuming resets the live decay clock"
@@ -371,6 +403,25 @@ func _test_offline_freeze() -> void:
 		var cleanup_path := OFFLINE_SAVE_PATH + suffix
 		if FileAccess.file_exists(cleanup_path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(cleanup_path))
+
+
+func _test_mood_decay_tiers(state: Node) -> void:
+	var now: int = state._now()
+	state.data.hunger = 80.0
+	state.data.thirst = 49.0
+	state.data.energy = 80.0
+	state.data.mood = 80.0
+	state.data.last_decay_at = now - 600
+	state._apply_elapsed_decay(now, 48)
+	_assert_near(state.data.mood, 79.5, "a need below fifty lowers mood by half a point")
+	state.data.thirst = 19.0
+	state.data.last_decay_at = now - 600
+	state._apply_elapsed_decay(now, 48)
+	_assert_near(state.data.mood, 78.5, "a need below twenty lowers mood by one point")
+	state.data.hunger = 80.0
+	state.data.thirst = 80.0
+	state.data.energy = 80.0
+	state.data.mood = 80.0
 
 
 func _test_frame_viewport_containment(visual: Node2D) -> void:
@@ -535,6 +586,13 @@ func _assert_true(condition: bool, label: String) -> void:
 		return
 	_failures += 1
 	push_error("Assertion failed: %s" % label)
+
+
+func _assert_near(actual: Variant, expected: float, label: String) -> void:
+	if is_equal_approx(float(actual), expected):
+		return
+	_failures += 1
+	push_error("Assertion failed: %s (actual=%s expected=%s)" % [label, actual, expected])
 
 
 func _assert_equal(actual: Variant, expected: Variant, label: String) -> void:
