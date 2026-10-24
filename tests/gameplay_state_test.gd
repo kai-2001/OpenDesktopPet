@@ -170,6 +170,8 @@ func _init() -> void:
 	_assert_equal(state.data.hunger, hunger_before_rejection, "rejected animation must not reward")
 	_assert_true(not state.is_action_busy(), "rejected animation must unlock state")
 	visual._busy = false
+	await _test_emergency_ration(state)
+	await _test_auto_feeder(state)
 
 	state.data.wish_action = "sleep"
 	state.data.wish_expires_at = state._now()
@@ -424,6 +426,104 @@ func _test_offline_freeze() -> void:
 		var cleanup_path := OFFLINE_SAVE_PATH + suffix
 		if FileAccess.file_exists(cleanup_path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(cleanup_path))
+
+
+func _test_emergency_ration(state: Node) -> void:
+	state.data.coins = 0
+	state.data.hunger = 5.0
+	state.data.mood = 40.0
+	_assert_true(state.is_emergency_ration_available("feed"), "broke and too hungry to work unlocks a free meal")
+	_assert_equal(state.care_cost_text("feed"), "緊急配給，免費", "the menu shows the free emergency meal")
+	await state.feed()
+	_assert_equal(state.data.hunger, 20.0, "the emergency meal only restores enough fullness to work")
+	_assert_equal(state.data.coins, 0, "the emergency meal is free")
+	_assert_near(state.data.mood, 40.0, "the emergency meal grants no mood")
+	_assert_true(not state.is_emergency_ration_available("feed"), "no second free meal once the pet can work")
+	_assert_equal(state.care_cost_text("feed"), "%d 金幣" % state.FEED_COST, "the menu returns to the normal price")
+	state.data.thirst = 5.0
+	await state.water()
+	_assert_equal(state.data.thirst, 25.0, "emergency water only restores enough hydration to work")
+	state.data.coins = 1
+	state.data.thirst = 5.0
+	_assert_true(not state.is_emergency_ration_available("water"), "a pet that can afford water pays for it")
+	state.data.hunger = 80.0
+	state.data.thirst = 80.0
+
+
+func _test_auto_feeder(state: Node) -> void:
+	state.data.affection = 99
+	state.data.coins = 1000
+	_assert_true(not state.can_buy_auto_feeder(), "the auto feeder needs affection 100")
+	state.data.affection = 100
+	state.data.coins = state.AUTO_FEEDER_PRICE - 1
+	_assert_true(not state.can_buy_auto_feeder(), "the auto feeder needs its full price")
+	state.data.coins = state.AUTO_FEEDER_PRICE + 20
+	_assert_true(state.buy_auto_feeder(), "the auto feeder can be bought")
+	_assert_equal(state.data.coins, 20, "buying charges the auto feeder price")
+	_assert_true(state.is_auto_feeder_active(), "a bought auto feeder starts enabled")
+	_assert_true(not state.buy_auto_feeder(), "the auto feeder is bought only once")
+
+	# Focus mode refills instantly without animation, which keeps this check fast.
+	state.auto_care_quiet = true
+	state.data.hunger = 80.0
+	state.data.thirst = 49.0
+	state.data.energy = 80.0
+	state.data.mood = 60.0
+	state.data.xp = 0
+	state._run_auto_feeder()
+	_assert_near(state.data.thirst, 49.0, "the first low check only marks the need")
+	state._run_auto_feeder()
+	_assert_equal(state.data.thirst, 100.0, "a need still low at the next check is refilled")
+	_assert_equal(state.data.coins, 19, "an automatic refill costs one coin")
+	_assert_near(state.data.mood, 60.0, "automatic care grants no mood")
+	_assert_equal(state.data.xp, 0, "automatic care grants no XP")
+
+	state.data.hunger = 25.0
+	state._run_auto_feeder()
+	_assert_true(state._auto_feeder_pending.hunger, "a low need is marked for the next check")
+	await state.feed()
+	_assert_true(not state._auto_feeder_pending.hunger, "feeding by hand restarts the wait")
+	_assert_near(state.data.hunger, 45.0, "manual feeding still uses its normal amount")
+	state._run_auto_feeder()
+	_assert_near(state.data.hunger, 45.0, "after manual care the auto feeder waits another check")
+	state.data.hunger = 40.0
+
+	state.data.coins = state.AUTO_FEEDER_COIN_RESERVE
+	state._run_auto_feeder()
+	state._run_auto_feeder()
+	_assert_near(state.data.hunger, 40.0, "the auto feeder pauses at its coin reserve")
+	_assert_true(state.is_auto_feeder_paused(), "the paused state is reported")
+
+	state.data.coins = 50
+	state.data.energy = 30.0
+	state.data.hunger = 80.0
+	state._run_auto_feeder()
+	state._run_auto_feeder()
+	_assert_true(not state.is_sleeping(), "focus mode postpones automatic sleep")
+
+	state.auto_care_quiet = false
+	state.set_auto_feeder_enabled(false)
+	state.data.thirst = 10.0
+	state._run_auto_feeder()
+	state._run_auto_feeder()
+	_assert_near(state.data.thirst, 10.0, "a disabled auto feeder does nothing")
+	state.set_auto_feeder_enabled(true)
+	state.data.thirst = 80.0
+
+	state.data.mood = 60.0
+	state.data.xp = 0
+	await state._auto_sleep()
+	_assert_true(state.is_sleeping(), "low energy puts the pet to sleep through the normal sleep")
+	state.data.energy = 100.0
+	state._end_sleep("natural")
+	_assert_near(state.data.mood, 60.0, "waking from automatic sleep grants no mood")
+	_assert_equal(state.data.xp, 0, "waking from automatic sleep grants no XP")
+
+	state.data.auto_feeder_owned = false
+	state.data.auto_feeder_enabled = false
+	state.data.coins = 20
+	state.data.energy = 80.0
+	state.data.hunger = 80.0
 
 
 func _test_mood_decay_tiers(state: Node) -> void:

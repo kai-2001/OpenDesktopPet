@@ -125,6 +125,9 @@ var _character_delete_dialog: ConfirmationDialog
 var _pending_character_archive := ""
 var _stats_bars: Dictionary = {}
 var _care_action_buttons: Dictionary = {}
+var _auto_feeder_buy_button: Button
+var _auto_feeder_toggle: Button
+var _auto_feeder_status: Label
 var _autostart_service
 var _window_service
 var _gameplay_coordinator
@@ -959,7 +962,8 @@ func _rebuild_action_menu(menu: PopupMenu) -> void:
 	PetMenuBuilderScript.populate(
 		menu,
 		Callable(self, "_interaction_icon"),
-		Callable(self, "_interaction_label")
+		Callable(self, "_interaction_label"),
+		Callable(state, "care_cost_text")
 	)
 	var reminders: Array[Dictionary] = []
 	if _task_reminder_coordinator != null:
@@ -1139,6 +1143,9 @@ func _build_stats_window() -> void:
 	_unlock_status = status_refs["unlock_status"] as Label
 	_last_message_status = status_refs["last_message_status"] as Label
 	_care_action_buttons = status_refs["care_action_buttons"] as Dictionary
+	_auto_feeder_buy_button = status_refs["auto_feeder_buy_button"] as Button
+	_auto_feeder_toggle = status_refs["auto_feeder_toggle"] as Button
+	_auto_feeder_status = status_refs["auto_feeder_status"] as Label
 	_stats_bars = status_refs["stats_bars"] as Dictionary
 
 	var settings_refs: Dictionary = refs["settings_refs"]
@@ -1267,6 +1274,8 @@ func _connect_details_window_signals() -> void:
 	_details_window_controller.care_action_requested.connect(
 		_on_care_action_requested
 	)
+	_details_window_controller.auto_feeder_buy_requested.connect(_on_auto_feeder_buy_requested)
+	_details_window_controller.auto_feeder_toggled.connect(_on_auto_feeder_toggled)
 	_details_window_controller.close_requested.connect(_destroy_stats_window)
 	_details_window_controller.target_fps_selected.connect(_on_target_fps_selected)
 	_details_window_controller.details_theme_selected.connect(_on_details_theme_selected)
@@ -1737,27 +1746,7 @@ func _reposition_after_character_switch(expected_character_id: String) -> void:
 
 
 func _refresh_json_driven_ui() -> void:
-	var labels := {
-		1: "%s  %s（2 金幣）" % [
-			_interaction_icon("feed"), _interaction_label("feed")
-		],
-		2: "%s  %s（1 金幣）" % [
-			_interaction_icon("water"), _interaction_label("water")
-		],
-		3: "%s  %s" % [
-			_interaction_icon("pet"), _interaction_label("pet")
-		],
-		4: "%s  %s（賺取金幣）" % [
-			_interaction_icon("work"), _interaction_label("work")
-		],
-		5: "%s  %s" % [
-			_interaction_icon("sleep"), _interaction_label("sleep")
-		],
-	}
-	for id: int in labels:
-		var index := context_menu.get_item_index(id)
-		if index >= 0:
-			context_menu.set_item_text(index, String(labels[id]))
+	_apply_care_menu_labels()
 	for action: String in _care_action_buttons:
 		var button: Button = _care_action_buttons[action]
 		if is_instance_valid(button):
@@ -1984,6 +1973,9 @@ func _destroy_stats_window() -> void:
 	_wish_status = null
 	_unlock_status = null
 	_last_message_status = null
+	_auto_feeder_buy_button = null
+	_auto_feeder_toggle = null
+	_auto_feeder_status = null
 	_fps_option_button = null
 	_details_theme_option_button = null
 	_visual_scale_slider = null
@@ -2108,6 +2100,7 @@ func _apply_keep_screen_on(enabled: bool) -> void:
 
 func _apply_focus_mode(enabled: bool) -> void:
 	_focus_mode = enabled
+	state.auto_care_quiet = enabled
 	if enabled and _gameplay_coordinator != null:
 		_gameplay_coordinator.cancel_autonomous_action()
 	if is_instance_valid(_focus_mode_check_box):
@@ -2549,6 +2542,82 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 		context_menu.set_item_text(0, level_text)
 	if is_instance_valid(_tray_menu) and _tray_menu.item_count > 0:
 		_tray_menu.set_item_text(0, level_text)
+	# Prices switch to the free emergency ration when the pet would be stuck.
+	_apply_care_menu_labels()
+	_refresh_auto_feeder_ui(snapshot)
+
+
+func _apply_care_menu_labels() -> void:
+	for menu: PopupMenu in [context_menu, _tray_menu]:
+		PetMenuBuilderScript.apply_care_labels(
+			menu,
+			Callable(self, "_interaction_icon"),
+			Callable(self, "_interaction_label"),
+			Callable(state, "care_cost_text")
+		)
+
+
+func _refresh_auto_feeder_ui(snapshot: Dictionary) -> void:
+	if not is_instance_valid(_auto_feeder_buy_button):
+		return
+	var owned := bool(snapshot.get("auto_feeder_owned", false))
+	var enabled := bool(snapshot.get("auto_feeder_enabled", false))
+	var coins := int(snapshot.get("coins", 0))
+	_auto_feeder_buy_button.visible = not owned
+	_auto_feeder_toggle.visible = owned
+	_auto_feeder_toggle.set_pressed_no_signal(enabled)
+	_auto_feeder_toggle.queue_redraw()
+	if not owned:
+		if not bool(snapshot.get("auto_feeder_unlocked", false)):
+			_auto_feeder_buy_button.text = "🔒 需要親密 %d" % (
+				PetState.AUTO_FEEDER_REQUIRED_AFFECTION
+			)
+			_auto_feeder_buy_button.disabled = true
+			_auto_feeder_buy_button.tooltip_text = (
+				"陪伴它到親密 %d，就能購買自動餵食器。目前親密 %d。" % [
+					PetState.AUTO_FEEDER_REQUIRED_AFFECTION,
+					int(snapshot.get("affection", 0)),
+				]
+			)
+			_set_auto_feeder_status("", "")
+			return
+		_auto_feeder_buy_button.text = "購買 %d 金幣" % PetState.AUTO_FEEDER_PRICE
+		var shortfall := PetState.AUTO_FEEDER_PRICE - coins
+		_auto_feeder_buy_button.disabled = shortfall > 0
+		_auto_feeder_buy_button.tooltip_text = (
+			"還差 %d 枚金幣。" % shortfall
+			if shortfall > 0
+			else "花 %d 枚金幣購買，買了就永久擁有，可以隨時開關。" % PetState.AUTO_FEEDER_PRICE
+		)
+		_set_auto_feeder_status("", "")
+		return
+	if not enabled:
+		_auto_feeder_toggle.tooltip_text = "開啟後會自動照顧飽食、水分與體力。"
+		_set_auto_feeder_status("已關閉", "開啟後會自動照顧飽食、水分與體力。")
+	elif bool(snapshot.get("auto_feeder_paused", false)):
+		var paused_text := "金幣只剩 %d 枚，已暫停；賺到更多金幣後會恢復運作。" % coins
+		_auto_feeder_toggle.tooltip_text = paused_text
+		_set_auto_feeder_status("已暫停", paused_text)
+	else:
+		_auto_feeder_toggle.tooltip_text = "自動餵食器運作中。"
+		_set_auto_feeder_status("運作中", "自動餵食器運作中。")
+
+
+func _set_auto_feeder_status(text: String, tooltip: String) -> void:
+	if not is_instance_valid(_auto_feeder_status):
+		return
+	_auto_feeder_status.text = text
+	_auto_feeder_status.tooltip_text = tooltip
+	_auto_feeder_status.visible = not text.is_empty()
+
+
+func _on_auto_feeder_buy_requested() -> void:
+	if not state.buy_auto_feeder():
+		_say_dialogue("auto_feeder_cannot_buy", "現在還買不起自動餵食器。", 2.5)
+
+
+func _on_auto_feeder_toggled(enabled: bool) -> void:
+	state.set_auto_feeder_enabled(enabled)
 
 
 func _wish_icon(action: String) -> String:

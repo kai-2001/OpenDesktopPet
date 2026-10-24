@@ -6,9 +6,12 @@ const SettingsToggleSwitchScript = preload("res://scripts/settings_toggle_switch
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const TaskReminderPanelScript = preload("res://scripts/task_reminder_panel.gd")
 const UpdateCheckServiceScript = preload("res://scripts/update_check_service.gd")
+const PetStateScript = preload("res://scripts/pet_state.gd")
 const TARGET_FPS_OPTIONS := [15, 30, 60]
 
 signal care_action_requested(action: String)
+signal auto_feeder_buy_requested
+signal auto_feeder_toggled(enabled: bool)
 signal close_requested
 signal target_fps_selected(index: int)
 signal details_theme_selected(index: int)
@@ -161,7 +164,8 @@ func build_status_tab(tabs: TabContainer) -> Dictionary:
 		"照顧操作", 16, _details_color("#30383c", "#d4d4d4")
 	)
 	action_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(action_title)
+	var auto_feeder_refs := _build_auto_feeder_row()
+	content.add_child(_build_care_header(action_title, auto_feeder_refs["row"]))
 
 	var action_grid := HFlowContainer.new()
 	action_grid.alignment = FlowContainer.ALIGNMENT_CENTER
@@ -204,7 +208,81 @@ func build_status_tab(tabs: TabContainer) -> Dictionary:
 		"last_message_status": last_message_status,
 		"care_action_buttons": care_action_buttons,
 		"stats_bars": stats_bars,
+		"auto_feeder_buy_button": auto_feeder_refs["buy_button"],
+		"auto_feeder_toggle": auto_feeder_refs["toggle"],
+		"auto_feeder_status": auto_feeder_refs["status"],
 	}
+
+
+## Centered title with the auto feeder on the right of the same line. A blank
+## spacer as wide as the feeder balances the left side so the title stays truly
+## centered. When the panel is too narrow for both, the feeder moves to its own
+## centered line under the title.
+func _build_care_header(title: Label, feeder_row: Control) -> Control:
+	var header := VBoxContainer.new()
+	header.add_theme_constant_override("separation", 6)
+	var top_row := HBoxContainer.new()
+	top_row.add_theme_constant_override("separation", 8)
+	var spacer := Control.new()
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.size_flags_vertical = Control.SIZE_FILL
+	top_row.add_child(spacer)
+	top_row.add_child(title)
+	top_row.add_child(feeder_row)
+	header.add_child(top_row)
+	var bottom_row := CenterContainer.new()
+	bottom_row.visible = false
+	header.add_child(bottom_row)
+	var layout := func() -> void:
+		var feeder_width := feeder_row.get_combined_minimum_size().x
+		var needed := title.get_combined_minimum_size().x + feeder_width * 2.0 + 24.0
+		var single_line := header.size.x >= needed
+		spacer.custom_minimum_size.x = feeder_width
+		spacer.visible = single_line
+		bottom_row.visible = not single_line
+		var target: Control = top_row if single_line else bottom_row
+		if feeder_row.get_parent() != target:
+			feeder_row.reparent(target, false)
+	# Defer so reparenting never happens inside the container's own sort pass.
+	header.resized.connect(func() -> void: layout.call_deferred())
+	# The row changes width when the feeder is bought or switches state.
+	feeder_row.minimum_size_changed.connect(func() -> void: layout.call_deferred())
+	return header
+
+
+func _build_auto_feeder_row() -> Dictionary:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 8)
+	row.add_child(_new_label(
+		"🍽 自動餵食器", 15, _details_color("#30383c", "#d4d4d4")
+	))
+	var help: Label = _new_label("(?)", 14, _details_color("#238b9d", "#4fc1ff"))
+	help.tooltip_text = PetStateScript.AUTO_FEEDER_TOOLTIP
+	help.mouse_filter = Control.MOUSE_FILTER_STOP
+	help.mouse_default_cursor_shape = Control.CURSOR_HELP
+	row.add_child(help)
+	var buy_button := Button.new()
+	buy_button.custom_minimum_size = Vector2(110, 34)
+	_apply_secondary_button_style(buy_button)
+	buy_button.pressed.connect(func() -> void: auto_feeder_buy_requested.emit())
+	row.add_child(buy_button)
+	var toggle := SettingsToggleSwitchScript.new()
+	toggle.name = "AutoFeederToggle"
+	toggle.configure(theme_mode, false)
+	toggle.visible = false
+	toggle.toggled.connect(func(value: bool) -> void: auto_feeder_toggled.emit(value))
+	row.add_child(toggle)
+	# A short state word sits in the row; the full explanation is its tooltip,
+	# so the feeder never adds an extra line under the care buttons.
+	var status: Label = _new_label("", 13, _details_color("#68747a", "#9da1a6"))
+	status.mouse_filter = Control.MOUSE_FILTER_STOP
+	status.visible = false
+	row.add_child(status)
+	return {"row": row, "buy_button": buy_button, "toggle": toggle, "status": status}
 
 
 func build_reminders_tab(tabs: TabContainer, reminder_coordinator) -> Dictionary:

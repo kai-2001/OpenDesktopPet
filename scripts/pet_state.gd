@@ -25,6 +25,24 @@ const WISH_MIN_SECONDS := 1200
 const WISH_MAX_SECONDS := 2400
 const SLEEP_RECOVERY_INTERVAL_SECONDS := 3.0
 const SLEEP_ENERGY_PER_TICK := 2.0
+const FEED_COST := 3
+const WATER_COST := 1
+const WORK_MIN_ENERGY := 20.0
+const WORK_MIN_HUNGER := 10.0
+const WORK_MIN_THIRST := 15.0
+# 緊急配給只補到剛好能工作的程度，避免沒錢又不能工作而卡死。
+const EMERGENCY_HUNGER := 20.0
+const EMERGENCY_THIRST := 25.0
+const AUTO_FEEDER_PRICE := 500
+const AUTO_FEEDER_REQUIRED_AFFECTION := 100
+const AUTO_FEEDER_TRIGGER_BELOW := 50.0
+const AUTO_FEEDER_CARE_COST := 1
+const AUTO_FEEDER_COIN_RESERVE := 5
+const AUTO_FEEDER_TOOLTIP := (
+	"自動餵食器\n"
+	+ "數值低於 50 且一段時間未照顧時，自動花 1 枚金幣補滿飽食或水分，體力不足則進入睡眠。\n"
+	+ "金幣剩 5 枚時暫停，不增加心情和 XP。"
+)
 
 const DEFAULT_DATA := {
 	"save_version": SAVE_VERSION,
@@ -55,6 +73,8 @@ const DEFAULT_DATA := {
 	"wish_notice_version": 0,
 	"last_pet_reward_at": 0,
 	"visual_scale": PetVisualScaleScript.DEFAULT_VALUE,
+	"auto_feeder_owned": false,
+	"auto_feeder_enabled": false,
 }
 
 var data: Dictionary = DEFAULT_DATA.duplicate(true)
@@ -71,6 +91,12 @@ var _sleeping := false
 var _sleep_accumulator := 0.0
 var _sleep_energy_before := 0.0
 var _sleep_recovered := 0.0
+var _sleep_is_auto := false
+# 專注模式時由 main 設為 true：自動餵食器只補數值、不播動畫，也不自動睡覺。
+var auto_care_quiet := false
+# 上一次檢查時已低於門檻、尚未被照顧的數值；連續兩次檢查都低於門檻才處理。
+var _auto_feeder_pending := {"hunger": false, "thirst": false, "energy": false}
+var _auto_feeder_paused_notified := false
 
 
 func _ready() -> void:
@@ -145,6 +171,10 @@ func _process(delta: float) -> void:
 	if changed_by_decay or changed_by_companion:
 		_commit()
 
+	# 自動餵食器跟自然衰減同一個節奏，每 10 分鐘檢查一次。
+	if changed_by_decay:
+		_run_auto_feeder()
+
 
 func pet() -> void:
 	var request_id := _begin_action("pet")
@@ -177,8 +207,9 @@ func feed() -> void:
 		_request_message("feed_full", "肚子已經很飽了，晚點再吃吧。")
 		return
 
-	if data.coins < 3:
-		_request_message("feed_no_coins", "需要 3 枚金幣，先去工作吧。")
+	var emergency := is_emergency_ration_available("feed")
+	if not emergency and data.coins < FEED_COST:
+		_request_message("feed_no_coins", "需要 %d 枚金幣，先去工作吧。" % FEED_COST)
 		return
 
 	var request_id := _begin_action("eat")
@@ -192,7 +223,13 @@ func feed() -> void:
 		_abort_action("feed_failed", "餵食動畫無法播放，沒有扣除金幣。")
 		return
 
-	data.coins -= 3
+	_auto_feeder_pending.hunger = false
+	if emergency:
+		data.hunger = maxf(float(data.hunger), EMERGENCY_HUNGER)
+		_finish_action("feed_emergency", "肚子好餓……先吃點簡單的，吃完就能去工作了。")
+		return
+
+	data.coins -= FEED_COST
 	data.hunger = _limit(float(data.hunger) + 20.0)
 	data.mood = _limit(float(data.mood) + 3.0)
 	data.care += 1
@@ -215,8 +252,9 @@ func water() -> void:
 		_request_message("water_full", "現在不渴，晚點再喝吧。")
 		return
 
-	if data.coins < 1:
-		_request_message("water_no_coins", "需要 1 枚金幣，先去工作吧。")
+	var emergency := is_emergency_ration_available("water")
+	if not emergency and data.coins < WATER_COST:
+		_request_message("water_no_coins", "需要 %d 枚金幣，先去工作吧。" % WATER_COST)
 		return
 
 	var request_id := _begin_action("drink")
@@ -230,7 +268,13 @@ func water() -> void:
 		_abort_action("water_failed", "喝水動畫無法播放，沒有扣除金幣。")
 		return
 
-	data.coins -= 1
+	_auto_feeder_pending.thirst = false
+	if emergency:
+		data.thirst = maxf(float(data.thirst), EMERGENCY_THIRST)
+		_finish_action("water_emergency", "好渴……先喝點水，喝完就能去工作了。")
+		return
+
+	data.coins -= WATER_COST
 	data.thirst = _limit(float(data.thirst) + 25.0)
 	data.mood = _limit(float(data.mood) + 3.0)
 	data.care += 1
@@ -252,13 +296,19 @@ func sleep() -> void:
 	if not played:
 		_abort_action("sleep_failed", "睡覺動畫無法播放。")
 		return
+	_auto_feeder_pending.energy = false
 	if float(data.energy) >= 100.0:
 		_finish_action(
 			"sleep_full",
 			"雖然很有精神，還是舒服地瞇了一會。" + _complete_wish("sleep")
 		)
 		return
+	_start_sleep_recovery(false)
+
+
+func _start_sleep_recovery(automatic: bool) -> void:
 	_sleeping = true
+	_sleep_is_auto = automatic
 	_sleep_accumulator = 0.0
 	_sleep_energy_before = float(data.energy)
 	_sleep_recovered = 0.0
@@ -271,15 +321,15 @@ func work() -> void:
 		_request_message("action_busy", "先等目前的動作完成～")
 		return
 
-	if data.energy < 20.0:
+	if data.energy < WORK_MIN_ENERGY:
 		_request_message("work_tired", "太累了，先睡一下吧。")
 		return
 
-	if data.hunger < 10.0:
+	if data.hunger < WORK_MIN_HUNGER:
 		_request_message("work_hungry", "肚子太餓了，吃飽再工作吧。")
 		return
 
-	if data.thirst < 15.0:
+	if data.thirst < WORK_MIN_THIRST:
 		_request_message("work_thirsty", "太渴了，喝水後再工作吧。")
 		return
 
@@ -333,7 +383,12 @@ func _end_sleep(reason: String) -> void:
 	_sleep_accumulator = 0.0
 	_action_busy = false
 	sleep_ended.emit(reason)
-	if natural:
+	var automatic := _sleep_is_auto
+	_sleep_is_auto = false
+	if natural and automatic:
+		# 自動照顧只恢復數值，不給心情、XP，也不代替玩家完成願望。
+		_request_message("sleep_recovered", "睡飽了，精神完全恢復！")
+	elif natural:
 		data.mood = _limit(float(data.mood) + 3.0)
 		# Only a real rest earns XP, not topping up an almost-full energy bar.
 		if _sleep_energy_before < 70.0:
@@ -370,6 +425,143 @@ func is_action_busy() -> bool:
 
 func is_sleeping() -> bool:
 	return _sleeping
+
+
+## 沒錢買、而且低到不能工作時，手動餵食或喝水免費，避免卡死。
+func is_emergency_ration_available(action: String) -> bool:
+	match action:
+		"feed":
+			return int(data.coins) < FEED_COST and float(data.hunger) < WORK_MIN_HUNGER
+		"water":
+			return int(data.coins) < WATER_COST and float(data.thirst) < WORK_MIN_THIRST
+	return false
+
+
+## 選單與面板共用的價格說明，價格只在這裡定義一次。
+func care_cost_text(action: String) -> String:
+	match action:
+		"feed":
+			if is_emergency_ration_available("feed"):
+				return "緊急配給，免費"
+			return "%d 金幣" % FEED_COST
+		"water":
+			if is_emergency_ration_available("water"):
+				return "緊急配給，免費"
+			return "%d 金幣" % WATER_COST
+		"work":
+			return "賺取金幣"
+	return ""
+
+
+func is_auto_feeder_unlocked() -> bool:
+	return int(data.affection) >= AUTO_FEEDER_REQUIRED_AFFECTION
+
+
+func can_buy_auto_feeder() -> bool:
+	return not bool(data.auto_feeder_owned) \
+		and is_auto_feeder_unlocked() \
+		and int(data.coins) >= AUTO_FEEDER_PRICE
+
+
+func buy_auto_feeder() -> bool:
+	if not can_buy_auto_feeder():
+		return false
+	data.coins -= AUTO_FEEDER_PRICE
+	data.auto_feeder_owned = true
+	data.auto_feeder_enabled = true
+	_request_message("auto_feeder_bought", "買到自動餵食器了！之後的飽食、水分和體力交給它照顧。")
+	_commit()
+	return true
+
+
+func set_auto_feeder_enabled(value: bool) -> void:
+	if not bool(data.auto_feeder_owned) or bool(data.auto_feeder_enabled) == value:
+		return
+	data.auto_feeder_enabled = value
+	for need: String in _auto_feeder_pending:
+		_auto_feeder_pending[need] = false
+	_commit()
+
+
+func is_auto_feeder_active() -> bool:
+	return bool(data.auto_feeder_owned) and bool(data.auto_feeder_enabled)
+
+
+func is_auto_feeder_paused() -> bool:
+	return is_auto_feeder_active() \
+		and int(data.coins) - AUTO_FEEDER_CARE_COST < AUTO_FEEDER_COIN_RESERVE
+
+
+## 每 10 分鐘檢查一次。某項第一次低於門檻只先記下；下一次檢查時仍低於門檻、
+## 中間也沒有手動照顧，才自動處理。水分優先，其次飽食，最後體力。
+func _run_auto_feeder() -> void:
+	if not is_auto_feeder_active() or _sleeping or _action_busy:
+		return
+	var due: Array[String] = []
+	for need: String in ["thirst", "hunger", "energy"]:
+		if float(data[need]) >= AUTO_FEEDER_TRIGGER_BELOW:
+			_auto_feeder_pending[need] = false
+		elif bool(_auto_feeder_pending[need]):
+			due.append(need)
+		else:
+			_auto_feeder_pending[need] = true
+	for need: String in due:
+		if need == "energy":
+			# 睡覺會播放睡眠動畫，專注模式時延到關閉後再處理。
+			if auto_care_quiet:
+				continue
+			_auto_sleep()
+			return
+		if is_auto_feeder_paused():
+			if not _auto_feeder_paused_notified:
+				_auto_feeder_paused_notified = true
+				_request_message("auto_feeder_paused", "金幣不夠了，自動餵食器先休息囉。")
+				emit_changed()
+			return
+		_auto_feeder_paused_notified = false
+		if auto_care_quiet:
+			_apply_auto_refill(need)
+			continue
+		# 有動畫時一次只處理一項，其他的留到下一次檢查。
+		_auto_refill(need)
+		return
+
+
+func _auto_refill(need: String) -> void:
+	var request_id := _begin_action("eat" if need == "hunger" else "drink")
+	if request_id <= 0:
+		return
+	var played: bool = await _wait_for_action_result(request_id)
+	if not played:
+		# 桌寵正在忙時不扣金幣，保留記錄，下一次檢查再試。
+		_action_busy = false
+		emit_changed()
+		return
+	_apply_auto_refill(need)
+
+
+func _apply_auto_refill(need: String) -> void:
+	data.coins -= AUTO_FEEDER_CARE_COST
+	data[need] = 100.0
+	_auto_feeder_pending[need] = false
+	if need == "hunger":
+		_finish_action("auto_feeder_feed", "自動餵食器送來了食物，吃飽了！")
+	else:
+		_finish_action("auto_feeder_water", "自動餵食器補滿了水，好清爽！")
+
+
+func _auto_sleep() -> void:
+	var request_id := _begin_action("sleep")
+	if request_id <= 0:
+		return
+	var played: bool = await _wait_for_action_result(request_id)
+	if not played:
+		_action_busy = false
+		emit_changed()
+		return
+	_auto_feeder_pending.energy = false
+	_request_message("auto_feeder_sleep", "體力不足，自動餵食器讓它進入睡眠。")
+	_start_sleep_recovery(true)
 
 
 func wish_text() -> String:
@@ -526,7 +718,9 @@ func _wish_is_sensible(action: String) -> bool:
 		"sleep":
 			return true
 		"work":
-			return data.energy >= 20.0 and data.hunger >= 10.0 and data.thirst >= 15.0
+			return data.energy >= WORK_MIN_ENERGY \
+				and data.hunger >= WORK_MIN_HUNGER \
+				and data.thirst >= WORK_MIN_THIRST
 		_:
 			return true
 
@@ -572,6 +766,8 @@ func get_snapshot() -> Dictionary:
 	# 提供給詳細面板與未來自主動畫使用。
 	snapshot.lowest_need = _lowest_need()
 	snapshot.condition_tier = _condition_tier()
+	snapshot.auto_feeder_unlocked = is_auto_feeder_unlocked()
+	snapshot.auto_feeder_paused = is_auto_feeder_paused()
 
 	return snapshot
 
@@ -814,6 +1010,11 @@ func _normalize_loaded_data() -> void:
 	data.care = maxi(int(data.care), 0)
 
 	data.visual_scale = PetVisualScaleScript.normalize(float(data.visual_scale))
+
+	data.auto_feeder_owned = bool(data.get("auto_feeder_owned", false))
+	data.auto_feeder_enabled = (
+		data.auto_feeder_owned and bool(data.get("auto_feeder_enabled", false))
+	)
 
 	for key: String in [
 		"last_seen",
