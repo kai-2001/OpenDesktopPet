@@ -2535,8 +2535,10 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 			_unlock_status.text = "下一動作：%s　需要 Lv.%d、親密度 %d" % [
 				next_unlock.name, next_unlock.level, next_unlock.affection
 			]
+		# Round down so the shown percent never claims more than the rules see:
+		# 19.8 energy reads 19%, matching the 20-energy work requirement.
 		for key: String in _stats_bars:
-			(_stats_bars[key] as ProgressBar).value = float(snapshot[key])
+			(_stats_bars[key] as ProgressBar).value = floorf(float(snapshot[key]))
 	if context_menu.item_count > 0:
 		context_menu.set_item_text(0, level_text)
 	if is_instance_valid(_tray_menu) and _tray_menu.item_count > 0:

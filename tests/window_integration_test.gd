@@ -339,6 +339,16 @@ func _init() -> void:
 		"the status tab fits the default details window without scrolling "
 			+ "(needed=%.0f visible=%.0f)" % [status_needed, status_page.size.y]
 	)
+	var energy_before_display_check := float(main.state.data.energy)
+	main.state.data.energy = 19.8
+	main._refresh_ui(main.state.get_snapshot())
+	_assert_equal(
+		(main._stats_bars["energy"] as ProgressBar).value,
+		19.0,
+		"stat bars round down so 19.8 energy does not read as the 20 work minimum"
+	)
+	main.state.data.energy = energy_before_display_check
+	main._refresh_ui(main.state.get_snapshot())
 	main._select_stats_tab(2)
 	await process_frame
 	_assert_true(
