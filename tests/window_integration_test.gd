@@ -2,6 +2,7 @@ extends SceneTree
 
 const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
+const CjkLineBreaksScript = preload("res://scripts/cjk_line_breaks.gd")
 
 var _failures := 0
 
@@ -65,7 +66,7 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	_assert_true(
-		main.bubble.visible and main.bubble_label.text.contains("徽章整合測試"),
+		main.bubble.visible and _bubble_text(main).contains("徽章整合測試"),
 		"today reminder replaces the normal startup bubble"
 	)
 	_assert_true(main.task_reminder_badge.visible, "today reminder displays the compact badge")
@@ -78,7 +79,7 @@ func _init() -> void:
 	await process_frame
 	_assert_true(main.bubble.visible, "timed reminder opens the real speech bubble")
 	_assert_equal(
-		main.bubble_label.text,
+		_bubble_text(main),
 		"・%s 時間到整合測試" % due_time,
 		"timed reminder speech bubble uses the compact bullet format"
 	)
@@ -677,7 +678,7 @@ func _init() -> void:
 	main.say("💤", 0.1)
 	await process_frame
 	_assert_true(main.bubble.visible, "latest speech is visible")
-	_assert_equal(main.bubble_label.text, "💤", "latest speech replaces earlier speech")
+	_assert_equal(_bubble_text(main), "💤", "latest speech replaces earlier speech")
 	await create_timer(0.2).timeout
 	_assert_true(not main.bubble.visible, "speech hides after its duration")
 	_assert_equal(
@@ -730,7 +731,7 @@ func _init() -> void:
 		"replacement Codex notification remains active"
 	)
 	_assert_equal(
-		main.bubble_label.text,
+		_bubble_text(main),
 		"Codex 最新通知",
 		"latest Codex notification replaces the previous bubble"
 	)
@@ -866,6 +867,11 @@ func _init() -> void:
 	else:
 		print("WINDOW_INTEGRATION_TEST_OK")
 		quit(0)
+
+
+func _bubble_text(main: Node) -> String:
+	# The bubble carries zero-width break hints between CJK characters.
+	return CjkLineBreaksScript.strip(main.bubble_label.text)
 
 
 func _native_hit_region_has(main: Node, point: Vector2) -> bool:

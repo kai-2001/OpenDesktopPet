@@ -16,6 +16,7 @@ const TaskReminderPresentationCoordinatorScript = preload(
 const WindowsAutostartServiceScript = preload("res://scripts/windows_autostart_service.gd")
 const DisplayRecoveryControllerScript = preload("res://scripts/display_recovery_controller.gd")
 const UpdateCheckCoordinatorScript = preload("res://scripts/update_check_coordinator.gd")
+const CjkLineBreaksScript = preload("res://scripts/cjk_line_breaks.gd")
 const CharacterEffectPreferencesScript = preload(
 	"res://scripts/character_effect_preferences.gd"
 )
@@ -278,7 +279,8 @@ func say(text: String, seconds := 6.0, agent_priority := false) -> void:
 	bubble.visible = false
 	bubble_tail.visible = false
 	_refresh_interaction_polygon()
-	bubble_label.text = text
+	# Exported builds cannot wrap Chinese without break hints; see CjkLineBreaks.
+	bubble_label.text = CjkLineBreaksScript.insert_break_opportunities(text)
 	bubble_label.add_theme_font_size_override(
 		"font_size", 20 if text in ["🥕", "💧", "💤", "🪙", "✋"] else 13
 	)

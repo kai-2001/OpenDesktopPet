@@ -131,6 +131,15 @@ try {
 		throw 'Update check validation failed.'
 	}
 
+	$ErrorActionPreference = 'Continue'
+	$cjkLineBreaksOutput =& $GodotExe --headless --path $projectRoot --script 'res://tests/cjk_line_breaks_test.gd' 2>&1
+	$cjkLineBreaksExitCode = $LASTEXITCODE
+	$ErrorActionPreference = $previousErrorActionPreference
+	$cjkLineBreaksOutput | Write-Output
+	if ($cjkLineBreaksExitCode -ne 0 -or -not ($cjkLineBreaksOutput -match 'CJK_LINE_BREAKS_TEST_OK')) {
+		throw 'CJK line break validation failed.'
+	}
+
     $ErrorActionPreference = 'Continue'
     $gameplayOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/gameplay_state_test.gd' 2>&1
     $gameplayExitCode = $LASTEXITCODE
