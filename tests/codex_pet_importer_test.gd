@@ -138,6 +138,40 @@ func _run() -> void:
 	var removed := CharacterPackManagerScript.remove_pack("codex-test-v1")
 	_assert_true(bool(removed.get("ok", false)), "installed Codex pack removes")
 
+	# Codex pet files may carry a mixed-case id ("Giratina"); fold it to
+	# lowercase instead of rejecting the archive.
+	var mixed_root := TEST_ROOT.path_join("mixed")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(mixed_root))
+	_assert_true(_write_sheet(mixed_root.path_join("spritesheet.png"), 9), "mixed-case test spritesheet is created")
+	_write_manifest(mixed_root, {
+		"id": "Codex-Test-Mixed",
+		"displayName": "Codex Mixed",
+		"spritesheetPath": "spritesheet.png",
+	})
+	var mixed_archive := TEST_ROOT.path_join("codex-test-mixed.zip")
+	_assert_true(_write_archive(mixed_archive, mixed_root), "mixed-case Codex archive is created")
+	var mixed_inspection := CharacterPackManagerScript.inspect_archive(mixed_archive)
+	_assert_true(bool(mixed_inspection.get("ok", false)), "mixed-case Codex id is accepted")
+	_assert_equal(String(mixed_inspection.get("id", "")), "codex-test-mixed", "mixed-case Codex id is lowercased")
+	_assert_equal(String(mixed_inspection.get("name", "")), "Codex Mixed", "display name keeps its case")
+	var mixed_installed := CharacterPackManagerScript.install_archive(mixed_archive)
+	_assert_true(bool(mixed_installed.get("ok", false)), "mixed-case Codex archive installs")
+	_assert_equal(String(mixed_installed.get("id", "")), "codex-test-mixed", "mixed-case pack installs under a lowercase id")
+	var mixed_profile := CharacterPackProfileScript.new()
+	_assert_true(
+		mixed_profile.load_pack(CharacterPackManagerScript.PACKS_ROOT.path_join("codex-test-mixed")),
+		"mixed-case pack loads from its lowercase folder"
+	)
+	_assert_equal(mixed_profile.character_id(), "codex-test-mixed", "loaded mixed-case pack reports the lowercase id")
+	_assert_true(
+		_contains_id(CharacterPackManagerScript.list_installed(), "codex-test-mixed"),
+		"mixed-case pack appears in the list under its lowercase id"
+	)
+	_assert_true(
+		bool(CharacterPackManagerScript.remove_pack("codex-test-mixed").get("ok", false)),
+		"mixed-case pack removes by its lowercase id"
+	)
+
 	if _failures > 0:
 		push_error("CODEX_PET_IMPORTER_TEST_FAILED: %d assertion(s)" % _failures)
 		quit(1)

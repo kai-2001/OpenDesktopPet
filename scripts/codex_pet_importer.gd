@@ -17,7 +17,7 @@ static func is_codex_manifest(manifest: Dictionary) -> bool:
 static func normalize(root: String, manifest: Dictionary) -> Dictionary:
 	if not is_codex_manifest(manifest):
 		return {"ok": false, "message": "不是 Codex Pet pet.json。"}
-	var character_id := String(manifest.get("id", "")).strip_edges()
+	var character_id := _normalized_id(manifest)
 	if not _is_safe_id(character_id):
 		return {"ok": false, "message": "Codex Pet id 不符合桌寵包命名規則。"}
 	var spritesheet_path := String(manifest.get("spritesheetPath", "")).strip_edges()
@@ -38,6 +38,7 @@ static func normalize(root: String, manifest: Dictionary) -> Dictionary:
 		}
 	var actions := _build_actions(spritesheet_path, sprite_version)
 	var normalized_manifest := manifest.duplicate(true)
+	normalized_manifest["id"] = character_id
 	normalized_manifest["name"] = String(manifest.get("displayName", character_id))
 	normalized_manifest["version"] = String(manifest.get("version", "codex-v%d" % sprite_version))
 	normalized_manifest["format"] = "codex-pet"
@@ -64,7 +65,7 @@ static func normalize(root: String, manifest: Dictionary) -> Dictionary:
 static func inspect_manifest(manifest: Dictionary, available_files: Array = []) -> Dictionary:
 	if not is_codex_manifest(manifest):
 		return {"ok": false, "message": "不是 Codex Pet pet.json。"}
-	var character_id := String(manifest.get("id", "")).strip_edges()
+	var character_id := _normalized_id(manifest)
 	if not _is_safe_id(character_id):
 		return {"ok": false, "message": "Codex Pet id 不符合桌寵包命名規則。"}
 	var spritesheet_path := String(manifest.get("spritesheetPath", "")).strip_edges()
@@ -180,6 +181,13 @@ static func _read_dimensions(path: String) -> Vector2i:
 	if error != OK:
 		return Vector2i.ZERO
 	return Vector2i(image.get_width(), image.get_height())
+
+
+## Codex pet files may use mixed-case ids such as "Giratina". Pack folders and
+## saves are keyed by id, and Windows paths ignore case, so fold to lowercase
+## once here instead of rejecting the pet.
+static func _normalized_id(manifest: Dictionary) -> String:
+	return String(manifest.get("id", "")).strip_edges().to_lower()
 
 
 static func _is_safe_id(value: String) -> bool:
