@@ -3,6 +3,7 @@
 #include <gdextension_interface.h>
 #include <godot_cpp/godot.hpp>
 
+#include "windows_click_through.h"
 #include "windows_display_recovery_monitor.h"
 #include "windows_window_activator.h"
 
@@ -14,6 +15,7 @@ void initialize_open_desktop_pet_windows(ModuleInitializationLevel p_level) {
 	}
 	GDREGISTER_CLASS(WindowsWindowActivator);
 	GDREGISTER_CLASS(WindowsDisplayRecoveryMonitor);
+	GDREGISTER_CLASS(WindowsClickThrough);
 }
 
 void uninitialize_open_desktop_pet_windows(ModuleInitializationLevel p_level) {

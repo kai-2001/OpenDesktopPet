@@ -9,6 +9,26 @@ PowerShell、CMD 或常駐的外部輔助程序，也不會取消桌寵的永遠
 處理事件；螢幕保護裝置狀態則由主程式每半秒查詢一次。恢復事件與透明設定重套用紀錄
 會附加到 `user://display_recovery.log`。
 
+## 點擊穿透
+
+`WindowsClickThrough` 依滑鼠是否在角色或對話框上，切換桌寵視窗的
+`WS_EX_LAYERED | WS_EX_TRANSPARENT`，讓空白處的點擊落到其他程式。這取代了
+Godot 的 `mouse_passthrough_polygon`：在 Windows 上它是 `SetWindowRgn`，會連畫面
+一起裁切，造成對話框殘影與角色缺角。
+
+使用時視窗區域要維持 `DesktopWindowService.unclipped_region()` 這個超大矩形，
+不能清空：Godot 清空區域時呼叫 `SetWindowRgn(nullptr, TRUE)` 強制重畫，與切換
+穿透同時發生時，DWM 會顯示一格灰色的視窗底色。設定多邊形則不強制重畫。
+
+分層視窗改變大小時，若同一格 GPU 正在上傳新的字形或圖片，Windows 會顯示一格
+半透明白色的空白畫面。因此原生模式下 `PetVisual.use_fixed_window()` 會在角色載入時，
+一次把視窗設成所有動作在最大倍率都放得下的大小，之後動作、拖曳、調整倍率都不再
+改變視窗大小；真的需要改變大小時（啟動、切換成更大的角色），`main.gd` 會先用
+`set_opacity` 把整個視窗設成全透明，幾格後再恢復。
+
+`tests/run_native_click_through_test.ps1` 會開真實視窗並移動滑鼠，驗證透明、穿透、
+拖曳、角色大小與 FPS；它不在 `run_validation.ps1` 內，需要手動執行。
+
 ## 編譯
 
 在 Windows PowerShell 由專案根目錄執行：

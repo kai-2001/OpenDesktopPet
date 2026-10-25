@@ -28,6 +28,7 @@ const DEFAULT_KEEP_SCREEN_ON := false
 const DEFAULT_FOCUS_MODE := false
 const AGENT_NOTIFICATION_DURATION_SECONDS := 60.0
 const AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3.0
+const WINDOW_REVEAL_FRAMES := 3
 const STARTUP_DIALOGUE_DURATION_SECONDS := 5.0
 const STARTUP_REMINDER_DURATION_SECONDS := 8.0
 const TASK_REMINDER_NOTIFICATION_DURATION_SECONDS := 8.0
@@ -130,6 +131,7 @@ var _auto_feeder_toggle: Button
 var _auto_feeder_status: Label
 var _autostart_service
 var _window_service
+var _window_reveal_token := 0
 var _gameplay_coordinator
 var _character_coordinator
 var _input_controller
@@ -332,9 +334,15 @@ func _layout_speech_bubble(text: String) -> void:
 
 
 func _finish_window_setup() -> void:
+	# With the native extension, rendering remains a whole transparent rectangle
+	# and mouse input alone is toggled as the pointer enters or leaves the pet.
+	# Without it, the polygon fallback clips rendering to the hit region.
+	# Native mode also sizes the window once for every action, before the pet
+	# is shown, because runtime resizes can flash a blank frame.
+	if _window_service.enable_native_click_through():
+		pet.fixed_window_resizing.connect(_hide_window_while_resizing)
+		pet.use_fixed_window(true)
 	_place_bottom_right()
-	# Rendering remains a normal transparent rectangle. Mouse input alone is
-	# toggled as the pointer enters or leaves the pet, so speech is never clipped.
 	_apply_interaction_polygon(pet.get_interaction_polygon())
 	# Give Windows one compositor frame to apply the final position and native
 	# transparency, then reveal the already-loaded sprite in one complete frame.
@@ -342,6 +350,18 @@ func _finish_window_setup() -> void:
 	pet.visible = true
 	_show_startup_message()
 	_refresh_task_reminder_badge(true)
+
+
+func _hide_window_while_resizing() -> void:
+	# A resized window shows one blank frame before Godot presents at the new
+	# size. Keep the whole window invisible until a few frames have rendered.
+	_window_reveal_token += 1
+	var token := _window_reveal_token
+	_window_service.set_window_opacity(0)
+	for _i in WINDOW_REVEAL_FRAMES:
+		await get_tree().process_frame
+	if token == _window_reveal_token:
+		_window_service.set_window_opacity(255)
 
 
 func _is_pet_interactive_at(local_point: Vector2) -> bool:
@@ -864,11 +884,13 @@ func _position_task_reminder_badge() -> void:
 		return
 	if _task_reminder_presentation == null:
 		return
+	# badge_position works in window coordinates; the badge is a child of this
+	# canvas, which is offset inside a window sized for every action.
 	task_reminder_badge.position = _task_reminder_presentation.badge_position(
 		pet.get_visual_bounds_in_canvas(),
 		get_viewport_rect().size,
 		task_reminder_badge.size
-	)
+	) - position
 
 
 func _open_task_reminders_from_badge() -> void:
@@ -1932,8 +1954,13 @@ func _show_stats_window(
 		return
 	_build_stats_window()
 	_refresh_ui(state.get_snapshot())
-	var pet_position: Vector2i = _window_service.window_position()
-	var pet_size: Vector2i = _window_service.window_size()
+	# Place beside the pet's base canvas rather than the native window, which
+	# may be larger and offset so it never resizes during actions.
+	var pet_position: Vector2i = _window_service.window_position() + Vector2i(position.round())
+	var pet_size := Vector2i(
+		int(ProjectSettings.get_setting("display/window/size/viewport_width")),
+		int(ProjectSettings.get_setting("display/window/size/viewport_height"))
+	)
 	var screen: int = _window_service.current_screen()
 	var usable: Rect2i = _window_service.usable_rect(screen)
 	var preferred_size := _load_stats_window_size()

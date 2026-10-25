@@ -87,14 +87,21 @@ func _init() -> void:
 	)
 	await process_frame
 	var badge_center: Vector2 = main.task_reminder_badge.get_global_rect().get_center()
+	var pet_bounds: Rect2 = main.pet.get_visual_bounds_in_canvas()
+	var badge_size: Vector2 = main.task_reminder_badge.size
+	# The canvas is offset inside the window; the badge must still sit on the
+	# pet's upper-right corner, not where that corner would be without the offset.
+	_assert_true(
+		absf(badge_center.x - pet_bounds.end.x) <= badge_size.x \
+			and absf(badge_center.y - pet_bounds.position.y) <= badge_size.y + 8.0,
+		"task reminder badge sits at the visible pet's upper-right corner"
+	)
 	_assert_true(
 		main._is_interactive_overlay_at(badge_center),
 		"task reminder badge is handled as an interactive overlay"
 	)
 	_assert_true(
-		Geometry2D.is_point_in_polygon(
-			badge_center, main.get_window().mouse_passthrough_polygon
-		),
+		_native_hit_region_has(main, badge_center),
 		"native desktop hit region includes the visible task reminder badge"
 	)
 	main.task_reminder_badge.pressed.emit()
@@ -183,7 +190,7 @@ func _init() -> void:
 		),
 		"character wish template replaces the minutes placeholder"
 	)
-	_assert_true(main.pet.contains_point(Vector2(140, 190)), "pet center is interactive")
+	_assert_true(main.pet.contains_point(main.pet.global_position), "pet center is interactive")
 	_assert_true(not main.pet.contains_point(Vector2(5, 5)), "transparent corner is not interactive")
 	_assert_true(not main.pet.is_busy(), "pet is idle before the autonomous action check")
 	main.pet.play_action("pet")
@@ -266,28 +273,25 @@ func _init() -> void:
 		main._is_pet_interactive_at(bubble_pet_overlap),
 		"visible speech bubble is handled as part of the pet"
 	)
-	var native_hit_polygon: PackedVector2Array = \
-		main.get_window().mouse_passthrough_polygon
 	_assert_true(
-		Geometry2D.is_point_in_polygon(bubble_pet_overlap, native_hit_polygon),
+		_native_hit_region_has(main, bubble_pet_overlap),
 		"native desktop hit region includes the visible speech bubble"
 	)
 	_assert_true(
-		main._is_pet_interactive_at(Vector2(140, 128)),
+		main._is_pet_interactive_at(main.position + Vector2(140, 128)),
 		"visible speech tail is handled as part of the pet"
 	)
 	main.bubble.visible = false
 	main.bubble_tail.visible = false
 	main._refresh_interaction_polygon()
 	await process_frame
-	native_hit_polygon = main.get_window().mouse_passthrough_polygon
 	var hidden_speech_point := bubble_rect.position + Vector2(10, 10)
 	_assert_true(
-		not Geometry2D.is_point_in_polygon(hidden_speech_point, native_hit_polygon),
+		not _native_hit_region_has(main, hidden_speech_point),
 		"hidden speech area is removed from the native hit region"
 	)
 	_assert_true(
-		Geometry2D.is_point_in_polygon(Vector2(140, 190), native_hit_polygon),
+		_native_hit_region_has(main, main.pet.global_position),
 		"native desktop hit region includes the visible pet"
 	)
 
@@ -364,7 +368,7 @@ func _init() -> void:
 	_assert_true(not main._stats_window.always_on_top, "details window behaves like a normal window")
 	var stats_open_right_click := InputEventMouseButton.new()
 	stats_open_right_click.button_index = MOUSE_BUTTON_RIGHT
-	stats_open_right_click.position = Vector2(140, 190)
+	stats_open_right_click.position = main.pet.global_position
 	stats_open_right_click.pressed = true
 	main._unhandled_input(stats_open_right_click)
 	await process_frame
@@ -862,6 +866,17 @@ func _init() -> void:
 	else:
 		print("WINDOW_INTEGRATION_TEST_OK")
 		quit(0)
+
+
+func _native_hit_region_has(main: Node, point: Vector2) -> bool:
+	var polygon: PackedVector2Array = main.get_window().mouse_passthrough_polygon
+	if main._window_service.uses_native_click_through():
+		# Native click-through decides input from the pointer each frame. The
+		# region must stay the oversized rectangle: a smaller one clips
+		# rendering, and clearing it makes Godot force a redraw (gray flash).
+		return polygon == DesktopWindowService.unclipped_region() \
+			and main._is_pet_interactive_at(point)
+	return Geometry2D.is_point_in_polygon(point, polygon)
 
 
 func _assert_true(condition: bool, label: String) -> void:

@@ -1,6 +1,16 @@
 class_name DesktopWindowService
 extends RefCounted
 
+var _click_through: RefCounted
+var _click_through_error_reported := false
+
+
+## A window region larger than any pet window, so it never clips rendering.
+static func unclipped_region() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(0, 0), Vector2(16384, 0), Vector2(16384, 16384), Vector2(0, 16384),
+	])
+
 
 func mouse_position() -> Vector2i:
 	return DisplayServer.mouse_get_position()
@@ -75,12 +85,57 @@ func set_cursor_shape(shape: Input.CursorShape) -> void:
 	Input.set_default_cursor_shape(shape)
 
 
+func enable_native_click_through() -> bool:
+	if _click_through != null:
+		return true
+	if not ClassDB.class_exists("WindowsClickThrough") \
+			or DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE) == 0:
+		return false
+	_click_through = ClassDB.instantiate("WindowsClickThrough")
+	return _click_through != null
+
+
+func uses_native_click_through() -> bool:
+	return _click_through != null
+
+
+func set_mouse_interactive(interactive: bool) -> void:
+	if _click_through == null:
+		return
+	# Called every frame: Godot rebuilds the extended window style when some
+	# window flags change, so the native call also restores dropped bits.
+	var handle := DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE)
+	if not bool(_click_through.set_click_through(handle, not interactive)) \
+			and not _click_through_error_reported:
+		_click_through_error_reported = true
+		push_warning("Native click-through failed: %s" % _click_through.get_last_error())
+
+
+func set_window_opacity(alpha: int) -> void:
+	if _click_through == null:
+		return
+	var handle := DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE)
+	if not bool(_click_through.set_opacity(handle, alpha)):
+		push_warning("Native window opacity failed: %s" % _click_through.get_last_error())
+
+
 func apply_interaction_polygon(
 	window: Window,
 	pet_polygon: PackedVector2Array,
 	interactive_overlay_points: PackedVector2Array
 ) -> void:
 	window.mouse_passthrough = false
+	if _click_through != null:
+		# On Windows the passthrough polygon becomes a window region, which also
+		# clips rendering one frame ahead of the presented image. Native
+		# click-through keeps the whole transparent window drawable instead.
+		# Godot clears a region with SetWindowRgn(nullptr, TRUE); that forced
+		# redraw shows a gray frame while the click-through style toggles, so
+		# set an oversized region once (Godot applies polygons without redraw).
+		var region := unclipped_region()
+		if window.mouse_passthrough_polygon != region:
+			window.mouse_passthrough_polygon = region
+		return
 	if interactive_overlay_points.is_empty():
 		window.mouse_passthrough_polygon = pet_polygon
 		return

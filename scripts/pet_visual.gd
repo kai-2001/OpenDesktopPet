@@ -3,12 +3,18 @@ extends Node2D
 
 signal action_completed(request_id: int, requested_action: String, success: bool)
 signal interaction_region_changed(polygon: PackedVector2Array)
+## Emitted right before a fixed-window resize, so the window can be hidden
+## while Windows has no rendered frame for the new size.
+signal fixed_window_resizing
 
 const PetHitboxCalculatorScript = preload("res://scripts/pet_hitbox_calculator.gd")
 const CharacterPackProfileScript = preload("res://scripts/character_pack_profile.gd")
 const PetEffectControllerScript = preload("res://scripts/pet_effect_controller.gd")
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const FRAME_VIEWPORT_PADDING := 2.0
+# Idle breathing, action pulses and drag sway draw slightly past a frame's
+# resting bounds; keep that much extra room in the fixed window.
+const FIXED_WINDOW_MOTION_MARGIN := 0.06
 
 var _profile = CharacterPackProfileScript.new()
 var _hitbox_calculator = PetHitboxCalculatorScript.new()
@@ -39,6 +45,7 @@ var _opaque_bounds_cache: Dictionary = {}
 var _base_window_size := Vector2i.ZERO
 var _base_root_position := Vector2.ZERO
 var _geometry_action := ""
+var _fixed_window := false
 
 
 func _ready() -> void:
@@ -125,6 +132,8 @@ func reload_character() -> bool:
 		queue_redraw()
 		_emit_interaction_region()
 		return false
+	if _fixed_window:
+		_reserve_fixed_window()
 	_effect_controller.configure_for_pack(
 		_profile.effect_scale_ratio(), _profile.effect_overrides()
 	)
@@ -233,6 +242,59 @@ func _stop_current_animation(restore_idle: bool) -> void:
 		_restore_idle()
 
 
+## Keeps the native window at one size that fits every action at the largest
+## visual scale. Used with native click-through, where empty window areas pass
+## clicks through: resizing a layered window in the same frame as a texture or
+## glyph upload makes Windows show one blank, semi-transparent white frame.
+func use_fixed_window(enabled: bool) -> void:
+	if _fixed_window == enabled:
+		return
+	_fixed_window = enabled
+	if enabled and _profile.has_action("idle"):
+		_reserve_fixed_window()
+
+
+func _reserve_fixed_window() -> void:
+	# Measure from the base canvas origin; frame bounds are canvas coordinates.
+	_restore_base_geometry(false)
+	var saved_scale := scale
+	var saved_rotation := rotation
+	var saved_facing := _facing_direction
+	scale = Vector2.ONE * PetVisualScaleScript.MAX_VALUE
+	rotation = 0.0
+	var envelope := Rect2()
+	var has_bounds := false
+	for facing: int in [-1, 1]:
+		_facing_direction = facing
+		for action: String in _profile.action_ids():
+			var definition := _action_definition(action)
+			for frame: int in _geometry_frames_for_action(definition):
+				_apply_action_frame_visual(frame, definition)
+				var frame_bounds := _opaque_frame_bounds_in_canvas()
+				if frame_bounds.size == Vector2.ZERO:
+					continue
+				envelope = envelope.merge(frame_bounds) if has_bounds else frame_bounds
+				has_bounds = true
+	scale = saved_scale
+	rotation = saved_rotation
+	_facing_direction = saved_facing
+	if has_bounds:
+		_fit_window_to_bounds(envelope.grow_individual(
+			envelope.size.x * FIXED_WINDOW_MOTION_MARGIN,
+			envelope.size.y * FIXED_WINDOW_MOTION_MARGIN,
+			envelope.size.x * FIXED_WINDOW_MOTION_MARGIN,
+			envelope.size.y * FIXED_WINDOW_MOTION_MARGIN
+		))
+		# The reserved window becomes the base, so later action envelopes fit
+		# inside it and neither the window size nor the canvas offset changes.
+		_capture_base_geometry()
+	var action := _current_action
+	if action.is_empty():
+		action = "drag" if _dragging else "idle"
+	_geometry_action = ""
+	_show_action_frame(action, _current_frame_index())
+
+
 func _capture_base_geometry() -> void:
 	var window := get_window()
 	if window:
@@ -261,8 +323,7 @@ func _restore_base_geometry(resize_window := true) -> void:
 			root_canvas.position = desktop_canvas_origin - Vector2(window.position)
 	if resize_window and window \
 			and _base_window_size.x > 0 and _base_window_size.y > 0:
-		window.content_scale_size = _base_window_size
-		window.size = _base_window_size
+		_set_window_size(window, _base_window_size)
 
 
 func set_drag_motion(is_moving: bool) -> void:
@@ -573,7 +634,13 @@ func get_character_version() -> String:
 
 
 func get_drag_anchor() -> Variant:
-	return _profile.drag_anchor()
+	var anchor: Variant = _profile.drag_anchor()
+	var root_canvas := get_parent() as Node2D
+	if anchor is Vector2 and root_canvas:
+		# Packs give the anchor on the canvas; the input controller needs it in
+		# window coordinates, which differ once the canvas is offset.
+		return anchor + root_canvas.position
+	return anchor
 
 
 func get_pack_root() -> String:
@@ -962,6 +1029,15 @@ func _fit_window_to_bounds(visible_bounds: Rect2) -> void:
 				roundi(ideal_window_position.y)
 			)
 			root_canvas.position = desktop_canvas_origin - Vector2(window.position)
+	_set_window_size(window, required_size)
+
+
+func _set_window_size(window: Window, required_size: Vector2i) -> void:
+	# Skip no-op assignments: each native resize risks a blank frame.
+	if window.size == required_size and window.content_scale_size == required_size:
+		return
+	if _fixed_window:
+		fixed_window_resizing.emit()
 	# The project uses a fixed base viewport. Keep the logical canvas in sync
 	# with a grown native window so oversized frames gain drawable space instead
 	# of being stretched and clipped inside the original 280x320 canvas.

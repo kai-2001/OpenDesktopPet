@@ -95,18 +95,14 @@ func start_autonomous_move(mouse_is_idle: bool) -> void:
 	if not _pet.begin_progressive_move():
 		return
 	var start: Vector2i = _window_service.window_position()
-	var window_size: Vector2i = _window_service.window_size()
-	var target_x := clampi(
-		start.x + distance,
-		usable.position.x,
-		usable.end.x - window_size.x
-	)
+	# Keep the visible pet on screen rather than the whole window: the window
+	# can be larger than the pet so it never resizes during actions.
+	var visible_bounds: Rect2 = _pet.get_visual_bounds_in_canvas()
+	var min_x := usable.position.x - floori(visible_bounds.position.x)
+	var max_x := usable.end.x - ceili(visible_bounds.end.x)
+	var target_x := clampi(start.x + distance, min_x, max_x)
 	if target_x == start.x:
-		target_x = clampi(
-			start.x - distance,
-			usable.position.x,
-			usable.end.x - window_size.x
-		)
+		target_x = clampi(start.x - distance, min_x, max_x)
 	var target := Vector2i(target_x, start.y)
 	var move_duration: float = _pet.get_action_duration("move")
 	_pet.set_facing_direction(1 if target_x > start.x else -1)

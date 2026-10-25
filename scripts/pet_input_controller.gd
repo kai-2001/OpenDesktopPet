@@ -56,7 +56,11 @@ func process() -> void:
 		_finish_left_press()
 	if _dragging and mouse != _last_drag_mouse:
 		_update_drag_position(mouse)
-	_update_cursor(mouse)
+	var over_pet := _is_over_pet(mouse)
+	# Keep the window clickable for a whole press so a fast drag cannot slip
+	# outside the sprite and hand the button release to another program.
+	_window_service.set_mouse_interactive(_dragging or _left_press_pending or over_pet)
+	_update_cursor(over_pet)
 
 
 func handle_input(event: InputEvent) -> void:
@@ -225,12 +229,19 @@ func _cancel_press() -> void:
 	_pet.set_dragging(false)
 
 
-func _update_cursor(global_mouse: Vector2i) -> void:
+func _is_over_pet(global_mouse: Vector2i) -> bool:
+	var local_mouse := Vector2(global_mouse - _window_service.window_position())
+	if bool(_speech_overlay_at.call(local_mouse)) or _pet.contains_point(local_mouse):
+		return true
+	# Also accept the sprite outline the polygon fallback uses, so soft edges
+	# and small gaps stay clickable instead of handing the press to the desktop.
+	return Geometry2D.is_point_in_polygon(local_mouse, _pet.get_interaction_polygon())
+
+
+func _update_cursor(over_pet: bool) -> void:
 	if _dragging:
 		_set_cursor_shape(Input.CURSOR_DRAG)
 		return
-	var local_mouse := Vector2(global_mouse - _window_service.window_position())
-	var over_pet: bool = bool(_speech_overlay_at.call(local_mouse)) or _pet.contains_point(local_mouse)
 	_set_cursor_shape(
 		Input.CURSOR_POINTING_HAND if over_pet else Input.CURSOR_ARROW
 	)
