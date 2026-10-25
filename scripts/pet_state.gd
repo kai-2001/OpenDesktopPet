@@ -38,6 +38,12 @@ const AUTO_FEEDER_REQUIRED_AFFECTION := 100
 const AUTO_FEEDER_TRIGGER_BELOW := 50.0
 const AUTO_FEEDER_CARE_COST := 1
 const AUTO_FEEDER_COIN_RESERVE := 5
+const WISH_FOR_NEED := {"hunger": "feed", "thirst": "water", "energy": "sleep"}
+# 願望出現門檻：吃或喝一次剛好能補滿的數值（100 − 一次補充量）。
+const FEED_AMOUNT := 20.0
+const WATER_AMOUNT := 25.0
+const FEED_WISH_BELOW := 100.0 - FEED_AMOUNT
+const WATER_WISH_BELOW := 100.0 - WATER_AMOUNT
 const AUTO_FEEDER_TOOLTIP := (
 	"自動餵食器\n"
 	+ "數值低於 50 且一段時間未照顧時，自動花 1 枚金幣補滿飽食或水分，體力不足則進入睡眠。\n"
@@ -230,7 +236,7 @@ func feed() -> void:
 		return
 
 	data.coins -= FEED_COST
-	data.hunger = _limit(float(data.hunger) + 20.0)
+	data.hunger = _limit(float(data.hunger) + FEED_AMOUNT)
 	data.mood = _limit(float(data.mood) + 3.0)
 	data.care += 1
 
@@ -275,7 +281,7 @@ func water() -> void:
 		return
 
 	data.coins -= WATER_COST
-	data.thirst = _limit(float(data.thirst) + 25.0)
+	data.thirst = _limit(float(data.thirst) + WATER_AMOUNT)
 	data.mood = _limit(float(data.mood) + 3.0)
 	data.care += 1
 
@@ -515,6 +521,10 @@ func _run_auto_feeder() -> void:
 			continue
 		if _sleeping or _action_busy:
 			return
+		# 願望是玩家的任務：有對應的願望時先不處理，留給玩家完成；
+		# 記號保留，願望結束後的下一次檢查再補。
+		if has_active_wish() and String(data.wish_action) == WISH_FOR_NEED[need]:
+			continue
 		if need == "energy":
 			# 睡覺會播放睡眠動畫，專注模式時延到關閉後再處理。
 			if auto_care_quiet:
@@ -697,16 +707,7 @@ func _update_wish() -> void:
 
 
 func _choose_wish() -> String:
-	var weighted: Array[Dictionary] = []
-	if data.hunger <= 70.0:
-		weighted.append({"action": "feed", "weight": 15 + int(70.0 - data.hunger)})
-	if data.thirst <= 70.0:
-		weighted.append({"action": "water", "weight": 15 + int(70.0 - data.thirst)})
-	if data.energy <= 70.0:
-		weighted.append({"action": "sleep", "weight": 12 + int(70.0 - data.energy)})
-	weighted.append({"action": "pet", "weight": 12 + int(100.0 - data.mood)})
-	if data.energy >= 40.0 and data.hunger >= 20.0 and data.thirst >= 30.0:
-		weighted.append({"action": "work", "weight": 12})
+	var weighted := _wish_candidates()
 	var total := 0
 	for candidate: Dictionary in weighted:
 		total += int(candidate.weight)
@@ -717,6 +718,21 @@ func _choose_wish() -> String:
 		if roll <= ceiling:
 			return String(candidate.action)
 	return "pet"
+
+
+## 可能出現的願望與權重；數值越低，對應願望越容易出現。
+func _wish_candidates() -> Array[Dictionary]:
+	var weighted: Array[Dictionary] = []
+	if data.hunger <= FEED_WISH_BELOW:
+		weighted.append({"action": "feed", "weight": 15 + int(FEED_WISH_BELOW - data.hunger)})
+	if data.thirst <= WATER_WISH_BELOW:
+		weighted.append({"action": "water", "weight": 15 + int(WATER_WISH_BELOW - data.thirst)})
+	if data.energy <= 70.0:
+		weighted.append({"action": "sleep", "weight": 12 + int(70.0 - data.energy)})
+	weighted.append({"action": "pet", "weight": 12 + int(100.0 - data.mood)})
+	if data.energy >= 40.0 and data.hunger >= 20.0 and data.thirst >= 30.0:
+		weighted.append({"action": "work", "weight": 12})
+	return weighted
 
 
 func _wish_is_sensible(action: String) -> bool:

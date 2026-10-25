@@ -145,6 +145,7 @@ func _init() -> void:
 	_assert_near(state.data.mood, 80.0, "mood holds while every need stays at 50 or above")
 	_assert_equal(state.data.last_decay_at, now, "decay timestamp should retain no remainder")
 	_test_mood_decay_tiers(state)
+	_test_wish_thresholds(state)
 
 	state.data.hunger = 50.0
 	state.data.mood = 80.0
@@ -478,6 +479,19 @@ func _test_auto_feeder(state: Node) -> void:
 	_assert_near(state.data.mood, 60.0, "automatic care grants no mood")
 	_assert_equal(state.data.xp, 0, "automatic care grants no XP")
 
+	state.data.thirst = 40.0
+	state.data.wish_action = "water"
+	state.data.wish_expires_at = state._now() + 600
+	state._run_auto_feeder()
+	state._run_auto_feeder()
+	_assert_near(state.data.thirst, 40.0, "a matching wish keeps the auto feeder away from that need")
+	_assert_true(state.has_active_wish(), "the wish stays available for the player")
+	state.data.wish_action = ""
+	state.data.wish_expires_at = 0
+	state._run_auto_feeder()
+	_assert_equal(state.data.thirst, 100.0, "once the wish ends the kept mark refills at the next check")
+	state.data.coins = 19
+
 	state.data.hunger = 25.0
 	state._run_auto_feeder()
 	_assert_true(state._auto_feeder_pending.hunger, "a low need is marked for the next check")
@@ -553,6 +567,21 @@ func _test_auto_feeder(state: Node) -> void:
 	state.data.coins = 20
 	state.data.energy = 80.0
 	state.data.hunger = 80.0
+
+
+func _test_wish_thresholds(state: Node) -> void:
+	state.data.hunger = 80.0
+	state.data.thirst = 75.0
+	var actions: Array = state._wish_candidates().map(func(c: Dictionary) -> String: return c.action)
+	_assert_true("feed" in actions, "a feed wish can appear once one meal would just fill fullness")
+	_assert_true("water" in actions, "a water wish can appear once one drink would just fill hydration")
+	state.data.hunger = 80.1
+	state.data.thirst = 75.1
+	actions = state._wish_candidates().map(func(c: Dictionary) -> String: return c.action)
+	_assert_true(not "feed" in actions, "no feed wish while one meal would overflow")
+	_assert_true(not "water" in actions, "no water wish while one drink would overflow")
+	state.data.hunger = 80.0
+	state.data.thirst = 80.0
 
 
 func _test_mood_decay_tiers(state: Node) -> void:
