@@ -42,6 +42,11 @@ const AGY_HOOKS_FILE_NAME := "hooks.json"
 const AGY_HOOK_NAME := "open-desktop-pet"
 const CODEX_URI := "vscode://command/chatgpt.openSidebar"
 const CLAUDE_CODE_VSCODE_URI := "vscode://anthropic.claude-code/open"
+# Semantic reactions; main plays the character's matching action when it has
+# one (Codex pets do) and falls back to pet / idle otherwise.
+const REACTION_DONE := "agent_done"
+const REACTION_WAITING := "agent_waiting"
+const REACTION_ERROR := "failed"
 const TARGET_VSCODE := AgentNotificationRouterScript.TARGET_VSCODE
 const TARGET_CODEX_APP := AgentNotificationRouterScript.TARGET_CODEX_APP
 const TARGET_TERMINAL := AgentNotificationRouterScript.TARGET_TERMINAL
@@ -1340,17 +1345,17 @@ func _handle_notification(notification: Dictionary) -> void:
 		"agent-turn-complete", "codex_done", "completed", "done":
 			notification_received.emit(
 				"%s 已完成這一輪，可以切回 %s 查看結果。" % [display_name, target_name],
-				"pet", target_app, agent
+				REACTION_DONE, target_app, agent
 			)
 		"codex_waiting", "waiting", "approval-requested":
 			notification_received.emit(
 				"%s 正在等待你回到 %s 處理下一步。" % [display_name, target_name],
-				"idle", target_app, agent
+				REACTION_WAITING, target_app, agent
 			)
 		"agent-error", "codex_error", "failed", "error":
 			notification_received.emit(
 				"%s 發生錯誤，請回到 %s 查看。" % [display_name, target_name],
-				"idle", target_app, agent
+				REACTION_ERROR, target_app, agent
 			)
 
 func _save_settings() -> void:

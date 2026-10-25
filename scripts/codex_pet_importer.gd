@@ -96,6 +96,12 @@ static func _build_actions(spritesheet_path: String, sprite_version: int) -> Dic
 		spritesheet_path, 7, "running", 0.25, 6, rows_count
 	)
 	var jumping := _row_definition(spritesheet_path, 4, "jumping", 0.25, 5, rows_count)
+	# Standard Codex rows the base mapping did not use. Every Codex atlas,
+	# v1 and v2, contains them with these frame counts.
+	var waving := _row_definition(spritesheet_path, 3, "waving", 0.25, 4, rows_count)
+	var failed := _row_definition(spritesheet_path, 5, "failed", 0.25, 8, rows_count)
+	var waiting := _row_definition(spritesheet_path, 6, "waiting", 0.25, 6, rows_count)
+	var review := _row_definition(spritesheet_path, 8, "review", 0.25, 6, rows_count)
 	var rows := {
 		"idle": idle,
 		"running": running,
@@ -107,8 +113,29 @@ static func _build_actions(spritesheet_path: String, sprite_version: int) -> Dic
 		"move": running_right.duplicate(true),
 		"drag": running_right.duplicate(true),
 		"work": running.duplicate(true),
+		# Autonomous actions unlocked through long-term care.
+		"waving": waving.duplicate(true),
+		"review": review.duplicate(true),
+		"waiting": waiting.duplicate(true),
+		# Event reactions: never picked autonomously and never locked, because
+		# they report Agent or care state rather than reward progression.
+		"agent_done": waving.duplicate(true),
+		"agent_waiting": waiting.duplicate(true),
+		"failed": failed.duplicate(true),
 	}
-	rows["move"]["autonomous_weight"] = 1
+	rows["move"]["autonomous_weight"] = 4
+	rows.waving.autonomous_weight = 2
+	rows.waving.unlock = {"level": 3}
+	rows.waving.display_name = "揮手"
+	rows.review.autonomous_weight = 2
+	rows.review.unlock = {"level": 6, "affection": 15}
+	rows.review.display_name = "專注"
+	rows.waiting.autonomous_weight = 2
+	rows.waiting.unlock = {"level": 10, "affection": 40}
+	rows.waiting.display_name = "期待"
+	rows.agent_done.display_name = "完成報告"
+	rows.agent_waiting.display_name = "等待回應"
+	rows.failed.display_name = "沮喪"
 	rows.pet.display_name = "摸摸"
 	rows.eat.display_name = "吃飯"
 	rows.drink.display_name = "喝水"

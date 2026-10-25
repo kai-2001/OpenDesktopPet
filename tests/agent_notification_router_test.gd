@@ -105,7 +105,7 @@ func _run() -> void:
 		"event_id": "claude:app:error-test",
 	})
 	_assert_equal(_received_notifications.size(), 1)
-	_assert_equal(_received_notifications[0].reaction_action, "idle")
+	_assert_equal(_received_notifications[0].reaction_action, "failed")
 	_assert_equal(_received_notifications[0].target_app, RouterScript.TARGET_CLAUDE_APP)
 	_assert_equal(_received_notifications[0].agent, "claude")
 	_assert_true(

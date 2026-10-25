@@ -44,7 +44,22 @@ func _run() -> void:
 	_assert_equal(int(actions.pet.sequence[0]), 32, "pet maps to jumping row")
 	_assert_equal(int(actions.move.sequence[0]), 8, "move maps to running-right row")
 	_assert_equal(int(actions.drag.sequence[0]), 8, "drag maps to running-right row")
-	_assert_equal(int(actions.move.autonomous_weight), 1, "Codex move is eligible for autonomous actions")
+	_assert_equal(int(actions.move.autonomous_weight), 4, "Codex move is eligible for autonomous actions")
+	_assert_equal(int(actions.waving.sequence[0]), 24, "waving maps to the waving row")
+	_assert_equal(actions.waving.sequence.size(), 4, "waving uses four Codex frames")
+	_assert_equal(int(actions.review.sequence[0]), 64, "review maps to the review row")
+	_assert_equal(int(actions.waiting.sequence[0]), 48, "waiting maps to the waiting row")
+	_assert_equal(int(actions.failed.sequence[0]), 40, "failed maps to the failed row")
+	_assert_equal(actions.failed.sequence.size(), 8, "failed uses eight Codex frames")
+	_assert_equal(actions.waving.unlock, {"level": 3}, "waving unlocks at level 3")
+	_assert_equal(actions.review.unlock, {"level": 6, "affection": 15}, "review unlocks at level 6 and affection 15")
+	_assert_equal(actions.waiting.unlock, {"level": 10, "affection": 40}, "waiting unlocks at level 10 and affection 40")
+	for event_action: String in ["agent_done", "agent_waiting", "failed"]:
+		_assert_true(
+			not actions[event_action].has("unlock")
+				and int(actions[event_action].get("autonomous_weight", 0)) == 0,
+			"%s is an event reaction: never locked and never picked autonomously" % event_action
+		)
 	_assert_equal(int(actions.work.sequence[0]), 56, "work maps to running row")
 	_assert_equal(actions.idle.sequence.size(), 6, "idle uses six Codex frames")
 	_assert_equal(actions.jumping.sequence.size(), 5, "jumping uses five Codex frames")
@@ -61,6 +76,15 @@ func _run() -> void:
 	_assert_equal(profile.character_name(), "Codex 測試角色", "profile uses displayName")
 	_assert_true(profile.has_action("jumping"), "profile exposes jumping action")
 	_assert_equal(profile.autonomous_chance(), 0.25, "Codex pack can set move chance")
+	profile.set_progression({"level": 1, "affection": 0})
+	_assert_true(not profile.is_action_unlocked("waving"), "waving starts locked")
+	_assert_true(profile.is_action_unlocked("agent_done"), "event reactions are always available")
+	_assert_equal(profile.next_unlock().get("id", ""), "waving", "the next unlock shown is waving")
+	profile.set_progression({"level": 10, "affection": 39})
+	_assert_true(profile.is_action_unlocked("review"), "review unlocks at level 6 and affection 15")
+	_assert_true(not profile.is_action_unlocked("waiting"), "waiting still needs affection 40")
+	profile.set_progression({"level": 10, "affection": 40})
+	_assert_true(profile.is_action_unlocked("waiting"), "waiting unlocks at level 10 and affection 40")
 	_assert_equal(
 		profile.effect_overrides().food.anchor[0], -31.0,
 		"Codex pack can override food anchor"

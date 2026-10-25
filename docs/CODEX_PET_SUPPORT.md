@@ -16,6 +16,14 @@ Codex spritesheet 會依標準 192×208 格切成 8 欄。v1 必須是 8×9（15
 | work | running 列（row 7） |
 | jumping / pet | jumping 列 |
 | eat / drink / sleep | idle 列，加上 OpenDesktopPet 共用特效 |
+| waving（自主動作，Lv.3 解鎖） | waving 列（row 3） |
+| review（自主動作，Lv.6、親密 15 解鎖） | review 列（row 8） |
+| waiting（自主動作，Lv.10、親密 40 解鎖） | waiting 列（row 6） |
+| agent_done（Agent 完成通知） | waving 列 |
+| agent_waiting（Agent 等待回應通知） | waiting 列 |
+| failed（Agent 錯誤通知；需求低於 20 時偶爾播放） | failed 列（row 5） |
+
+waving、review、waiting 會在解鎖後加入自主動作抽選；agent_done、agent_waiting、failed 只在對應事件時播放，不需解鎖，也不會被抽成自主動作。這些動作只播放動畫，不會另外顯示對話氣泡。v2 的 look 方向列（row 9–10）目前尚未使用。
 
 共用特效位於 `assets/effects/`，會依角色包尺寸自動縮放：睡覺加眼罩與飄出的 `zzz`，吃飯加食物晃動後消失，喝水加水杯晃動後消失。
 
@@ -38,4 +46,4 @@ Codex 包可另外放置選用的 `open_desktop_pet.json`，只由 OpenDesktopPe
 }
 ```
 
-未設定時，Codex Pet 每次符合自主行為條件的抽選有 35% 機率移動；特效則使用共用素材。設定檔可以只覆寫某一個效果，其餘仍沿用共用預設。
+未設定時，Codex Pet 每次符合自主行為條件的抽選有 35% 機率做出自主動作，再依權重在移動（4）與已解鎖的 waving、review、waiting（各 2）之間選一個；特效則使用共用素材。設定檔可以只覆寫某一個效果，其餘仍沿用共用預設。

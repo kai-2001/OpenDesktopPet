@@ -777,7 +777,21 @@ func _enqueue_agent_status(
 	)
 	say(message, _agent_notification_duration(target_is_foreground), true)
 	if not state.is_sleeping() and not state.is_action_busy():
-		pet.play_action(reaction_action)
+		pet.play_action(_resolve_reaction_action(reaction_action))
+
+
+## Codex pets have dedicated reaction rows; other character packs keep the
+## original pet / idle reactions.
+func _resolve_reaction_action(reaction_action: String) -> String:
+	if pet.has_action(reaction_action):
+		return reaction_action
+	match reaction_action:
+		AgentIntegrationControllerScript.REACTION_DONE:
+			return "pet"
+		AgentIntegrationControllerScript.REACTION_WAITING, \
+				AgentIntegrationControllerScript.REACTION_ERROR:
+			return "idle"
+	return reaction_action
 
 
 func _agent_notification_duration(vscode_is_foreground: bool) -> float:

@@ -3,6 +3,10 @@ extends RefCounted
 
 const AUTONOMOUS_MOVE_MIN_PX := 96
 const AUTONOMOUS_MOVE_MAX_PX := 120
+# When a need is critical, a character with a "failed" row sometimes looks
+# unwell instead of its usual autonomous action. Animation only, no speech.
+const CRITICAL_NEED_BELOW := 20.0
+const CRITICAL_FAILED_CHANCE := 0.5
 
 var _owner: Node
 var _state: Node
@@ -61,11 +65,23 @@ func request_care_action(action_id: int) -> String:
 func run_autonomous_action(mouse_is_idle: bool) -> void:
 	if _state.is_sleeping():
 		return
+	if _should_show_critical_need():
+		_pet.play_action("failed")
+		return
 	var action: String = _pet.pick_autonomous_action(mouse_is_idle)
 	if action == "move":
 		start_autonomous_move(mouse_is_idle)
 	elif not action.is_empty():
 		_pet.play_action(action)
+
+
+func _should_show_critical_need() -> bool:
+	if not _pet.has_action("failed"):
+		return false
+	var snapshot: Dictionary = _state.get_snapshot()
+	if float(snapshot.get("lowest_need", 100.0)) >= CRITICAL_NEED_BELOW:
+		return false
+	return randf() < CRITICAL_FAILED_CHANCE
 
 
 func start_autonomous_move(mouse_is_idle: bool) -> void:

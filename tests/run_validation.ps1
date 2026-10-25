@@ -114,7 +114,16 @@ try {
 	}
 
 	$ErrorActionPreference = 'Continue'
-	$updateCheckOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/update_check_test.gd' 2>&1
+	$codexPetOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_pet_importer_test.gd' 2>&1
+	$codexPetExitCode = $LASTEXITCODE
+	$ErrorActionPreference = $previousErrorActionPreference
+	$codexPetOutput | Write-Output
+	if ($codexPetExitCode -ne 0 -or -not ($codexPetOutput -match 'CODEX_PET_IMPORTER_TEST_OK')) {
+		throw 'Codex Pet importer validation failed.'
+	}
+
+	$ErrorActionPreference = 'Continue'
+	$updateCheckOutput =& $GodotExe --headless --path $projectRoot --script 'res://tests/update_check_test.gd' 2>&1
 	$updateCheckExitCode = $LASTEXITCODE
 	$ErrorActionPreference = $previousErrorActionPreference
 	$updateCheckOutput | Write-Output

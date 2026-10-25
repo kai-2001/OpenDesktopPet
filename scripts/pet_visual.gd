@@ -540,6 +540,10 @@ func set_effect_preview(effect_name: String, enabled: bool) -> void:
 		_effect_controller.set_preview(effect_name, enabled)
 
 
+func has_action(action: String) -> bool:
+	return _profile.has_action(action)
+
+
 func pick_autonomous_action(allow_move: bool) -> String:
 	return _profile.pick_autonomous_action(allow_move)
 
