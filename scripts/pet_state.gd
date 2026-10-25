@@ -957,11 +957,11 @@ func _apply_elapsed_decay(now: int, maximum_intervals: int) -> bool:
 		return false
 
 	for _interval in intervals:
-		# 每 10 分鐘的自然衰減，以程式開著的時間計算。從 100 歸零約需：
+		# 每 10 分鐘的自然衰減；以每天開啟 8 小時計算，從 100 歸零約需：
 		# 水分 2.8 天、飽食 5.8 天、體力 3.5 天。
-		data.hunger = _limit(float(data.hunger) - 0.12)
-		data.thirst = _limit(float(data.thirst) - 0.25)
-		data.energy = _limit(float(data.energy) - 0.2)
+		data.hunger = _limit(float(data.hunger) - 0.36)
+		data.thirst = _limit(float(data.thirst) - 0.75)
+		data.energy = _limit(float(data.energy) - 0.6)
 
 		var lowest := _lowest_need()
 

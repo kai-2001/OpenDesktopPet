@@ -139,9 +139,9 @@ func _init() -> void:
 	state.data.last_decay_at = now - 1200
 	var decayed: bool = state._apply_elapsed_decay(now, 48)
 	_assert_true(decayed, "elapsed decay should run")
-	_assert_near(state.data.hunger, 79.76, "two hunger decay intervals")
-	_assert_near(state.data.thirst, 79.5, "two thirst decay intervals")
-	_assert_near(state.data.energy, 79.6, "two energy decay intervals")
+	_assert_near(state.data.hunger, 79.28, "two hunger decay intervals")
+	_assert_near(state.data.thirst, 78.5, "two thirst decay intervals")
+	_assert_near(state.data.energy, 78.8, "two energy decay intervals")
 	_assert_near(state.data.mood, 80.0, "mood holds while every need stays at 50 or above")
 	_assert_equal(state.data.last_decay_at, now, "decay timestamp should retain no remainder")
 	_test_mood_decay_tiers(state)
