@@ -9,6 +9,7 @@ $testProfile = Join-Path $testRoot 'Kai Chen'
 $testAppData = Join-Path $testRoot 'Roaming App Data'
 $testTemp = Join-Path $testRoot 'Temporary Logs'
 $originalUserProfile = $env:USERPROFILE
+$originalCodexHome = $env:CODEX_HOME
 $originalAppData = $env:APPDATA
 $originalTemp = $env:TEMP
 $originalPiAgentDir = $env:PI_CODING_AGENT_DIR
@@ -27,6 +28,7 @@ function Write-TestFile([string]$path, [string]$content = 'test') {
 
 try {
     $env:USERPROFILE = $testProfile
+    $env:CODEX_HOME = Join-Path $testProfile '.codex'
     $env:APPDATA = $testAppData
     $env:TEMP = $testTemp
     $env:PI_CODING_AGENT_DIR = Join-Path $testProfile '.pi\agent'
@@ -146,6 +148,7 @@ try {
     Write-Output 'OPEN_DESKTOP_PET_UNINSTALLER_TEST_OK'
 } finally {
     $env:USERPROFILE = $originalUserProfile
+    $env:CODEX_HOME = $originalCodexHome
     $env:APPDATA = $originalAppData
     $env:TEMP = $originalTemp
     $env:PI_CODING_AGENT_DIR = $originalPiAgentDir
