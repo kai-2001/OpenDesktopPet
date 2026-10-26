@@ -141,6 +141,7 @@ func _ready() -> void:
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
 	_style_bubble()
+	_apply_speech_font()
 	_connect_signals()
 	_refresh_ui(state.get_snapshot())
 	_setup_context_menu()
@@ -1120,6 +1121,20 @@ func _clamp_window_position(requested: Vector2i) -> Vector2i:
 		_window_service.window_size(),
 		visual_bounds
 	)
+
+
+## Speech keeps distance-field glyphs for its fuller, tighter strokes. The
+## details window draws regular glyphs instead: building distance fields for
+## its hundreds of Chinese characters stalled the first open for seconds,
+## while a speech line only ever adds a few new characters. System fonts that
+## fill in the Chinese glyphs inherit the setting from this font.
+func _apply_speech_font() -> void:
+	var base_font := bubble_label.get_theme_font("font") as FontFile
+	if base_font == null:
+		return
+	var speech_font := base_font.duplicate() as FontFile
+	speech_font.multichannel_signed_distance_field = true
+	bubble_label.add_theme_font_override("font", speech_font)
 
 
 func _style_bubble(agent_notification := false) -> void:
