@@ -30,6 +30,7 @@ const COPILOT_NOTIFY_TOOL_FILE_NAME := "vscode_agent_notify.ps1"
 const PI_EXTENSION_TOOL_FILE_NAME := "pi_agent_notify.ts"
 const CODEX_HOOK_REVIEW_TOOL_FILE_NAME := "codex_hook_review.ps1"
 const CODEX_SETUP_SETTINGS_SECTION := "codex_setup"
+const CODEX_QUERY_RETRY_DELAY_MS := 1000
 const COPILOT_HOOK_CONFIG_FILE_NAME := "open-desktop-pet.json"
 const COPILOT_NOTIFY_SCRIPT_FILE_NAME := "vscode_copilot_notify.ps1"
 const OPENCODE_PLUGIN_FILE_NAME := "open-desktop-pet.js"
@@ -63,6 +64,7 @@ signal codex_unavailable(target_name: String, message: String)
 signal codex_trust_required(target_name: String, status: String, message: String)
 signal codex_trust_ready(target_name: String, target_app: String)
 signal codex_trust_refresh_required(target_name: String, status: String, message: String)
+signal codex_status_check_failed(target_name: String, message: String)
 signal executable_path_detection_started(targets: Array)
 signal executable_path_detection_finished(targets: Array)
 
@@ -643,15 +645,30 @@ func _start_codex_setup(mode: String, target: String, target_name: String) -> bo
 	return true
 
 
+# Each query starts a Codex app-server, which can miss its timeout while Codex
+# is starting up. A failed query says nothing about trust, so retry it once.
 func _run_codex_setup_task(mode: String) -> Dictionary:
 	if mode == "enable":
 		var availability := get_codex_availability_status()
+		if _is_codex_query_error(availability):
+			OS.delay_msec(CODEX_QUERY_RETRY_DELAY_MS)
+			availability = get_codex_availability_status()
+		if _is_codex_query_error(availability):
+			return {"stage": "status", "status": availability}
 		if not _codex_hook_trust_service.is_available(availability):
 			return {"stage": "unavailable", "status": availability}
 		if not is_codex_configured():
 			if not _run_codex_configuration_tool() or not is_codex_configured():
 				return {"stage": "configuration_failed"}
-	return {"stage": "status", "status": get_codex_hook_trust_status()}
+	var status := get_codex_hook_trust_status()
+	if _is_codex_query_error(status):
+		OS.delay_msec(CODEX_QUERY_RETRY_DELAY_MS)
+		status = get_codex_hook_trust_status()
+	return {"stage": "status", "status": status}
+
+
+func _is_codex_query_error(status: Dictionary) -> bool:
+	return String(status.get("status", "")) == CodexHookTrustServiceScript.STATUS_ERROR
 
 
 func _poll_codex_setup() -> void:
@@ -717,6 +734,16 @@ func _finish_codex_status_check(
 				String(status.get("status", "")),
 				String(status.get("message", ""))
 			)
+		return
+	if _is_codex_query_error(status):
+		# Unknown is not untrusted: report the failed check instead of sending
+		# the user to review hooks. A recheck keeps its pending target so the
+		# user can simply check again.
+		if mode == "enable":
+			_clear_pending_codex_enable()
+			_set_codex_target_enabled(target, false)
+		_persist_agent_state()
+		codex_status_check_failed.emit(target_name, String(status.get("message", "")))
 		return
 	if _codex_hook_trust_service.is_trusted(status):
 		_clear_pending_codex_enable()

@@ -3,6 +3,7 @@
 *.tscn text eol=lf
 *.godot text eol=lf
 *.md text eol=lf
+tests/fixtures/*.txt text eol=lf
 *.cmd text eol=crlf
 *.vbs text eol=crlf
 

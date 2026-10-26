@@ -35,6 +35,7 @@ func configure(agent_controller: AgentIntegrationController) -> void:
 	_agent_controller.codex_trust_refresh_required.connect(
 		_handle_codex_trust_refresh_required
 	)
+	_agent_controller.codex_status_check_failed.connect(_handle_codex_status_check_failed)
 	_agent_controller.state_changed.connect(refresh)
 	_agent_controller.executable_path_detection_started.connect(
 		_on_executable_path_detection_started
@@ -216,6 +217,19 @@ func _handle_codex_unavailable(target_name: String, _message: String) -> void:
 			"%s 通知無法開啟：找不到支援 Hook 審查的 Codex。請先安裝或更新 "
 			+ "Codex Desktop、VS Code Codex 擴充功能或 Codex CLI。"
 		) % target_name,
+		8.0
+	)
+
+
+func _handle_codex_status_check_failed(target_name: String, _message: String) -> void:
+	_apply_control_state()
+	if _agent_controller != null and _agent_controller.has_pending_codex_trust():
+		speech_requested.emit(
+			"暫時無法確認 Codex Hook 狀態，請稍後再按「我已信任，檢查通知」。", 8.0
+		)
+		return
+	speech_requested.emit(
+		"暫時無法確認 %s 的 Codex 通知狀態，開關先維持關閉，請稍後再打開一次。" % target_name,
 		8.0
 	)
 

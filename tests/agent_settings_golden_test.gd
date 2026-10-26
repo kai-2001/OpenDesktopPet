@@ -107,6 +107,8 @@ func _init() -> void:
 	RecordingControllerScript.configured = {}
 	FakeCodexHookTrustServiceScript.available = true
 	FakeCodexHookTrustServiceScript.trusted = false
+	FakeCodexHookTrustServiceScript.availability_errors = 0
+	FakeCodexHookTrustServiceScript.status_errors = 0
 	var config := ConfigFile.new()
 	config.set_value("codex", "enabled", true)
 	config.set_value("codex", "port", TEST_PORT)
@@ -179,6 +181,16 @@ func _run() -> void:
 	await _step("enable VS Code Codex without a Codex runtime")
 	FakeCodexHookTrustServiceScript.available = true
 	FakeCodexHookTrustServiceScript.trusted = true
+
+	FakeCodexHookTrustServiceScript.status_errors = 2
+	await _press_toggle("CodexAppEnabledToggle", true)
+	await _step("enable ChatGPT Codex while the trust query keeps failing")
+	FakeCodexHookTrustServiceScript.status_errors = 1
+	await _press_toggle("CodexAppEnabledToggle", true)
+	await _step("enable ChatGPT Codex after one failed trust query")
+	_clear_speech_lock()
+	await _press_toggle("CodexAppEnabledToggle", false)
+	await _step("disable ChatGPT Codex after the retried check")
 
 	for controls: Array in PATH_CONTROLS:
 		var line_edit := _find(controls[0]) as LineEdit
@@ -301,7 +313,8 @@ func _step(title: String) -> void:
 	keys.sort()
 	for key: String in keys:
 		if not _previous_state.has(key) or _previous_state[key] != current[key]:
-			_output.append("  %s = %s" % [key, current[key]])
+			# Empty values must not leave trailing whitespace for git diff --check.
+			_output.append(("  %s = %s" % [key, current[key]]).strip_edges(false, true))
 	for key: String in _previous_state.keys():
 		if not current.has(key):
 			_output.append("  %s removed" % key)

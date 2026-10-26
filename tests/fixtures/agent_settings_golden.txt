@@ -9,18 +9,18 @@
   say VS Code 的 Codex Hook 尚待信任，請開啟 Hook 審查。
   controller.agy_terminal_enabled = false
   controller.claude_app_enabled = false
-  controller.claude_app_executable_path = 
+  controller.claude_app_executable_path =
   controller.claude_terminal_enabled = true
   controller.claude_vscode_enabled = false
   controller.codex_app_enabled = false
-  controller.codex_app_executable_path = 
+  controller.codex_app_executable_path =
   controller.codex_enabled = true
   controller.copilot_enabled = false
   controller.enabled = true
-  controller.executable_path = 
+  controller.executable_path =
   controller.gemini_terminal_enabled = false
   controller.opencode_app_enabled = false
-  controller.opencode_app_executable_path = 
+  controller.opencode_app_executable_path =
   controller.pending_codex_trust = true
   controller.pi_codex_enabled = false
   controller.port = 49871
@@ -42,23 +42,23 @@
   runtime.enabled_targets.opencode_terminal = false
   runtime.enabled_targets.opencode_vscode = false
   runtime.enabled_targets.pi_codex_terminal = false
-  runtime.executable_paths.claude_app = 
-  runtime.executable_paths.codex_app = 
-  runtime.executable_paths.opencode_app = 
+  runtime.executable_paths.claude_app =
+  runtime.executable_paths.codex_app =
+  runtime.executable_paths.opencode_app =
   runtime.executable_paths.terminal = C:/ODP-golden/startup-terminal.exe
   runtime.port = 49871.0
   settings.agy_terminal.enabled = false
   settings.claude_code_app.enabled = false
-  settings.claude_code_app.executable_path = 
+  settings.claude_code_app.executable_path =
   settings.claude_code_terminal.enabled = true
   settings.claude_code_vscode.enabled = false
   settings.codex.enabled = true
-  settings.codex.executable_path = 
+  settings.codex.executable_path =
   settings.codex.port = 49871
   settings.codex.vscode_enabled = true
-  settings.codex.vscode_executable_path = 
+  settings.codex.vscode_executable_path =
   settings.codex_app.enabled = false
-  settings.codex_app.executable_path = 
+  settings.codex_app.executable_path =
   settings.codex_setup.pending_target = vscode
   settings.codex_setup.pending_target_name = VS Code
   settings.codex_terminal.enabled = false
@@ -66,7 +66,7 @@
   settings.copilot.enabled = false
   settings.gemini_terminal.enabled = false
   settings.opencode_app.enabled = false
-  settings.opencode_app.executable_path = 
+  settings.opencode_app.executable_path =
   settings.opencode_terminal.enabled = false
   settings.opencode_vscode.enabled = false
   settings.pi_codex_terminal.enabled = false
@@ -110,8 +110,8 @@
   call worker trust query_status
   say VS Code 的 Codex 通知已完成信任並啟用。
   controller.pending_codex_trust = false
-  settings.codex_setup.pending_target = 
-  settings.codex_setup.pending_target_name = 
+  settings.codex_setup.pending_target =
+  settings.codex_setup.pending_target_name =
   ui.CodexHookTrustPageReviewButton = visible=false disabled=false
   ui.CodexHookTrustRecheckButton = visible=false disabled=false
   ui.status = 狀態: 監聽中  127.0.0.1:49871 color=238b9dff
@@ -416,14 +416,14 @@
   runtime.enabled_targets.opencode_terminal = false
   runtime.enabled_targets.opencode_vscode = false
   runtime.enabled_targets.pi_codex_terminal = false
-  runtime.executable_paths.claude_app = 
-  runtime.executable_paths.codex_app = 
-  runtime.executable_paths.opencode_app = 
+  runtime.executable_paths.claude_app =
+  runtime.executable_paths.codex_app =
+  runtime.executable_paths.opencode_app =
   runtime.executable_paths.terminal = C:/ODP-golden/startup-terminal.exe
   runtime.port = 49871.0
   settings.codex_app.enabled = true
-  settings.codex_setup.pending_target = 
-  settings.codex_setup.pending_target_name = 
+  settings.codex_setup.pending_target =
+  settings.codex_setup.pending_target_name =
   ui.CodexAppEnabledToggle = 　Codex 開 disabled=false
   ui.CodexHookTrustPageReviewButton = visible=false disabled=false
   ui.CodexHookTrustRecheckButton = visible=false disabled=false
@@ -475,8 +475,8 @@
   call trust open_review
 ## postpone trust from the dialog
   controller.pending_codex_trust = false
-  settings.codex_setup.pending_target = 
-  settings.codex_setup.pending_target_name = 
+  settings.codex_setup.pending_target =
+  settings.codex_setup.pending_target_name =
   ui.CodexHookTrustPageReviewButton = visible=false disabled=false
   ui.CodexHookTrustRecheckButton = visible=false disabled=false
   ui.status = 狀態: 已關閉 color=68747aff
@@ -488,6 +488,73 @@
   call worker detect vscode
   call worker trust query_availability
   say VS Code 通知無法開啟：找不到支援 Hook 審查的 Codex。請先安裝或更新 Codex Desktop、VS Code Codex 擴充功能或 Codex CLI。
+## enable ChatGPT Codex while the trust query keeps failing
+  call refresh_paths codex_app
+  call worker detect codex_app
+  call worker trust query_availability
+  call worker trust query_status
+  call worker trust query_status
+  say 暫時無法確認 ChatGPT 的 Codex 通知狀態，開關先維持關閉，請稍後再打開一次。
+## enable ChatGPT Codex after one failed trust query
+  call refresh_paths codex_app
+  call signal codex_trust_ready ChatGPT codex_app
+  call worker detect codex_app
+  call worker trust query_availability
+  call worker trust query_status
+  call worker trust query_status
+  say ChatGPT 的 Codex 通知已完成信任並啟用。
+  controller.codex_app_enabled = true
+  controller.running = true
+  runtime.enabled_targets.agy_terminal = false
+  runtime.enabled_targets.claude_app = false
+  runtime.enabled_targets.claude_terminal = false
+  runtime.enabled_targets.claude_vscode = false
+  runtime.enabled_targets.codex_app = true
+  runtime.enabled_targets.codex_terminal = false
+  runtime.enabled_targets.codex_vscode = false
+  runtime.enabled_targets.copilot = false
+  runtime.enabled_targets.gemini_terminal = false
+  runtime.enabled_targets.opencode_app = false
+  runtime.enabled_targets.opencode_terminal = false
+  runtime.enabled_targets.opencode_vscode = false
+  runtime.enabled_targets.pi_codex_terminal = false
+  runtime.executable_paths.claude_app =
+  runtime.executable_paths.codex_app =
+  runtime.executable_paths.opencode_app =
+  runtime.executable_paths.terminal = C:/ODP-golden/startup-terminal.exe
+  runtime.port = 49871.0
+  settings.codex_app.enabled = true
+  ui.CodexAppEnabledToggle = 　Codex 開 disabled=false
+  ui.port = 49871 editable=false
+  ui.status = 狀態: 監聽中  127.0.0.1:49871 color=238b9dff
+  ui.trust_dialog_visible = false
+  runtime removed
+## disable ChatGPT Codex after the retried check
+  controller.codex_app_enabled = false
+  controller.running = false
+  runtime = missing
+  settings.codex_app.enabled = false
+  ui.CodexAppEnabledToggle = 　Codex 關 disabled=false
+  ui.port = 49871 editable=true
+  ui.status = 狀態: 已關閉 color=68747aff
+  runtime.port removed
+  runtime.enabled_targets.agy_terminal removed
+  runtime.enabled_targets.claude_app removed
+  runtime.enabled_targets.claude_terminal removed
+  runtime.enabled_targets.claude_vscode removed
+  runtime.enabled_targets.codex_app removed
+  runtime.enabled_targets.codex_terminal removed
+  runtime.enabled_targets.codex_vscode removed
+  runtime.enabled_targets.copilot removed
+  runtime.enabled_targets.gemini_terminal removed
+  runtime.enabled_targets.opencode_app removed
+  runtime.enabled_targets.opencode_terminal removed
+  runtime.enabled_targets.opencode_vscode removed
+  runtime.enabled_targets.pi_codex_terminal removed
+  runtime.executable_paths.claude_app removed
+  runtime.executable_paths.codex_app removed
+  runtime.executable_paths.opencode_app removed
+  runtime.executable_paths.terminal removed
 ## submit VscodeExecutablePath
   controller.executable_path = C:/ODP-golden/VscodeExecutablePath.exe
   settings.codex.executable_path = C:/ODP-golden/VscodeExecutablePath.exe
@@ -554,7 +621,6 @@
 ## switch the details window to the dark theme
   ui.status = 狀態: 監聽中  127.0.0.1:49872 color=4fc1ffff
   ui.trust_dialog_text = Codex 必須先信任桌寵的 Stop、PermissionRequest、PreToolUse Hook，通知才會生效。\n\n1. 按「開啟 Codex 信任畫面」。\n2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，每一項都按 Enter 開啟詳細內容。\n4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n6. 回到桌寵，按「我已信任，檢查通知」。\n\n選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。\n\n不需另外安裝 CLI；桌寵會使用已安裝 Codex 產品提供的核心。\n\n審查選單會顯示在「Codex Hook Review」PowerShell 視窗，不會出現在 GPT Codex 或 VS Code 面板裡。
-  ui.trust_dialog_visible = false
 ## disable Pi in the rebuilt window
   controller.pi_codex_enabled = false
   runtime.enabled_targets.pi_codex_terminal = false

@@ -231,6 +231,12 @@ try {
     if ($agentSettingsGoldenExitCode -ne 0 -or -not ($agentSettingsGoldenOutput -match 'AGENT_SETTINGS_GOLDEN_TEST_OK')) {
         throw 'Agent settings golden validation failed.'
     }
+    $codexTrustCheckOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_trust_check_test.gd' 2>&1
+    $codexTrustCheckExitCode = $LASTEXITCODE
+    $codexTrustCheckOutput | Write-Output
+    if ($codexTrustCheckExitCode -ne 0 -or -not ($codexTrustCheckOutput -match 'CODEX_TRUST_CHECK_TEST_OK')) {
+        throw 'Codex trust check validation failed.'
+    }
 
     $ErrorActionPreference = 'Continue'
     $windowOutput = & $GodotExe --path $projectRoot --script 'res://tests/window_integration_test.gd' 2>&1
