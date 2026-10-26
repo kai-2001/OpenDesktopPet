@@ -1,7 +1,11 @@
 class_name StatsWindowCoordinator
 extends RefCounted
 
-const DetailsWindowControllerScript = preload("res://scripts/details_window_controller.gd")
+const StatusTabViewScript = preload("res://scripts/status_tab_view.gd")
+const RemindersTabViewScript = preload("res://scripts/reminders_tab_view.gd")
+const SettingsTabViewScript = preload("res://scripts/settings_tab_view.gd")
+const AgentTabViewScript = preload("res://scripts/agent_tab_view.gd")
+const CharacterTabViewScript = preload("res://scripts/character_tab_view.gd")
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const DEFAULT_WINDOW_SIZE := Vector2i(640, 620)
 const MIN_WINDOW_SIZE := Vector2i(360, 480)
@@ -22,7 +26,11 @@ var visual_scale := PetVisualScaleScript.DEFAULT_VALUE
 var interaction_label: Callable
 var interaction_icon: Callable
 var reminder_coordinator
-var details_controller
+var status_tab
+var reminders_tab
+var settings_tab
+var agent_tab
+var character_tab
 var window: Window
 
 
@@ -87,31 +95,39 @@ func build(owner: Node) -> Dictionary:
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_layout.add_child(tabs)
 
-	details_controller = DetailsWindowControllerScript.new()
-	details_controller.theme_mode = theme_mode
-	details_controller.last_state_message = last_state_message
-	details_controller.agent_settings = agent_settings
-	details_controller.autostart_supported = autostart_supported
-	details_controller.keep_screen_on = keep_screen_on
-	details_controller.focus_mode = focus_mode
-	details_controller.visual_scale = visual_scale
-	details_controller.interaction_label = interaction_label
-	details_controller.interaction_icon = interaction_icon
-	var status_refs: Dictionary = details_controller.build_status_tab(tabs)
-	var reminder_refs: Dictionary = details_controller.build_reminders_tab(
-		tabs, reminder_coordinator
-	)
-	var settings_refs: Dictionary = details_controller.build_settings_tab(tabs)
-	var agent_refs: Dictionary = details_controller.build_agent_tab(tabs)
-	var character_refs: Dictionary = details_controller.build_character_tab(
-		tabs, window
-	)
+	status_tab = StatusTabViewScript.new()
+	status_tab.theme_mode = theme_mode
+	status_tab.last_state_message = last_state_message
+	status_tab.interaction_label = interaction_label
+	status_tab.interaction_icon = interaction_icon
+	var status_refs: Dictionary = status_tab.build(tabs)
+	reminders_tab = RemindersTabViewScript.new()
+	reminders_tab.theme_mode = theme_mode
+	var reminder_refs: Dictionary = reminders_tab.build(tabs, reminder_coordinator)
+	settings_tab = SettingsTabViewScript.new()
+	settings_tab.theme_mode = theme_mode
+	settings_tab.autostart_supported = autostart_supported
+	settings_tab.keep_screen_on = keep_screen_on
+	settings_tab.focus_mode = focus_mode
+	settings_tab.visual_scale = visual_scale
+	var settings_refs: Dictionary = settings_tab.build(tabs)
+	agent_tab = AgentTabViewScript.new()
+	agent_tab.theme_mode = theme_mode
+	agent_tab.agent_settings = agent_settings
+	var agent_refs: Dictionary = agent_tab.build(tabs)
+	character_tab = CharacterTabViewScript.new()
+	character_tab.theme_mode = theme_mode
+	var character_refs: Dictionary = character_tab.build(tabs, window)
 	tabs.tab_changed.connect(func(index: int) -> void: tab_changed.emit(index))
 	return {
 		"window": window,
 		"tabs": tabs,
 		"tab_buttons": tab_buttons,
-		"details_controller": details_controller,
+		"status_tab": status_tab,
+		"reminders_tab": reminders_tab,
+		"settings_tab": settings_tab,
+		"agent_tab": agent_tab,
+		"character_tab": character_tab,
 		"status_refs": status_refs,
 		"reminder_refs": reminder_refs,
 		"settings_refs": settings_refs,
@@ -124,7 +140,11 @@ func destroy() -> void:
 	if is_instance_valid(window):
 		window.queue_free()
 	window = null
-	details_controller = null
+	status_tab = null
+	reminders_tab = null
+	settings_tab = null
+	agent_tab = null
+	character_tab = null
 
 
 func _details_color(light: String, dark: String) -> Color:

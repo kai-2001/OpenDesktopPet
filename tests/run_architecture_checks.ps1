@@ -11,7 +11,15 @@ function Assert-Architecture([bool]$condition, [string]$message) {
 	}
 }
 
-$details = Read-Source 'scripts/details_window_controller.gd'
+# The details window is built by one view per tab on a shared base.
+$details = @(
+	'scripts/details_tab_view.gd',
+	'scripts/status_tab_view.gd',
+	'scripts/reminders_tab_view.gd',
+	'scripts/settings_tab_view.gd',
+	'scripts/agent_tab_view.gd',
+	'scripts/character_tab_view.gd'
+) | ForEach-Object { Read-Source $_ } | Out-String
 $menu = Read-Source 'scripts/pet_menu_builder.gd'
 $main = Read-Source 'scripts/main.gd'
 $state = Read-Source 'scripts/pet_state.gd'
@@ -47,7 +55,7 @@ $releasePreparation = Read-Source 'tools/prepare_windows_release.ps1'
 $exportPresets = Read-Source 'export_presets.cfg'
 
 Assert-Architecture ($details -notmatch 'host\.') `
-	'DetailsWindowController must not depend on host private APIs.'
+	'Details tab views must not depend on host private APIs.'
 Assert-Architecture ($main -notmatch 'build_(status|settings|character)_tab\(\s*tabs,\s*self') `
 	'main.gd must not pass itself as the details-window host.'
 Assert-Architecture ($state -notmatch 'FileAccess|DirAccess|OS\.execute|Time\.(get_unix_time_from_system|get_date_string_from_system)') `
@@ -63,7 +71,7 @@ Assert-Architecture ($visual -match 'CharacterPackProfileScript') `
 Assert-Architecture ($autostart -match 'class_name WindowsAutostartService') `
 	'WindowsAutostartService is missing.'
 Assert-Architecture ($details -notmatch 'autostart_query_requested') `
-	'DetailsWindowController must not emit autostart queries before signal wiring.'
+	'The settings tab must not emit autostart queries before signal wiring.'
 Assert-Architecture ($main -match '(?s)_autostart_check_box = settings_refs\["autostart_check_box"\].*call_deferred\("_start_autostart_operation", "query", false\)') `
 	'The initial autostart query must start after settings controls are assigned.'
 Assert-Architecture ($runtime -match 'class_name CharacterPackRuntime') `

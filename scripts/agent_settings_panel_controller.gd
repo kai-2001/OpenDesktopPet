@@ -15,7 +15,7 @@ signal agent_status_requested(
 )
 
 var _agent_controller: AgentIntegrationController
-var _details_controller
+var _agent_tab
 var _theme_mode := "light"
 var _channel_toggles: Dictionary = {}
 var _port_spin_box: SpinBox
@@ -45,8 +45,8 @@ func configure(agent_controller: AgentIntegrationController) -> void:
 	)
 
 
-func bind(details_controller, agent_refs: Dictionary, theme_mode: String) -> void:
-	_details_controller = details_controller
+func bind(agent_tab, agent_refs: Dictionary, theme_mode: String) -> void:
+	_agent_tab = agent_tab
 	_theme_mode = theme_mode
 	_channel_toggles = agent_refs["channel_toggles"]
 	_port_spin_box = agent_refs["agent_port_spin_box"] as SpinBox
@@ -57,18 +57,18 @@ func bind(details_controller, agent_refs: Dictionary, theme_mode: String) -> voi
 	_trust_dialog = agent_refs["codex_trust_dialog"] as ConfirmationDialog
 	_trust_dialog.confirmed.connect(_open_codex_hook_review)
 	_trust_dialog.canceled.connect(_cancel_codex_hook_trust)
-	_details_controller.agent_channel_toggled.connect(_on_channel_toggled)
-	_details_controller.agent_port_changed.connect(_on_port_changed)
-	_details_controller.agent_executable_path_changed.connect(
+	_agent_tab.agent_channel_toggled.connect(_on_channel_toggled)
+	_agent_tab.agent_port_changed.connect(_on_port_changed)
+	_agent_tab.agent_executable_path_changed.connect(
 		_on_executable_path_changed
 	)
-	_details_controller.codex_trust_review_requested.connect(_open_codex_hook_review)
-	_details_controller.codex_trust_recheck_requested.connect(_recheck_codex_hook_trust)
+	_agent_tab.codex_trust_review_requested.connect(_open_codex_hook_review)
+	_agent_tab.codex_trust_recheck_requested.connect(_recheck_codex_hook_trust)
 	refresh()
 
 
 func unbind() -> void:
-	_details_controller = null
+	_agent_tab = null
 	_channel_toggles = {}
 	_port_spin_box = null
 	_status_label = null
@@ -80,13 +80,13 @@ func unbind() -> void:
 
 func refresh() -> void:
 	_apply_control_state()
-	if _details_controller != null and _agent_controller != null:
+	if _agent_tab != null and _agent_controller != null:
 		var executable_paths: Dictionary = (
 			_agent_controller.get_settings_snapshot()["executable_paths"]
 		)
 		for target_entry: Dictionary in AgentChannelCatalogScript.TARGETS:
 			var target := String(target_entry["target"])
-			_details_controller.refresh_agent_executable_path(
+			_agent_tab.refresh_agent_executable_path(
 				target, String(executable_paths[target])
 			)
 	if not is_instance_valid(_status_label):
@@ -195,13 +195,13 @@ func _on_executable_path_changed(target: String, path: String) -> void:
 
 
 func _on_executable_path_detection_started(targets: Array) -> void:
-	if _details_controller != null:
-		_details_controller.set_agent_executable_path_detection_state(targets, true)
+	if _agent_tab != null:
+		_agent_tab.set_agent_executable_path_detection_state(targets, true)
 
 
 func _on_executable_path_detection_finished(targets: Array) -> void:
-	if _details_controller != null:
-		_details_controller.set_agent_executable_path_detection_state(targets, false)
+	if _agent_tab != null:
+		_agent_tab.set_agent_executable_path_detection_state(targets, false)
 	refresh()
 
 

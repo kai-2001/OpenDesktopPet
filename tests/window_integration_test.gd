@@ -115,7 +115,7 @@ func _init() -> void:
 	main._on_context_action(PetMenuBuilderScript.REMINDER_ITEM_ID_BASE)
 	await process_frame
 	await process_frame
-	var reminder_panel = main._details_window_controller._task_reminder_panel
+	var reminder_panel = main._reminders_tab_view._task_reminder_panel
 	_assert_true(
 		not reminder_panel._form_panel.visible,
 		"context-menu reminder navigation does not open the edit form"

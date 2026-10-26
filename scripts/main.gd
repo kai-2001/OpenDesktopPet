@@ -127,7 +127,10 @@ var _agent_settings_panel
 # Tests swap in a recording subclass before the node enters the tree.
 var agent_controller_script: Script = AgentIntegrationControllerScript
 var _update_check_coordinator
-var _details_window_controller
+var _status_tab_view
+var _reminders_tab_view
+var _settings_tab_view
+var _character_tab_view
 var _agent_notification_active := false
 var _active_agent_target_app := AgentIntegrationControllerScript.TARGET_VSCODE
 var _active_agent := "codex"
@@ -824,7 +827,10 @@ func _build_stats_window() -> void:
 	_stats_window = refs["window"] as Window
 	_stats_tabs = refs["tabs"] as TabContainer
 	_stats_tab_buttons = refs["tab_buttons"] as Array[Button]
-	_details_window_controller = refs["details_controller"]
+	_status_tab_view = refs["status_tab"]
+	_reminders_tab_view = refs["reminders_tab"]
+	_settings_tab_view = refs["settings_tab"]
+	_character_tab_view = refs["character_tab"]
 	_connect_details_window_signals()
 	_stats_window_coordinator.close_requested.connect(_destroy_stats_window)
 	_stats_window_coordinator.window_input.connect(_on_stats_window_input)
@@ -858,7 +864,7 @@ func _build_stats_window() -> void:
 	_update_skip_button = settings_refs["update_skip_button"] as Button
 	_refresh_update_ui()
 	_agent_settings_panel.bind(
-		_details_window_controller, refs["agent_refs"], _details_theme_mode
+		refs["agent_tab"], refs["agent_refs"], _details_theme_mode
 	)
 	# The settings builder cannot request this before its signals and control
 	# references exist. Queue the initial query only after initialization.
@@ -890,56 +896,56 @@ func _build_stats_window() -> void:
 
 
 func _connect_details_window_signals() -> void:
-	_details_window_controller.care_action_requested.connect(
+	_status_tab_view.care_action_requested.connect(
 		_on_care_action_requested
 	)
-	_details_window_controller.auto_feeder_buy_requested.connect(_on_auto_feeder_buy_requested)
-	_details_window_controller.auto_feeder_toggled.connect(_on_auto_feeder_toggled)
-	_details_window_controller.target_fps_selected.connect(_on_target_fps_selected)
-	_details_window_controller.details_theme_selected.connect(_on_details_theme_selected)
-	_details_window_controller.autostart_toggled.connect(_on_autostart_toggled)
-	_details_window_controller.keep_screen_on_toggled.connect(_on_keep_screen_on_toggled)
-	_details_window_controller.focus_mode_toggled.connect(_on_focus_mode_toggled)
-	_details_window_controller.update_auto_check_toggled.connect(
+	_status_tab_view.auto_feeder_buy_requested.connect(_on_auto_feeder_buy_requested)
+	_status_tab_view.auto_feeder_toggled.connect(_on_auto_feeder_toggled)
+	_settings_tab_view.target_fps_selected.connect(_on_target_fps_selected)
+	_settings_tab_view.details_theme_selected.connect(_on_details_theme_selected)
+	_settings_tab_view.autostart_toggled.connect(_on_autostart_toggled)
+	_settings_tab_view.keep_screen_on_toggled.connect(_on_keep_screen_on_toggled)
+	_settings_tab_view.focus_mode_toggled.connect(_on_focus_mode_toggled)
+	_settings_tab_view.update_auto_check_toggled.connect(
 		_on_update_auto_check_toggled
 	)
-	_details_window_controller.update_check_requested.connect(_on_update_check_requested)
-	_details_window_controller.update_release_page_requested.connect(
+	_settings_tab_view.update_check_requested.connect(_on_update_check_requested)
+	_settings_tab_view.update_release_page_requested.connect(
 		_on_update_release_page_requested
 	)
-	_details_window_controller.update_skip_requested.connect(_on_update_skip_requested)
-	_details_window_controller.visual_scale_previewed.connect(_on_visual_scale_previewed)
-	_details_window_controller.visual_scale_changed.connect(_on_visual_scale_changed)
-	_details_window_controller.character_selected.connect(_on_character_selected)
-	_details_window_controller.character_use_requested.connect(_use_selected_character)
-	_details_window_controller.character_delete_requested.connect(
+	_settings_tab_view.update_skip_requested.connect(_on_update_skip_requested)
+	_settings_tab_view.visual_scale_previewed.connect(_on_visual_scale_previewed)
+	_settings_tab_view.visual_scale_changed.connect(_on_visual_scale_changed)
+	_character_tab_view.character_selected.connect(_on_character_selected)
+	_character_tab_view.character_use_requested.connect(_use_selected_character)
+	_character_tab_view.character_delete_requested.connect(
 		_confirm_delete_selected_character
 	)
-	_details_window_controller.character_import_requested.connect(
+	_character_tab_view.character_import_requested.connect(
 		_open_character_import_dialog
 	)
-	_details_window_controller.open_character_packs_folder_requested.connect(
+	_character_tab_view.open_character_packs_folder_requested.connect(
 		_open_character_packs_folder
 	)
-	_details_window_controller.character_archive_selected.connect(
+	_character_tab_view.character_archive_selected.connect(
 		_install_character_archive
 	)
-	_details_window_controller.character_update_confirmed.connect(
+	_character_tab_view.character_update_confirmed.connect(
 		_install_pending_character_archive
 	)
-	_details_window_controller.character_delete_confirmed.connect(
+	_character_tab_view.character_delete_confirmed.connect(
 		_delete_selected_character
 	)
-	_details_window_controller.mask_effect_changed.connect(
+	_character_tab_view.mask_effect_changed.connect(
 		_on_mask_effect_changed
 	)
-	_details_window_controller.mask_effect_toggle_requested.connect(
+	_character_tab_view.mask_effect_toggle_requested.connect(
 		_on_mask_effect_toggle_requested
 	)
-	_details_window_controller.mask_effect_apply_requested.connect(
+	_character_tab_view.mask_effect_apply_requested.connect(
 		_on_mask_effect_apply_requested
 	)
-	_details_window_controller.mask_effect_reset_requested.connect(
+	_character_tab_view.mask_effect_reset_requested.connect(
 		_on_mask_effect_reset_requested
 	)
 
@@ -1103,7 +1109,7 @@ func _set_mask_effect_editing(editing: bool) -> void:
 	_mask_effect_x_spin.editable = editing
 	_mask_effect_y_spin.editable = editing
 	_mask_effect_scale_spin.editable = editing
-	_details_window_controller.configure_mask_effect_header(
+	_character_tab_view.configure_mask_effect_header(
 		_mask_effect_header_state, _mask_effect_header_chevron, editing
 	)
 	_mask_effect_apply_button.visible = editing
@@ -1400,10 +1406,10 @@ func _show_stats_window(
 		_refresh_ui(state.get_snapshot())
 		if select_tab >= 0:
 			_select_stats_tab(select_tab)
-		if not reminder_id.is_empty() and _details_window_controller != null:
-			_details_window_controller.focus_reminder(reminder_id)
-		elif create_reminder and _details_window_controller != null:
-			_details_window_controller.start_new_reminder()
+		if not reminder_id.is_empty() and _reminders_tab_view != null:
+			_reminders_tab_view.focus_reminder(reminder_id)
+		elif create_reminder and _reminders_tab_view != null:
+			_reminders_tab_view.start_new_reminder()
 		call_deferred("_bring_stats_window_forward")
 		return
 	_build_stats_window()
@@ -1430,10 +1436,10 @@ func _show_stats_window(
 	_stats_window.show()
 	if select_tab >= 0:
 		_select_stats_tab(select_tab)
-	if not reminder_id.is_empty() and _details_window_controller != null:
-		_details_window_controller.focus_reminder(reminder_id)
-	elif create_reminder and _details_window_controller != null:
-		_details_window_controller.start_new_reminder()
+	if not reminder_id.is_empty() and _reminders_tab_view != null:
+		_reminders_tab_view.focus_reminder(reminder_id)
+	elif create_reminder and _reminders_tab_view != null:
+		_reminders_tab_view.start_new_reminder()
 	call_deferred("_bring_stats_window_forward")
 
 
@@ -1458,7 +1464,10 @@ func _destroy_stats_window() -> void:
 	if _stats_window_coordinator != null:
 		_stats_window_coordinator.destroy()
 		_stats_window_coordinator = null
-	_details_window_controller = null
+	_status_tab_view = null
+	_reminders_tab_view = null
+	_settings_tab_view = null
+	_character_tab_view = null
 	_agent_settings_panel.unbind()
 	_stats_window = null
 	_stats_tabs = null
