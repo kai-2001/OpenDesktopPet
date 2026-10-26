@@ -3,6 +3,10 @@ param(
     [string]$GodotExe
 )
 
+# Manual-only checks, kept out of this run because they take over the desktop:
+# run_native_click_through_test.ps1 moves the real cursor, and
+# windows_window_activator_focus_test.gd needs OPEN_DESKTOP_PET_FOCUS_TEST_EXECUTABLE
+# and steals window focus.
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 & (Join-Path $PSScriptRoot 'run_architecture_checks.ps1')
@@ -237,6 +241,35 @@ try {
     if ($codexTrustCheckExitCode -ne 0 -or -not ($codexTrustCheckOutput -match 'CODEX_TRUST_CHECK_TEST_OK')) {
         throw 'Codex trust check validation failed.'
     }
+    $codexSleepTransitionOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_sleep_transition_test.gd' 2>&1
+    $codexSleepTransitionExitCode = $LASTEXITCODE
+    $codexSleepTransitionOutput | Write-Output
+    if ($codexSleepTransitionExitCode -ne 0 -or -not ($codexSleepTransitionOutput -match 'CODEX_SLEEP_TRANSITION_TEST_OK')) {
+        throw 'Codex sleep transition validation failed.'
+    }
+    $petEffectControllerOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/pet_effect_controller_test.gd' 2>&1
+    $petEffectControllerExitCode = $LASTEXITCODE
+    $petEffectControllerOutput | Write-Output
+    if ($petEffectControllerExitCode -ne 0 -or -not ($petEffectControllerOutput -match 'PET_EFFECT_CONTROLLER_TEST_OK')) {
+        throw 'Pet effect controller validation failed.'
+    }
+
+    # Rendered checks open small windows; they skip screenshots unless
+    # OPEN_DESKTOP_PET_UI_CAPTURE_DIR is set.
+    $ErrorActionPreference = 'Continue'
+    $taskReminderVisualOutput = & $GodotExe --path $projectRoot --script 'res://tests/task_reminder_visual_test.gd' 2>&1
+    $taskReminderVisualExitCode = $LASTEXITCODE
+    $taskReminderVisualOutput | Write-Output
+    if ($taskReminderVisualExitCode -ne 0 -or -not ($taskReminderVisualOutput -match 'TASK_REMINDER_VISUAL_TEST_OK')) {
+        throw 'Task reminder visual validation failed.'
+    }
+    $taskReminderBadgeVisualOutput = & $GodotExe --path $projectRoot --script 'res://tests/task_reminder_badge_visual_test.gd' 2>&1
+    $taskReminderBadgeVisualExitCode = $LASTEXITCODE
+    $taskReminderBadgeVisualOutput | Write-Output
+    if ($taskReminderBadgeVisualExitCode -ne 0 -or -not ($taskReminderBadgeVisualOutput -match 'TASK_REMINDER_BADGE_VISUAL_TEST_OK')) {
+        throw 'Task reminder badge visual validation failed.'
+    }
+    $ErrorActionPreference = $previousErrorActionPreference
 
     $ErrorActionPreference = 'Continue'
     $windowOutput = & $GodotExe --path $projectRoot --script 'res://tests/window_integration_test.gd' 2>&1
