@@ -9,6 +9,7 @@ const TaskReminderRepositoryScript = preload("res://scripts/task_reminder_reposi
 const TaskReminderSectionScript = preload("res://scripts/task_reminder_section.gd")
 const TaskReminderThemeScript = preload("res://scripts/task_reminder_theme.gd")
 const TaskReminderPanelScript = preload("res://scripts/task_reminder_panel.gd")
+const TaskReminderDatePickerScript = preload("res://scripts/task_reminder_date_picker.gd")
 
 var _failures := 0
 var _requested_status := ""
@@ -209,7 +210,9 @@ func _run() -> void:
 		"reloaded reminder keeps UTF-8 title"
 	)
 
-	await _assert_time_is_picked()
+	_assert_date_time_parsing()
+	await _assert_schedule_is_typed_or_picked()
+	await _assert_calendar_grid()
 
 	_cleanup()
 	if _failures > 0:
@@ -249,7 +252,31 @@ func _assert_context_menu_today_section_visibility() -> void:
 	menu.queue_free()
 
 
-func _assert_time_is_picked() -> void:
+func _assert_date_time_parsing() -> void:
+	for case: Array in [
+		["9:30", "09:30"], ["930", "09:30"], ["0930", "09:30"], ["14", "14:00"],
+		["9:5", "09:05"], ["１４：０５", "14:05"], ["23.59", "23:59"],
+		["24:00", ""], ["9:60", ""], ["abc", ""], ["", ""],
+	]:
+		_assert_equal(TaskReminderDateTime.parse_time(case[0]), case[1], "time '%s' is read" % case[0])
+	for case: Array in [
+		["2026-10-26", "2026-10-26"], ["2026/1/5", "2026-01-05"], ["20261026", "2026-10-26"],
+		["10/30", "2026-10-30"], ["1030", "2026-10-30"], ["１０／３０", "2026-10-30"],
+		["2028年2月29日", "2028-02-29"], ["10月30日", "2026-10-30"],
+		["2026-02-29", ""], ["13/01", ""], ["明天", ""], ["", ""],
+	]:
+		_assert_equal(
+			TaskReminderDateTime.parse_date(case[0], "2026-10-26"), case[1], "date '%s' is read" % case[0]
+		)
+	_assert_equal(TaskReminderDateTime.step_time("23:59", 0, 1), "00:59", "hours wrap alone")
+	_assert_equal(TaskReminderDateTime.step_time("23:59", 1, 1), "23:00", "minutes wrap alone")
+	_assert_equal(TaskReminderDateTime.step_date("2026-10-31", 2, 1), "2026-11-01", "days move through months")
+	_assert_equal(TaskReminderDateTime.step_date("2026-01-31", 1, 1), "2026-02-28", "months keep the day inside")
+	_assert_equal(TaskReminderDateTime.step_date("2026-01-15", 1, -1), "2025-12-15", "months cross years")
+	_assert_equal(TaskReminderDateTime.step_date("2028-02-29", 0, 1), "2029-02-28", "years keep the day inside")
+
+
+func _assert_schedule_is_typed_or_picked() -> void:
 	var repository = TaskReminderRepositoryScript.new()
 	repository.save_path = PANEL_TEST_PATH
 	var coordinator = TaskReminderCoordinatorScript.new()
@@ -260,38 +287,92 @@ func _assert_time_is_picked() -> void:
 	get_root().add_child(panel)
 	panel.show_new_form()
 	await process_frame
-	var time_control := panel.find_child("ReminderTime", true, false) as Control
-	_assert_true(time_control is Button, "reminder time is chosen with a picker, not typed")
-	_assert_true(panel._time_button.disabled, "all-day reminders need no time")
+	var time_edit := panel.find_child("ReminderTime", true, false) as LineEdit
+	var date_edit := panel.find_child("ReminderDate", true, false) as LineEdit
+	_assert_true(time_edit != null and date_edit != null, "date and time can be typed")
+	_assert_true(not time_edit.editable, "all-day reminders need no time")
 	panel._title_edit.text = "選時間的待辦"
 	panel._all_day_check_box.button_pressed = false
-	_assert_true(not panel._time_button.disabled, "timed reminders enable the time picker")
+	_assert_true(time_edit.editable, "timed reminders can type a time")
 	_assert_true(
-		panel._is_valid_time(panel._time_button.text),
+		not TaskReminderDateTime.parse_time(time_edit.text).is_empty(),
 		"a timed reminder starts from a valid time"
 	)
-	panel._time_picker._hour_buttons[14].pressed.emit()
-	panel._time_picker._minute_buttons[6].pressed.emit()
-	_assert_equal(panel._time_button.text, "14:30", "picked hour and minute are shown")
+
+	time_edit.text = "１４：０５"
+	time_edit.text_submitted.emit(time_edit.text)
+	_assert_equal(time_edit.text, "14:05", "a typed time is tidied when submitted")
+	_assert_equal(panel._time_picker._minute_buttons.size(), 60, "the picker offers every minute")
+	panel._time_picker.open_for(time_edit, panel._editing_time)
+	panel._time_picker._hour_buttons[9].pressed.emit()
+	_assert_equal(time_edit.text, "09:05", "picking an hour keeps the typed minute")
+	panel._time_picker._minute_buttons[37].pressed.emit()
+	_assert_equal(time_edit.text, "09:37", "picking a minute fills the field")
+	panel._time_picker.hide()
+	time_edit.caret_column = 1
+	panel._on_schedule_edit_input(time_edit, _key(KEY_UP))
+	_assert_equal(time_edit.text, "10:37", "Up on the hour adds an hour")
+	time_edit.caret_column = 4
+	panel._on_schedule_edit_input(time_edit, _key(KEY_DOWN))
+	_assert_equal(time_edit.text, "10:36", "Down on the minute removes a minute")
+
+	date_edit.text = "1030"
+	date_edit.text_submitted.emit(date_edit.text)
+	var year := Time.get_date_string_from_system(false).left(4)
+	_assert_equal(date_edit.text, "%s-10-30" % year, "a typed month and day use this year")
+	_assert_true(panel._date_hint.text.begins_with("星期"), "the weekday is shown beside the date")
+	date_edit.caret_column = 6
+	panel._on_schedule_edit_input(date_edit, _key(KEY_UP))
+	_assert_equal(date_edit.text, "%s-11-30" % year, "Up on the month adds a month")
+
+	time_edit.text = "25:00"
+	panel._save_form()
+	_assert_true(coordinator.get_all_reminders().is_empty(), "an unreadable time is not saved")
+	_assert_true(panel._form_feedback.text.contains("時間"), "an unreadable time is explained")
+	time_edit.text = "10:36"
 	panel._save_form()
 	var saved: Array[Dictionary] = coordinator.get_all_reminders()
-	_assert_equal(saved.size(), 1, "picked time saves the reminder")
-	_assert_equal(String(saved[0].get("due_time", "")), "14:30", "picked time is saved")
-	_assert_true(not bool(saved[0].get("all_day", true)), "picked time saves a timed reminder")
+	_assert_equal(saved.size(), 1, "typed date and time save the reminder")
+	_assert_equal(String(saved[0].get("due_date", "")), "%s-11-30" % year, "the date is saved")
+	_assert_equal(String(saved[0].get("due_time", "")), "10:36", "the time is saved")
+	_assert_true(not bool(saved[0].get("all_day", true)), "a timed reminder is saved")
 
-	var legacy: Dictionary = coordinator.update_reminder(
-		String(saved[0].get("id", "")), {"due_time": "09:37"}
-	)
-	panel._show_edit_form(legacy)
-	_assert_equal(panel._time_button.text, "09:37", "times off the picker steps are shown")
-	panel._save_form()
-	_assert_equal(
-		String(coordinator.get_all_reminders()[0].get("due_time", "")),
-		"09:37",
-		"editing keeps a time the picker cannot show"
-	)
+	panel._show_edit_form(saved[0])
+	_assert_equal(time_edit.text, "10:36", "editing shows the saved time")
 	panel.queue_free()
 	await process_frame
+
+
+func _assert_calendar_grid() -> void:
+	var picker = TaskReminderDatePickerScript.new()
+	picker.configure(TaskReminderThemeScript.new("dark"))
+	get_root().add_child(picker)
+	picker._selected_date = "2026-02-10"
+	picker._set_display_month("2026-02-10")
+	var cells: Array = picker._dates_grid.get_children().filter(
+		func(child: Node) -> bool: return child is Button
+	)
+	_assert_equal(cells.size(), 42, "the calendar always shows six weeks")
+	_assert_equal(String(cells[0].get_meta("date")), "2026-02-01", "weeks start on Sunday")
+	_assert_equal(String(cells[-1].get_meta("date")), "2026-03-14", "next month's days fill the grid")
+	var selected := cells[9] as Button
+	_assert_equal(String(selected.get_meta("date")), "2026-02-10", "cells follow the calendar")
+	_assert_equal(
+		(selected.get_theme_stylebox("normal") as StyleBoxFlat).bg_color,
+		TaskReminderThemeScript.new("dark").color("accent"),
+		"the chosen date is highlighted"
+	)
+	picker._shift_month(1)
+	_assert_equal(picker._month_title.text, "2026 年 03 月", "the next month can be shown")
+	picker.queue_free()
+	await process_frame
+
+
+func _key(keycode: Key) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = keycode
+	event.pressed = true
+	return event
 
 
 func _cleanup() -> void:

@@ -60,7 +60,7 @@ func _run() -> void:
 				OK,
 				"%s editor screenshot is saved" % theme_mode
 			)
-			panel._date_picker.open_for(panel._date_button, panel._editing_date)
+			panel._date_picker.open_for(panel._date_edit, panel._editing_date)
 			for _calendar_frame: int in 2:
 				await process_frame
 			_assert_equal(
@@ -87,8 +87,15 @@ func _run() -> void:
 			panel._date_picker.hide()
 			panel._all_day_check_box.button_pressed = false
 			panel._on_time_selected("14:30")
-			panel._time_picker.open_for(panel._time_button, panel._editing_time)
-			for _time_frame: int in 2:
+			for _timed_frame: int in 2:
+				await process_frame
+			_assert_equal(
+				_capture(window, capture_root.path_join("task-reminders-%s-editor-timed.png" % theme_mode)),
+				OK,
+				"%s timed editor screenshot is saved" % theme_mode
+			)
+			panel._time_picker.open_for(panel._time_edit, panel._editing_time)
+			for _time_frame: int in 3:
 				await process_frame
 			_assert_equal(
 				_capture(
@@ -104,6 +111,16 @@ func _run() -> void:
 				TaskReminderThemeScript.new(theme_mode).color("accent"),
 				"%s time picker marks the selected hour" % theme_mode
 			)
+			for column: Array in [
+				[panel._time_picker._hour_scroll, selected_hour],
+				[panel._time_picker._minute_scroll, panel._time_picker._minute_buttons[30]],
+			]:
+				var scroll := column[0] as ScrollContainer
+				var chosen := column[1] as Button
+				_assert_true(
+					scroll.get_global_rect().encloses(chosen.get_global_rect()),
+					"%s time picker scrolls to the selected value" % theme_mode
+				)
 			var time_picker_size: Vector2i = panel._time_picker.size
 			var time_content_size: Vector2 = panel._time_picker.get_child(0).get_combined_minimum_size()
 			_assert_true(

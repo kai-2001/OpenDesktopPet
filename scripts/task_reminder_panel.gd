@@ -19,8 +19,10 @@ var _completed_section: TaskReminderSection
 var _form_panel: PanelContainer
 var _form_title: Label
 var _title_edit: LineEdit
-var _date_button: Button
-var _time_button: Button
+var _date_edit: LineEdit
+var _date_hint: Label
+var _time_edit: LineEdit
+var _time_pick_button: Button
 var _all_day_check_box: CheckBox
 var _form_feedback: Label
 var _date_picker: TaskReminderDatePicker
@@ -185,15 +187,20 @@ func _build_form() -> void:
 
 	var date_content := VBoxContainer.new()
 	date_content.add_theme_constant_override("separation", 7)
-	_date_button = Button.new()
-	_date_button.name = "ReminderDate"
-	_date_button.custom_minimum_size.y = 40
-	_date_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_theme.style_button(_date_button, "secondary")
-	_date_button.pressed.connect(func() -> void:
-		_date_picker.open_for(_date_button, _editing_date)
+	var date_row := HBoxContainer.new()
+	date_row.add_theme_constant_override("separation", 8)
+	date_content.add_child(date_row)
+	_date_edit = _schedule_edit("ReminderDate", "例如 2026-10-26、10/26")
+	_date_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_date_edit.text_submitted.connect(func(_text: String) -> void: _commit_date_edit())
+	_date_edit.focus_exited.connect(_commit_date_edit)
+	date_row.add_child(_date_edit)
+	var date_pick_button := _pick_button("ReminderDatePicker", "選日期", "開啟日期選擇器")
+	date_pick_button.pressed.connect(func() -> void:
+		_commit_date_edit()
+		_date_picker.open_for(_date_edit, _editing_date)
 	)
-	date_content.add_child(_date_button)
+	date_row.add_child(date_pick_button)
 	var presets := HFlowContainer.new()
 	presets.add_theme_constant_override("h_separation", 7)
 	presets.add_theme_constant_override("v_separation", 7)
@@ -209,11 +216,15 @@ func _build_form() -> void:
 		var days := int(preset["days"])
 		preset_button.pressed.connect(func() -> void: _set_relative_date(days))
 		presets.add_child(preset_button)
+	_date_hint = _label("", 13, "text_muted")
+	_date_hint.custom_minimum_size.y = 32
+	_date_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	presets.add_child(_date_hint)
 	date_content.add_child(presets)
 	content.add_child(_field_with_label("安排日期", date_content))
 
 	var schedule_row := HBoxContainer.new()
-	schedule_row.add_theme_constant_override("separation", 10)
+	schedule_row.add_theme_constant_override("separation", 8)
 	_all_day_check_box = CheckBox.new()
 	_all_day_check_box.name = "ReminderAllDay"
 	_all_day_check_box.text = "整日"
@@ -221,15 +232,17 @@ func _build_form() -> void:
 	_theme.style_button(_all_day_check_box, "secondary")
 	_all_day_check_box.toggled.connect(_on_all_day_toggled)
 	schedule_row.add_child(_all_day_check_box)
-	_time_button = Button.new()
-	_time_button.name = "ReminderTime"
-	_time_button.custom_minimum_size = Vector2(110, 40)
-	_time_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_theme.style_button(_time_button, "secondary")
-	_time_button.pressed.connect(func() -> void:
-		_time_picker.open_for(_time_button, _editing_time)
+	_time_edit = _schedule_edit("ReminderTime", "09:30")
+	_time_edit.custom_minimum_size.x = 110
+	_time_edit.text_submitted.connect(func(_text: String) -> void: _commit_time_edit())
+	_time_edit.focus_exited.connect(_commit_time_edit)
+	schedule_row.add_child(_time_edit)
+	_time_pick_button = _pick_button("ReminderTimePicker", "選時間", "開啟時間選擇器")
+	_time_pick_button.pressed.connect(func() -> void:
+		_commit_time_edit()
+		_time_picker.open_for(_time_edit, _editing_time)
 	)
-	schedule_row.add_child(_time_button)
+	schedule_row.add_child(_time_pick_button)
 	schedule_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_child(_field_with_label("提醒時間", schedule_row))
 
@@ -255,6 +268,27 @@ func _build_form() -> void:
 	_theme.style_button(save_button, "primary")
 	save_button.pressed.connect(_save_form)
 	actions.add_child(save_button)
+
+
+func _schedule_edit(edit_name: String, placeholder: String) -> LineEdit:
+	var edit := LineEdit.new()
+	edit.name = edit_name
+	edit.placeholder_text = placeholder
+	edit.custom_minimum_size.y = 40
+	edit.select_all_on_focus = true
+	_theme.style_input(edit)
+	edit.gui_input.connect(func(event: InputEvent) -> void: _on_schedule_edit_input(edit, event))
+	return edit
+
+
+func _pick_button(button_name: String, text: String, tooltip: String) -> Button:
+	var button := Button.new()
+	button.name = button_name
+	button.text = text
+	button.tooltip_text = tooltip
+	button.custom_minimum_size = Vector2(72, 40)
+	_theme.style_button(button, "secondary")
+	return button
 
 
 func _field_with_label(label_text: String, control: Control) -> VBoxContainer:
@@ -322,29 +356,32 @@ func _update_scope_labels(today_count: int, upcoming_count: int, completed_count
 func _show_new_form() -> void:
 	_editing_id = ""
 	_editing_date = Time.get_date_string_from_system(false)
+	_editing_time = ""
 	_form_title.text = "新增待辦"
 	_title_edit.text = ""
-	_date_button.text = _editing_date
-	_editing_time = ""
 	_all_day_check_box.set_pressed_no_signal(true)
+	_show_schedule()
 	_form_feedback.text = ""
 	_form_panel.visible = true
-	_on_all_day_toggled(true)
 	_title_edit.grab_focus()
 
 
 func _show_edit_form(reminder: Dictionary) -> void:
 	_editing_id = String(reminder.get("id", ""))
 	_editing_date = String(reminder.get("due_date", Time.get_date_string_from_system(false)))
+	_editing_time = String(reminder.get("due_time", ""))
 	_form_title.text = "編輯待辦"
 	_title_edit.text = String(reminder.get("title", ""))
-	_date_button.text = _editing_date
-	_editing_time = String(reminder.get("due_time", ""))
 	_all_day_check_box.set_pressed_no_signal(bool(reminder.get("all_day", false)))
+	_show_schedule()
 	_form_feedback.text = ""
 	_form_panel.visible = true
-	_on_all_day_toggled(_all_day_check_box.button_pressed)
 	_title_edit.grab_focus()
+
+
+func _show_schedule() -> void:
+	_on_date_selected(_editing_date)
+	_on_all_day_toggled(_all_day_check_box.button_pressed)
 
 
 func _save_form() -> void:
@@ -353,12 +390,14 @@ func _save_form() -> void:
 		_form_feedback.text = "請輸入待辦內容，才能加入清單。"
 		_title_edit.grab_focus()
 		return
-	var all_day := _all_day_check_box.button_pressed
-	var due_time := "" if all_day else _editing_time
-	if not all_day and not _is_valid_time(due_time):
-		_form_feedback.text = "請選擇提醒時間，或改選「整日」。"
-		_time_button.grab_focus()
+	if not _commit_date_edit():
+		_date_edit.grab_focus()
 		return
+	var all_day := _all_day_check_box.button_pressed
+	if not all_day and not _commit_time_edit():
+		_time_edit.grab_focus()
+		return
+	var due_time := "" if all_day else _editing_time
 	var result: Dictionary
 	if _editing_id.is_empty():
 		result = _coordinator.create_reminder(title, _editing_date, due_time, all_day)
@@ -398,52 +437,100 @@ func _delete_reminder(id: String) -> void:
 
 
 func _set_relative_date(days: int) -> void:
-	var today := Time.get_datetime_dict_from_system(false)
-	var timestamp := Time.get_unix_time_from_datetime_dict(today) + days * 86400
-	var target := Time.get_datetime_dict_from_unix_time(timestamp)
-	_on_date_selected("%04d-%02d-%02d" % [target.year, target.month, target.day])
+	_on_date_selected(TaskReminderDateTime.add_days(Time.get_date_string_from_system(false), days))
 
 
 func _on_date_selected(date: String) -> void:
 	_editing_date = date
-	_date_button.text = date
+	_date_edit.text = date
+	_date_hint.text = _date_hint_text(date)
 
 
 func _on_time_selected(time: String) -> void:
 	_editing_time = time
-	_update_time_button()
+	_time_edit.text = time
+
+
+# Typed dates and times are read leniently and rewritten in the standard
+# form when the field is submitted or loses focus.
+func _commit_date_edit() -> bool:
+	var date := TaskReminderDateTime.parse_date(
+		_date_edit.text, Time.get_date_string_from_system(false)
+	)
+	if date.is_empty():
+		_form_feedback.text = "看不懂這個日期，請輸入像 2026-10-26 或 10/26 的格式。"
+		return false
+	_on_date_selected(date)
+	_form_feedback.text = ""
+	return true
+
+
+func _commit_time_edit() -> bool:
+	if _all_day_check_box.button_pressed:
+		return true
+	var time := TaskReminderDateTime.parse_time(_time_edit.text)
+	if time.is_empty():
+		_form_feedback.text = "看不懂這個時間，請輸入像 09:30 或 0930 的格式。"
+		return false
+	_on_time_selected(time)
+	_form_feedback.text = ""
+	return true
+
+
+# Up and Down change the part of the date or time under the caret.
+func _on_schedule_edit_input(edit: LineEdit, event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or not edit.editable 			or key.is_ctrl_pressed() or key.is_alt_pressed() or key.is_shift_pressed():
+		return
+	if key.keycode not in [KEY_UP, KEY_DOWN]:
+		return
+	var delta := 1 if key.keycode == KEY_UP else -1
+	var caret := edit.caret_column
+	if edit == _time_edit:
+		var time := TaskReminderDateTime.parse_time(edit.text)
+		if time.is_empty():
+			time = _editing_time
+		_on_time_selected(TaskReminderDateTime.step_time(time, 0 if caret <= 2 else 1, delta))
+	else:
+		var date := TaskReminderDateTime.parse_date(
+			edit.text, Time.get_date_string_from_system(false)
+		)
+		if date.is_empty():
+			date = _editing_date
+		var section := 0 if caret <= 4 else (1 if caret <= 7 else 2)
+		_on_date_selected(TaskReminderDateTime.step_date(date, section, delta))
+	edit.caret_column = caret
+	_form_feedback.text = ""
+	edit.accept_event()
 
 
 func _on_all_day_toggled(enabled: bool) -> void:
-	if not is_instance_valid(_time_button):
+	if not is_instance_valid(_time_edit):
 		return
 	# A timed reminder always starts from a valid time the picker can adjust.
-	if not enabled and not _is_valid_time(_editing_time):
+	if not enabled and TaskReminderDateTime.parse_time(_editing_time).is_empty():
 		_editing_time = _next_whole_hour()
-	_update_time_button()
+	_time_edit.editable = not enabled
+	_time_edit.text = "" if enabled else _editing_time
+	_time_edit.placeholder_text = "不需時間" if enabled else "09:30"
+	_time_pick_button.disabled = enabled
 
 
-func _update_time_button() -> void:
-	var all_day := _all_day_check_box.button_pressed
-	_time_button.disabled = all_day
-	_time_button.text = "不需時間" if all_day else _editing_time
-	_time_button.tooltip_text = "" if all_day else "選擇提醒時間"
+func _date_hint_text(date: String) -> String:
+	var today := Time.get_date_string_from_system(false)
+	var days := roundi(float(
+		Time.get_unix_time_from_datetime_string(date) - Time.get_unix_time_from_datetime_string(today)
+	) / 86400.0)
+	var relative: String = {-1: "昨天", 0: "今天", 1: "明天", 2: "後天"}.get(
+		days, "%d 天後" % days if days > 0 else "%d 天前" % -days
+	)
+	var weekday: String = ["日", "一", "二", "三", "四", "五", "六"][TaskReminderDateTime.weekday(date)]
+	return "星期%s · %s" % [weekday, relative]
 
 
 func _next_whole_hour() -> String:
 	var now := Time.get_datetime_dict_from_system(false)
 	return "%02d:00" % mini(int(now.get("hour", 0)) + 1, 23)
-
-
-func _is_valid_time(value: String) -> bool:
-	var parts := value.split(":")
-	if parts.size() != 2 or parts[0].length() != 2 or parts[1].length() != 2:
-		return false
-	if not parts[0].is_valid_int() or not parts[1].is_valid_int():
-		return false
-	var hour := int(parts[0])
-	var minute := int(parts[1])
-	return hour >= 0 and hour <= 23 and minute >= 0 and minute <= 59
 
 
 func _label(text: String, font_size: int, color_role: String) -> Label:
