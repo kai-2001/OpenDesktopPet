@@ -105,7 +105,7 @@ func style_button(button: Button, kind := "secondary") -> void:
 	button.add_theme_stylebox_override("hover", panel(hover_background, hover_border, 8))
 	button.add_theme_stylebox_override("pressed", panel(pressed_background, hover_border, 8))
 	button.add_theme_stylebox_override("focus", panel(hover_background, "accent", 8))
-	button.add_theme_stylebox_override("disabled", panel("surface_subtle", "border", 8))
+	button.add_theme_stylebox_override("disabled", panel("surface_subtle", "surface_subtle", 8))
 	button.add_theme_color_override("font_color", color(foreground))
 	button.add_theme_color_override(
 		"font_hover_color", color("surface") if kind in ["primary", "danger"] else color("accent_hover")
@@ -118,8 +118,9 @@ func style_button(button: Button, kind := "secondary") -> void:
 
 
 func style_input(control: Control) -> void:
-	for state: String in ["normal", "read_only"]:
-		control.add_theme_stylebox_override(state, panel("surface", "border", 8))
+	control.add_theme_stylebox_override("normal", panel("surface", "border", 8))
+	# Matches disabled buttons so a field that cannot be typed in looks it.
+	control.add_theme_stylebox_override("read_only", panel("surface_subtle", "surface_subtle", 8))
 	control.add_theme_stylebox_override("focus", panel("surface", "accent", 8))
 	control.add_theme_color_override("font_color", color("text"))
 	control.add_theme_color_override("font_uneditable_color", color("text_faint"))

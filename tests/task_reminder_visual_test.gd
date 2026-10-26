@@ -123,10 +123,11 @@ func _run() -> void:
 			panel._time_picker.open_for(panel._time_edit, "21:00")
 			for _edge_frame: int in 3:
 				await process_frame
-			_assert_middle_row(
-				panel._time_picker._minute_scroll,
-				panel._time_picker._minute_buttons[0],
-				"%s time picker centres minute 00" % theme_mode
+			var first_minute := panel._time_picker._minute_buttons[0] as Button
+			_assert_true(
+				absf(first_minute.get_global_rect().position.y
+					- panel._time_picker._minute_scroll.get_global_rect().position.y) <= 1.0,
+				"%s time picker starts minute 00 on the top row" % theme_mode
 			)
 			var time_picker_size: Vector2i = panel._time_picker.size
 			var time_content_size: Vector2 = panel._time_picker.get_child(0).get_combined_minimum_size()

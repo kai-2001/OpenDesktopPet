@@ -95,9 +95,6 @@ func _column(
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", ROW_GAP)
 	scroll.add_child(list)
-	# Padding lets the first and last values reach the middle row too.
-	var padding := (VISIBLE_ROWS - 1) / 2 * (ROW_HEIGHT + ROW_GAP)
-	list.add_child(_spacer(padding))
 	for value: int in count:
 		var button := Button.new()
 		button.text = "%02d" % value
@@ -105,15 +102,7 @@ func _column(
 		button.pressed.connect(func() -> void: chosen.call(value))
 		list.add_child(button)
 		buttons.append(button)
-	list.add_child(_spacer(padding))
 	return scroll
-
-
-func _spacer(height: int) -> Control:
-	var spacer := Control.new()
-	spacer.custom_minimum_size.y = height
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return spacer
 
 
 func _choose_hour(hour: int) -> void:
@@ -171,9 +160,9 @@ func _style_row(button: Button, selected: bool) -> void:
 			button.add_theme_stylebox_override(state + "_mirrored", compact[state])
 
 
-# Centre each column on its selected value. The padding rows make that
-# offset depend only on the value. Set it again once the popup has laid
-# out, because a scroll container clamps offsets to its current content.
+# Centre each column on its selected value; values near either end stop at
+# the edge. Set it again once the popup has laid out, because a scroll
+# container clamps offsets to its current content.
 func _scroll_to_selection() -> void:
 	_apply_scroll()
 	await get_tree().process_frame
@@ -184,7 +173,11 @@ func _scroll_to_selection() -> void:
 # Re-sort as well: an offset set while the popup was hidden is stored but the
 # rows are not moved, and setting the same offset again does not move them.
 func _apply_scroll() -> void:
-	_hour_scroll.scroll_vertical = _hour * (ROW_HEIGHT + ROW_GAP)
-	_minute_scroll.scroll_vertical = _minute * (ROW_HEIGHT + ROW_GAP)
+	_hour_scroll.scroll_vertical = _centred_offset(_hour)
+	_minute_scroll.scroll_vertical = _centred_offset(_minute)
 	_hour_scroll.queue_sort()
 	_minute_scroll.queue_sort()
+
+
+func _centred_offset(index: int) -> int:
+	return maxi(0, (index - VISIBLE_ROWS / 2) * (ROW_HEIGHT + ROW_GAP))

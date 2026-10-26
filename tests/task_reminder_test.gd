@@ -295,6 +295,11 @@ func _assert_schedule_is_typed_or_picked() -> void:
 		time_edit.text.is_empty() and time_edit.placeholder_text.is_empty(),
 		"an all-day reminder leaves the time field empty"
 	)
+	_assert_equal(
+		(time_edit.get_theme_stylebox("read_only") as StyleBoxFlat).bg_color,
+		TaskReminderThemeScript.new("light").color("surface_subtle"),
+		"a time field that cannot be typed in looks disabled"
+	)
 	panel._title_edit.text = "選時間的待辦"
 	panel._all_day_check_box.button_pressed = false
 	_assert_true(time_edit.editable, "timed reminders can type a time")
