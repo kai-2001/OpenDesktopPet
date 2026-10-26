@@ -120,7 +120,7 @@ func _ready() -> void:
 	_task_reminder_presentation = TaskReminderPresentationCoordinatorScript.new()
 	_task_reminder_presentation.configure(_task_reminder_coordinator)
 	_task_reminder_coordinator.reminders_changed.connect(_on_reminders_changed)
-	_task_reminder_coordinator.reminder_due.connect(_on_reminder_due)
+	_task_reminder_coordinator.reminders_due.connect(_on_reminders_due)
 	task_reminder_badge.pressed.connect(_open_task_reminders_from_badge)
 	task_reminder_badge.visibility_changed.connect(_refresh_interaction_polygon)
 	task_reminder_badge.resized.connect(_on_task_reminder_badge_resized)
@@ -234,6 +234,7 @@ func say(text: String, seconds := 6.0, agent_priority := false) -> void:
 		_refresh_interaction_polygon()
 		if agent_priority:
 			_agent_notification_active = false
+			_say_deferred_due_reminders()
 
 
 func _restore_from_system_minimize() -> void:
@@ -474,6 +475,7 @@ func _dismiss_active_agent_notification() -> void:
 	bubble_tail.visible = false
 	_agent_notification_active = false
 	_refresh_interaction_polygon()
+	_say_deferred_due_reminders()
 
 
 func _show_state_message(key: String, fallback: String) -> void:
@@ -491,14 +493,24 @@ func _on_reminders_changed() -> void:
 	_refresh_task_reminder_badge()
 
 
-func _on_reminder_due(reminder: Dictionary) -> void:
-	if reminder.is_empty():
-		return
+func _on_reminders_due(reminders: Array[Dictionary]) -> void:
 	_refresh_task_reminder_badge(true)
-	if bool(reminder.get("all_day", false)) \
-			or _task_reminder_presentation == null:
+	if _task_reminder_presentation == null:
 		return
-	var message: String = _task_reminder_presentation.due_message(reminder)
+	# An Agent notification owns the bubble; say these once it closes.
+	if _agent_notification_active:
+		_task_reminder_presentation.defer_due(reminders)
+		return
+	_say_due_reminders(reminders)
+
+
+func _say_deferred_due_reminders() -> void:
+	if _task_reminder_presentation != null and not _agent_notification_active:
+		_say_due_reminders(_task_reminder_presentation.take_deferred_due())
+
+
+func _say_due_reminders(reminders: Array[Dictionary]) -> void:
+	var message: String = _task_reminder_presentation.due_message(reminders)
 	if not message.is_empty():
 		say(message, TASK_REMINDER_NOTIFICATION_DURATION_SECONDS)
 

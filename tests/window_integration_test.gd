@@ -75,13 +75,29 @@ func _init() -> void:
 	var timed_reminder: Dictionary = main._task_reminder_coordinator.create_reminder(
 		"時間到整合測試", Time.get_date_string_from_system(false), due_time, false
 	)
-	main._on_reminder_due(timed_reminder)
+	var due_batch: Array[Dictionary] = [timed_reminder]
+	main._on_reminders_due(due_batch)
 	await process_frame
 	_assert_true(main.bubble.visible, "timed reminder opens the real speech bubble")
 	_assert_equal(
 		_bubble_text(main),
 		"・%s 時間到整合測試" % due_time,
 		"timed reminder speech bubble uses the compact bullet format"
+	)
+	# Hold the bubble as an Agent notification does, without its pet reaction.
+	main._agent_notification_active = true
+	main.say("Agent 通知期間", 60.0, true)
+	await process_frame
+	await process_frame
+	main._on_reminders_due(due_batch)
+	await process_frame
+	_assert_equal(_bubble_text(main), "Agent 通知期間", "a due reminder waits for the Agent notification")
+	main._dismiss_active_agent_notification()
+	await process_frame
+	await process_frame
+	_assert_true(
+		main.bubble.visible and _bubble_text(main) == "・%s 時間到整合測試" % due_time,
+		"a reminder held back by an Agent notification is said afterwards"
 	)
 	main._task_reminder_coordinator.set_status(
 		String(timed_reminder.get("id", "")), "done"

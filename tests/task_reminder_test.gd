@@ -17,6 +17,7 @@ var _due_count := 0
 const TEST_PATH := "user://test_runs/task_reminder_test.json"
 const FUTURE_TEST_PATH := "user://test_runs/task_reminder_future.json"
 const PANEL_TEST_PATH := "user://test_runs/task_reminder_panel.json"
+const REVIEW_TEST_PATH := "user://test_runs/task_reminder_review.json"
 
 
 class FakeTimeCoordinator extends TaskReminderCoordinatorScript:
@@ -77,7 +78,7 @@ func _run() -> void:
 		"startup presentation contains the reminder title"
 	)
 	_assert_equal(
-		presentation.due_message(created),
+		presentation.due_message([created] as Array[Dictionary]),
 		"",
 		"all-day reminder does not gain a timed due message"
 	)
@@ -104,7 +105,7 @@ func _run() -> void:
 	)
 	var future_presentation := TaskReminderPresentationCoordinatorScript.new()
 	future_presentation.configure(future_coordinator)
-	future_coordinator.reminder_due.connect(_capture_due)
+	future_coordinator.reminders_due.connect(_capture_due)
 	_assert_equal(
 		future_presentation.startup_message(),
 		"",
@@ -126,7 +127,7 @@ func _run() -> void:
 	)
 	future_coordinator.process(15.0)
 	_assert_equal(_due_count, 1, "timed reminder emits its due notification")
-	var due_message := future_presentation.due_message(future_timed)
+	var due_message: String = future_presentation.due_message([future_timed] as Array[Dictionary])
 	_assert_equal(
 		due_message,
 		"・11:00 尚未到時間的待辦",
@@ -213,6 +214,12 @@ func _run() -> void:
 	_assert_date_time_parsing()
 	await _assert_schedule_is_typed_or_picked()
 	await _assert_calendar_grid()
+	_assert_date_change_refreshes()
+	_assert_restart_does_not_repeat_overdue()
+	_assert_due_reminders_share_one_message()
+	_assert_only_schedule_changes_remind_again()
+	_assert_failed_saves_leave_no_trace()
+	_assert_deferred_reminders_skip_finished_items()
 
 	_cleanup()
 	if _failures > 0:
@@ -387,8 +394,136 @@ func _key(keycode: Key) -> InputEventKey:
 	return event
 
 
+func _fake_coordinator(path: String, date: String, time: String) -> FakeTimeCoordinator:
+	var repository = TaskReminderRepositoryScript.new()
+	repository.save_path = path
+	var coordinator := FakeTimeCoordinator.new()
+	coordinator.repository = repository
+	coordinator.fake_date = date
+	coordinator.fake_time = time
+	coordinator.initialize()
+	return coordinator
+
+
+func _assert_date_change_refreshes() -> void:
+	var coordinator := _fake_coordinator(REVIEW_TEST_PATH, "2026-10-26", "23:59")
+	coordinator.create_reminder("今天整日", "2026-10-26", "", true)
+	coordinator.process(15.0)
+	var changes := [0]
+	coordinator.reminders_changed.connect(func() -> void: changes[0] += 1)
+	coordinator.fake_date = "2026-10-27"
+	coordinator.fake_time = "00:00"
+	coordinator.process(15.0)
+	_assert_equal(changes[0], 1, "a new day refreshes the today lists, badge and menu")
+	coordinator.process(15.0)
+	_assert_equal(changes[0], 1, "the same day does not refresh again")
+	_cleanup()
+
+
+func _assert_restart_does_not_repeat_overdue() -> void:
+	var first := _fake_coordinator(REVIEW_TEST_PATH, "2026-10-25", "08:00")
+	first.create_reminder("昨天的定時待辦", "2026-10-25", "09:00", false)
+	first.create_reminder("昨天的整日待辦", "2026-10-25", "", true)
+	var restarted := _fake_coordinator(REVIEW_TEST_PATH, "2026-10-26", "08:00")
+	var due: Array[Dictionary] = []
+	restarted.reminders_due.connect(func(items: Array[Dictionary]) -> void: due.append_array(items))
+	restarted.process(15.0)
+	_assert_true(due.is_empty(), "overdue reminders are not reminded again after a restart")
+	var presentation = TaskReminderPresentationCoordinatorScript.new()
+	presentation.configure(restarted)
+	_assert_equal(presentation.startup_message(), "有 2 件逾期待辦", "the startup message names overdue reminders")
+	var overdue_timed: Dictionary = restarted.get_overdue_reminders().filter(
+		func(item: Dictionary) -> bool: return not bool(item.get("all_day", true))
+	)[0]
+	var batch: Array[Dictionary] = [overdue_timed]
+	_assert_equal(
+		presentation.due_message(batch), "・10/25 09:00 昨天的定時待辦",
+		"a reminder from another day shows its date"
+	)
+	_cleanup()
+
+
+func _assert_due_reminders_share_one_message() -> void:
+	var coordinator := _fake_coordinator(REVIEW_TEST_PATH, "2026-10-26", "08:00")
+	for title: String in ["第一件", "第二件", "第三件", "第四件"]:
+		coordinator.create_reminder(title, "2026-10-26", "09:00", false)
+	var batches: Array = []
+	coordinator.reminders_due.connect(func(items: Array[Dictionary]) -> void: batches.append(items))
+	coordinator.fake_time = "09:00"
+	coordinator.process(15.0)
+	_assert_equal(batches.size(), 1, "reminders due together arrive together")
+	var presentation = TaskReminderPresentationCoordinatorScript.new()
+	presentation.configure(coordinator)
+	var batch: Array[Dictionary] = batches[0]
+	_assert_equal(
+		presentation.due_message(batch),
+		"・09:00 第一件\n・09:00 第三件\n・09:00 第二件\n・另外 1 件",
+		"reminders due together share one bubble"
+	)
+	_cleanup()
+
+
+func _assert_only_schedule_changes_remind_again() -> void:
+	var coordinator := _fake_coordinator(REVIEW_TEST_PATH, "2026-10-26", "10:00")
+	var reminder: Dictionary = coordinator.create_reminder("已經到時間", "2026-10-26", "09:00", false)
+	var due: Array[Dictionary] = []
+	coordinator.reminders_due.connect(func(items: Array[Dictionary]) -> void: due.append_array(items))
+	coordinator.process(15.0)
+	due.clear()
+	var id := String(reminder.get("id", ""))
+	coordinator.update_reminder(id, {"title": "已經到時間（改標題）"})
+	_assert_true(due.is_empty(), "editing only the title does not remind again")
+	coordinator.set_status(id, "done")
+	coordinator.set_status(id, "todo")
+	_assert_true(due.is_empty(), "reopening a completed reminder does not remind again")
+	coordinator.update_reminder(id, {"due_time": "09:30"})
+	_assert_equal(due.size(), 1, "a new time is reminded again")
+	_cleanup()
+
+
+func _assert_failed_saves_leave_no_trace() -> void:
+	var repository = TaskReminderRepositoryScript.new()
+	repository.save_path = REVIEW_TEST_PATH
+	var coordinator = TaskReminderCoordinatorScript.new()
+	coordinator.repository = repository
+	coordinator.initialize()
+	var kept: Dictionary = coordinator.create_reminder("已保存", "2026-10-26", "", true)
+	# A directory where the temporary save file goes makes every save fail.
+	var blocker := ProjectSettings.globalize_path(REVIEW_TEST_PATH + ".tmp")
+	DirAccess.make_dir_recursive_absolute(blocker)
+	_assert_true(
+		coordinator.create_reminder("寫不進去", "2026-10-26", "", true).is_empty(),
+		"a reminder that cannot be saved is reported"
+	)
+	coordinator.create_reminder("寫不進去", "2026-10-26", "", true)
+	_assert_equal(coordinator.get_all_reminders().size(), 1, "retrying a failed save leaves no duplicates")
+	var id := String(kept.get("id", ""))
+	coordinator.update_reminder(id, {"title": "改不了"})
+	_assert_equal(String(coordinator.get_reminder(id).get("title", "")), "已保存", "a failed edit is undone")
+	coordinator.delete_reminder(id)
+	_assert_true(not coordinator.get_reminder(id).is_empty(), "a failed delete keeps the reminder")
+	DirAccess.remove_absolute(blocker)
+	_cleanup()
+
+
+func _assert_deferred_reminders_skip_finished_items() -> void:
+	var coordinator := _fake_coordinator(REVIEW_TEST_PATH, "2026-10-26", "10:00")
+	var waiting: Dictionary = coordinator.create_reminder("還沒做", "2026-10-26", "09:00", false)
+	var finished: Dictionary = coordinator.create_reminder("已經做完", "2026-10-26", "09:00", false)
+	var presentation = TaskReminderPresentationCoordinatorScript.new()
+	presentation.configure(coordinator)
+	var batch: Array[Dictionary] = [waiting, finished]
+	presentation.defer_due(batch)
+	coordinator.set_status(String(finished.get("id", "")), "done")
+	var deferred: Array[Dictionary] = presentation.take_deferred_due()
+	_assert_equal(deferred.size(), 1, "a reminder completed while deferred is not said")
+	_assert_equal(String(deferred[0].get("title", "")), "還沒做", "the open reminder is said later")
+	_assert_true(presentation.take_deferred_due().is_empty(), "deferred reminders are said once")
+	_cleanup()
+
+
 func _cleanup() -> void:
-	for test_path: String in [TEST_PATH, FUTURE_TEST_PATH, PANEL_TEST_PATH]:
+	for test_path: String in [TEST_PATH, FUTURE_TEST_PATH, PANEL_TEST_PATH, REVIEW_TEST_PATH]:
 		for suffix: String in ["", ".tmp", ".backup"]:
 			var path := test_path + suffix
 			if FileAccess.file_exists(path):
@@ -399,8 +534,8 @@ func _capture_requested_status(_id: String, status: String) -> void:
 	_requested_status = status
 
 
-func _capture_due(_reminder: Dictionary) -> void:
-	_due_count += 1
+func _capture_due(reminders: Array[Dictionary]) -> void:
+	_due_count += reminders.size()
 
 
 func _assert_true(condition: bool, label: String) -> void:

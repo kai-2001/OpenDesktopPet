@@ -39,6 +39,17 @@ func all() -> Array[Dictionary]:
 	return result
 
 
+# Lets a caller undo in-memory changes that could not be saved.
+func snapshot() -> Array[Dictionary]:
+	return all()
+
+
+func restore(reminders: Array[Dictionary]) -> void:
+	_reminders.clear()
+	for reminder: Dictionary in reminders:
+		_reminders.append(reminder.duplicate(true))
+
+
 func create(
 	title: String,
 	due_date: String,
