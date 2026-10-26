@@ -3,6 +3,7 @@ extends SceneTree
 const StatsWindowCoordinatorScript = preload("res://scripts/stats_window_coordinator.gd")
 const TaskReminderCoordinatorScript = preload("res://scripts/task_reminder_coordinator.gd")
 const TaskReminderRepositoryScript = preload("res://scripts/task_reminder_repository.gd")
+const TaskReminderThemeScript = preload("res://scripts/task_reminder_theme.gd")
 
 const TEST_PATH := "user://test_runs/task_reminder_visual_test.json"
 var _failures := 0
@@ -84,6 +85,32 @@ func _run() -> void:
 			panel._date_picker._on_drag_handle_input(drag_press)
 			_assert_true(not panel._date_picker._dragging, "%s date picker ends dragging" % theme_mode)
 			panel._date_picker.hide()
+			panel._all_day_check_box.button_pressed = false
+			panel._on_time_selected("14:30")
+			panel._time_picker.open_for(panel._time_button, panel._editing_time)
+			for _time_frame: int in 2:
+				await process_frame
+			_assert_equal(
+				_capture(
+					panel._time_picker,
+					capture_root.path_join("task-reminders-%s-time-picker.png" % theme_mode)
+				),
+				OK,
+				"%s time picker screenshot is saved" % theme_mode
+			)
+			var selected_hour := panel._time_picker._hour_buttons[14] as Button
+			_assert_equal(
+				(selected_hour.get_theme_stylebox("normal") as StyleBoxFlat).bg_color,
+				TaskReminderThemeScript.new(theme_mode).color("accent"),
+				"%s time picker marks the selected hour" % theme_mode
+			)
+			var time_picker_size: Vector2i = panel._time_picker.size
+			var time_content_size: Vector2 = panel._time_picker.get_child(0).get_combined_minimum_size()
+			_assert_true(
+				time_content_size.x <= time_picker_size.x and time_content_size.y <= time_picker_size.y,
+				"%s time picker content fits (%s in %s)" % [theme_mode, time_content_size, time_picker_size]
+			)
+			panel._time_picker.hide()
 			panel._hide_form()
 			panel._today_section._header_button.pressed.emit()
 			await process_frame

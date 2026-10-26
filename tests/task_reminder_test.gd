@@ -8,12 +8,14 @@ const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
 const TaskReminderRepositoryScript = preload("res://scripts/task_reminder_repository.gd")
 const TaskReminderSectionScript = preload("res://scripts/task_reminder_section.gd")
 const TaskReminderThemeScript = preload("res://scripts/task_reminder_theme.gd")
+const TaskReminderPanelScript = preload("res://scripts/task_reminder_panel.gd")
 
 var _failures := 0
 var _requested_status := ""
 var _due_count := 0
 const TEST_PATH := "user://test_runs/task_reminder_test.json"
 const FUTURE_TEST_PATH := "user://test_runs/task_reminder_future.json"
+const PANEL_TEST_PATH := "user://test_runs/task_reminder_panel.json"
 
 
 class FakeTimeCoordinator extends TaskReminderCoordinatorScript:
@@ -207,6 +209,8 @@ func _run() -> void:
 		"reloaded reminder keeps UTF-8 title"
 	)
 
+	await _assert_time_is_picked()
+
 	_cleanup()
 	if _failures > 0:
 		push_error("TASK_REMINDER_TEST_FAILED: %d assertion(s)" % _failures)
@@ -245,8 +249,53 @@ func _assert_context_menu_today_section_visibility() -> void:
 	menu.queue_free()
 
 
+func _assert_time_is_picked() -> void:
+	var repository = TaskReminderRepositoryScript.new()
+	repository.save_path = PANEL_TEST_PATH
+	var coordinator = TaskReminderCoordinatorScript.new()
+	coordinator.repository = repository
+	coordinator.initialize()
+	var panel = TaskReminderPanelScript.new()
+	panel.configure(coordinator, "light")
+	get_root().add_child(panel)
+	panel.show_new_form()
+	await process_frame
+	var time_control := panel.find_child("ReminderTime", true, false) as Control
+	_assert_true(time_control is Button, "reminder time is chosen with a picker, not typed")
+	_assert_true(panel._time_button.disabled, "all-day reminders need no time")
+	panel._title_edit.text = "選時間的待辦"
+	panel._all_day_check_box.button_pressed = false
+	_assert_true(not panel._time_button.disabled, "timed reminders enable the time picker")
+	_assert_true(
+		panel._is_valid_time(panel._time_button.text),
+		"a timed reminder starts from a valid time"
+	)
+	panel._time_picker._hour_buttons[14].pressed.emit()
+	panel._time_picker._minute_buttons[6].pressed.emit()
+	_assert_equal(panel._time_button.text, "14:30", "picked hour and minute are shown")
+	panel._save_form()
+	var saved: Array[Dictionary] = coordinator.get_all_reminders()
+	_assert_equal(saved.size(), 1, "picked time saves the reminder")
+	_assert_equal(String(saved[0].get("due_time", "")), "14:30", "picked time is saved")
+	_assert_true(not bool(saved[0].get("all_day", true)), "picked time saves a timed reminder")
+
+	var legacy: Dictionary = coordinator.update_reminder(
+		String(saved[0].get("id", "")), {"due_time": "09:37"}
+	)
+	panel._show_edit_form(legacy)
+	_assert_equal(panel._time_button.text, "09:37", "times off the picker steps are shown")
+	panel._save_form()
+	_assert_equal(
+		String(coordinator.get_all_reminders()[0].get("due_time", "")),
+		"09:37",
+		"editing keeps a time the picker cannot show"
+	)
+	panel.queue_free()
+	await process_frame
+
+
 func _cleanup() -> void:
-	for test_path: String in [TEST_PATH, FUTURE_TEST_PATH]:
+	for test_path: String in [TEST_PATH, FUTURE_TEST_PATH, PANEL_TEST_PATH]:
 		for suffix: String in ["", ".tmp", ".backup"]:
 			var path := test_path + suffix
 			if FileAccess.file_exists(path):

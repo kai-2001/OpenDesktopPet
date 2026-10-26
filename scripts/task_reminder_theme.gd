@@ -105,6 +105,7 @@ func style_button(button: Button, kind := "secondary") -> void:
 	button.add_theme_stylebox_override("hover", panel(hover_background, hover_border, 8))
 	button.add_theme_stylebox_override("pressed", panel(pressed_background, hover_border, 8))
 	button.add_theme_stylebox_override("focus", panel(hover_background, "accent", 8))
+	button.add_theme_stylebox_override("disabled", panel("surface_subtle", "border", 8))
 	button.add_theme_color_override("font_color", color(foreground))
 	button.add_theme_color_override(
 		"font_hover_color", color("surface") if kind in ["primary", "danger"] else color("accent_hover")
@@ -113,6 +114,7 @@ func style_button(button: Button, kind := "secondary") -> void:
 		"font_pressed_color", color("surface") if kind in ["primary", "danger"] else color("accent")
 	)
 	button.add_theme_color_override("font_focus_color", color(foreground))
+	button.add_theme_color_override("font_disabled_color", color("text_faint"))
 
 
 func style_input(control: Control) -> void:
