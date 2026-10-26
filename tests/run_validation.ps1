@@ -247,6 +247,12 @@ try {
     if ($detailsWindowGoldenExitCode -ne 0 -or -not ($detailsWindowGoldenOutput -match 'DETAILS_WINDOW_GOLDEN_TEST_OK')) {
         throw 'Details window golden validation failed.'
     }
+    $settingsTabControllerOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/settings_tab_controller_test.gd' 2>&1
+    $settingsTabControllerExitCode = $LASTEXITCODE
+    $settingsTabControllerOutput | Write-Output
+    if ($settingsTabControllerExitCode -ne 0 -or -not ($settingsTabControllerOutput -match 'SETTINGS_TAB_CONTROLLER_TEST_OK')) {
+        throw 'Settings tab controller validation failed.'
+    }
     $codexSleepTransitionOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_sleep_transition_test.gd' 2>&1
     $codexSleepTransitionExitCode = $LASTEXITCODE
     $codexSleepTransitionOutput | Write-Output

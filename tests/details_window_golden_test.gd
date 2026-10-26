@@ -18,6 +18,12 @@ const STATE_KEYS: Array[String] = [
 ]
 # The reminders tab shows today's date; it has its own visual and logic tests.
 const SKIPPED_SUBTREES: Array[String] = ["待辦"]
+# Earlier tests in the same user directory leave packs, saves and effects
+# behind; move them aside so the recording starts from a fresh install.
+const SET_ASIDE_PATHS: Array[String] = [
+	"user://character_packs", "user://profiles", "user://character_effects.json",
+]
+const SET_ASIDE_SUFFIX := ".details-golden-backup"
 
 var _main: Node
 var _output: Array[String] = []
@@ -31,6 +37,10 @@ var _version := ""
 
 
 func _init() -> void:
+	for path: String in SET_ASIDE_PATHS:
+		var absolute := ProjectSettings.globalize_path(path)
+		if FileAccess.file_exists(absolute) or DirAccess.dir_exists_absolute(absolute):
+			DirAccess.rename_absolute(absolute, absolute + SET_ASIDE_SUFFIX)
 	_had_ui_settings = FileAccess.file_exists(UI_SETTINGS_PATH)
 	if _had_ui_settings:
 		_previous_ui_settings = FileAccess.get_file_as_bytes(UI_SETTINGS_PATH)
@@ -392,6 +402,13 @@ func _write_codex_pet_archive() -> String:
 
 
 func _restore_ui_settings() -> void:
+	if not _archive_path.is_empty():
+		DirAccess.remove_absolute(_archive_path)
+	for path: String in SET_ASIDE_PATHS:
+		var absolute := ProjectSettings.globalize_path(path)
+		_remove_path(absolute)
+		if FileAccess.file_exists(absolute + SET_ASIDE_SUFFIX) 				or DirAccess.dir_exists_absolute(absolute + SET_ASIDE_SUFFIX):
+			DirAccess.rename_absolute(absolute + SET_ASIDE_SUFFIX, absolute)
 	if _had_ui_settings:
 		var file := FileAccess.open(UI_SETTINGS_PATH, FileAccess.WRITE)
 		file.store_buffer(_previous_ui_settings)
@@ -441,3 +458,16 @@ func _fail(message: String) -> void:
 	_restore_ui_settings()
 	push_error("DETAILS_WINDOW_GOLDEN_TEST_FAILED: " + message)
 	quit(1)
+
+
+func _remove_path(absolute: String) -> void:
+	if FileAccess.file_exists(absolute):
+		DirAccess.remove_absolute(absolute)
+		return
+	if not DirAccess.dir_exists_absolute(absolute):
+		return
+	for file_name: String in DirAccess.get_files_at(absolute):
+		DirAccess.remove_absolute(absolute.path_join(file_name))
+	for directory: String in DirAccess.get_directories_at(absolute):
+		_remove_path(absolute.path_join(directory))
+	DirAccess.remove_absolute(absolute)

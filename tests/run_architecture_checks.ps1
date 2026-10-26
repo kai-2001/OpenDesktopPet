@@ -22,39 +22,42 @@ $details = @(
 ) | ForEach-Object { Read-Source $_ } | Out-String
 $menu = Read-Source 'scripts/pet_menu_builder.gd'
 $main = Read-Source 'scripts/main.gd'
-$settingsTab = Read-Source 'scripts/settings_tab_controller.gd'
 $state = Read-Source 'scripts/pet_state.gd'
 $visual = Read-Source 'scripts/pet_visual.gd'
-$visualScale = Read-Source 'scripts/pet_visual_scale.gd'
-$profile = Read-Source 'scripts/character_pack_profile.gd'
-$autostart = Read-Source 'scripts/windows_autostart_service.gd'
-$runtime = Read-Source 'scripts/character_pack_runtime.gd'
 $manager = Read-Source 'scripts/character_pack_manager.gd'
-$windowService = Read-Source 'scripts/desktop_window_service.gd'
-$hitbox = Read-Source 'scripts/pet_hitbox_calculator.gd'
-$gameplay = Read-Source 'scripts/pet_gameplay_coordinator.gd'
 $statsCoordinator = Read-Source 'scripts/stats_window_coordinator.gd'
-$inputController = Read-Source 'scripts/pet_input_controller.gd'
-$characterCoordinator = Read-Source 'scripts/character_pack_coordinator.gd'
 $agentController = Read-Source 'scripts/agent_integration_controller.gd'
-$agentRouter = Read-Source 'scripts/agent_notification_router.gd'
-$agentCatalog = Read-Source 'scripts/agent_channel_catalog.gd'
-$piExtension = Read-Source 'tools/pi_agent_notify.ts'
-$piInstaller = Read-Source 'tools/install_pi_integration.ps1'
 $codexTrustService = Read-Source 'scripts/codex_hook_trust_service.gd'
 $reminderPanel = Read-Source 'scripts/task_reminder_panel.gd'
-$reminderSection = Read-Source 'scripts/task_reminder_section.gd'
 $reminderItem = Read-Source 'scripts/task_reminder_item.gd'
-$reminderTheme = Read-Source 'scripts/task_reminder_theme.gd'
 $reminderCoordinator = Read-Source 'scripts/task_reminder_coordinator.gd'
 $reminderPresentation = Read-Source 'scripts/task_reminder_presentation_coordinator.gd'
 $reminderBadge = Read-Source 'scripts/task_reminder_badge.gd'
-$reminderBadgeState = Read-Source 'scripts/task_reminder_badge_state.gd'
 $windowsActivator = Read-Source 'native/windows/src/windows_window_activator.cpp'
 $windowsExtension = Read-Source 'native/windows/windows_window_activator.gdextension'
 $releasePreparation = Read-Source 'tools/prepare_windows_release.ps1'
+$updateCoordinator = Read-Source 'scripts/update_check_coordinator.gd'
 $exportPresets = Read-Source 'export_presets.cfg'
 
+# Keep only rules that tests cannot express: dependency boundaries and
+# requirements of external tools, native code and release files. Behavior
+# such as Agent switches, settings and the details window is covered by
+# the golden and integration tests instead of matching code text here.
+
+# Dependency boundaries: what each module must not do.
+$tabControllers = @(
+	'scripts/status_tab_presenter.gd',
+	'scripts/settings_tab_controller.gd',
+	'scripts/character_tab_controller.gd',
+	'scripts/agent_settings_panel_controller.gd'
+) | ForEach-Object { Read-Source $_ } | Out-String
+$detailsControls = '\b(Label|Button|CheckBox|SpinBox|OptionButton|ItemList|HSlider|LineEdit|ProgressBar|ScrollContainer|TabContainer)\.new\(\)'
+Assert-Architecture ($main -notmatch $detailsControls) `
+	'main.gd must leave building details-window controls to the tab views.'
+Assert-Architecture ($tabControllers -notmatch $detailsControls) `
+	'Tab controllers must leave building controls to the tab views.'
+Assert-Architecture ($main -notmatch '"(performance|appearance|power|behavior)"') `
+	'main.gd must leave the settings tab options to SettingsTabController.'
 Assert-Architecture ($details -notmatch 'host\.') `
 	'Details tab views must not depend on host private APIs.'
 Assert-Architecture ($main -notmatch 'build_(status|settings|character)_tab\(\s*tabs,\s*self') `
@@ -65,86 +68,28 @@ Assert-Architecture ($main -notmatch 'OS\.execute|AUTOSTART_REGISTRY_KEY|_regist
 	'main.gd must not contain Windows Registry implementation details.'
 Assert-Architecture ($visual -notmatch 'func _validate_action') `
 	'PetVisual must not own character-pack action validation.'
-Assert-Architecture ($profile -match 'class_name CharacterPackProfile') `
-	'CharacterPackProfile is missing.'
-Assert-Architecture ($visual -match 'CharacterPackProfileScript') `
-	'PetVisual must delegate character-pack data to CharacterPackProfile.'
-Assert-Architecture ($autostart -match 'class_name WindowsAutostartService') `
-	'WindowsAutostartService is missing.'
 Assert-Architecture ($details -notmatch 'autostart_query_requested') `
 	'The settings tab must not emit autostart queries before signal wiring.'
-Assert-Architecture ($main -match '(?s)_settings_tab\.bind\(.*_settings_tab\.query_autostart\(\)' -and $settingsTab -match '(?s)func query_autostart\(\).*call_deferred\("_start_autostart_operation", "query", false\)') `
-	'The initial autostart query must start after settings controls are assigned.'
-Assert-Architecture ($runtime -match 'class_name CharacterPackRuntime') `
-	'CharacterPackRuntime is missing.'
-Assert-Architecture ($manager -match 'CharacterPackValidatorScript') `
-	'CharacterPackManager must use the shared action validator.'
-Assert-Architecture ($windowService -match 'class_name DesktopWindowService') `
-	'DesktopWindowService is missing.'
-Assert-Architecture ($main -match 'DesktopWindowServiceScript') `
-	'main.gd must delegate native window primitives to DesktopWindowService.'
-Assert-Architecture ($hitbox -match 'class_name PetHitboxCalculator') `
-	'PetHitboxCalculator is missing.'
-Assert-Architecture ($visual -match 'PetHitboxCalculatorScript') `
-	'PetVisual must delegate opaque hitbox calculation.'
-Assert-Architecture ($gameplay -match 'class_name PetGameplayCoordinator') `
-	'PetGameplayCoordinator is missing.'
-Assert-Architecture ($main -match 'PetGameplayCoordinatorScript') `
-	'main.gd must delegate gameplay action coordination.'
-Assert-Architecture ($statsCoordinator -match 'class_name StatsWindowCoordinator') `
-	'StatsWindowCoordinator is missing.'
-Assert-Architecture ($main -match 'StatsWindowCoordinatorScript') `
-	'main.gd must delegate details-window construction.'
-Assert-Architecture ($statsCoordinator -match 'panel\.theme = _create_details_theme\(\)') `
-	'StatsWindowCoordinator must apply the complete details-window theme.'
 Assert-Architecture ($statsCoordinator -notmatch 'HSlider|create_slider_grabber_texture') `
 	'The shared details theme must not style the visual-size slider globally.'
-Assert-Architecture ($details -match 'visual_scale_theme\.set_stylebox\("slider", "HSlider"') `
-	'The visual-size slider must own its track styling locally.'
-Assert-Architecture ($details -match 'visual_scale_theme\.set_icon\(\s*"grabber", "HSlider"') `
-	'The visual-size slider must use the Godot Theme icon API.'
 Assert-Architecture ($details -notmatch 'set_texture|get_theme_texture') `
 	'The details UI must not use nonexistent Godot Theme texture APIs.'
-Assert-Architecture ($details -match 'visual_scale_slider\.gui_input\.connect') `
-	'Only the visual-size slider may capture wheel input.'
 Assert-Architecture ($details -notmatch 'visual_scale_panel\.gui_input\.connect') `
 	'The visual-size settings row must not capture wheel input.'
-Assert-Architecture ($details -match 'visual_scale_slider\.scrollable = false') `
-	'The visual-size slider must pass wheel scrolling to the settings page.'
 Assert-Architecture ($details -notmatch 'visual_scale_panel|visual_scale_panel_style') `
 	'Visual-size controls must use the standard settings layout without a card background.'
-Assert-Architecture ($details -match 'focus_mode_check_box\.text = "') `
-	'The focus-mode setting must have a visible label.'
 Assert-Architecture ($details -notmatch 'focus_mode_check_box\.text = .*idle') `
 	'The focus-mode label must not expose implementation wording.'
 Assert-Architecture ($menu -notmatch 'SIZE_SMALLER_ITEM_ID|SIZE_LARGER_ITEM_ID') `
 	'The details settings must be the only visual-size adjustment surface.'
-Assert-Architecture ($visualScale -match 'class_name PetVisualScale') `
-	'Visual-size limits must have one shared policy module.'
-Assert-Architecture ($state -match 'PetVisualScaleScript' -and $visual -match 'PetVisualScaleScript') `
-	'State and rendering must share the visual-size policy.'
 Assert-Architecture ($state -notmatch 'PetVisualScript') `
 	'Gameplay state must not depend on the visual renderer.'
 Assert-Architecture ($state -notmatch 'func change_visual_size' -and $visual -notmatch 'func change_visual_size') `
 	'Obsolete incremental visual-size entry points must stay removed.'
 Assert-Architecture ($visual -notmatch '_keep_frame_inside_viewport|_axis_containment_shift') `
 	'Frame changes must not apply a second per-frame viewport shift.'
-Assert-Architecture ($visual -match 'desktop_canvas_origin') `
-	'Window resizing must preserve one desktop-space canvas anchor.'
-Assert-Architecture ($visual -match 'func _activate_action_geometry') `
-	'Each animation must reserve its complete geometry at the action boundary.'
-Assert-Architecture ($visual -match 'func _geometry_frames_for_action') `
-	'Action geometry must include every configured animation phase.'
 Assert-Architecture ($visual -notmatch '_grow_window_to_fit_frame') `
 	'Animation frames must not resize the native window independently.'
-Assert-Architecture ($inputController -match 'class_name PetInputController') `
-	'PetInputController is missing.'
-Assert-Architecture ($main -match 'PetInputControllerScript') `
-	'main.gd must delegate input and drag state.'
-Assert-Architecture ($characterCoordinator -match 'class_name CharacterPackCoordinator') `
-	'CharacterPackCoordinator is missing.'
-Assert-Architecture ($main -match 'CharacterPackCoordinatorScript') `
-	'main.gd must delegate character-pack coordination.'
 Assert-Architecture ($main -notmatch 'set_channel_enabled|set_target_executable_path|refresh_agent_executable_path|codex_trust_dialog') `
 	'main.gd must delegate the Agent tab to AgentSettingsPanelController.'
 Assert-Architecture ($details -notmatch 'signal agent_[a-z_]+_enabled_toggled|signal [a-z_]+_executable_path_changed\(path') `
@@ -153,153 +98,30 @@ Assert-Architecture ($main -notmatch 'CharacterPackManagerScript') `
 	'main.gd must not depend directly on CharacterPackManager.'
 Assert-Architecture ($main -notmatch '_agent_notification_queue') `
 	'Agent notifications must replace the active bubble instead of queueing.'
-Assert-Architecture `
-	($main -match '_say_configured_dialogue\("idle", 2\.5\)') `
-	'Idle speech must be opt-in through character dialogue.'
-Assert-Architecture ($agentController -match '_focus_target\(TARGET_VSCODE\)') `
-	'Codex focus must route VS Code notifications to the configured VS Code target.'
-Assert-Architecture ($agentController -match '"--reuse-window"') `
-	'Codex focus must reuse the selected VS Code window.'
-Assert-Architecture ($agentController -match 'TARGET_CODEX_APP') `
-	'Codex integration must define a separate Codex App target.'
-Assert-Architecture ($agentController -match 'TARGET_TERMINAL') `
-	'Codex integration must define a separate terminal target.'
-Assert-Architecture ($agentController -match 'TARGET_OPENCODE_APP') `
-	'Codex integration must define a separate OpenCode Desktop target.'
-Assert-Architecture ($agentController -match 'TARGET_CLAUDE_APP') `
-	'Codex integration must define a separate Claude Desktop target.'
-Assert-Architecture ($agentController -match '_detect_claude_app_from_appx') `
-	'Claude Desktop detection must support Microsoft Store Appx installations.'
-Assert-Architecture ($agentController -match 'terminal_opencode_enabled') `
-	'Codex integration must keep OpenCode terminal state separate from Codex.'
-Assert-Architecture ($agentCatalog -match 'install_opencode_integration\.ps1') `
-	'Codex integration must configure OpenCode through its installer.'
-Assert-Architecture ($agentCatalog -match 'install_claude_code_integration\.ps1') `
-	'Codex integration must configure Claude Code through its installer.'
-Assert-Architecture ($agentController -match 'claude_vscode_enabled') `
-	'Codex integration must keep Claude Code VS Code state separate.'
-Assert-Architecture ($agentController -match 'claude_terminal_enabled') `
-	'Codex integration must keep Claude Code terminal state separate.'
-Assert-Architecture ($agentController -match 'gemini_terminal_enabled') `
-	'Codex integration must keep Gemini CLI terminal state separate.'
-Assert-Architecture ($agentCatalog -match 'install_gemini_cli_integration\.ps1') `
-	'Codex integration must configure Gemini CLI through its installer.'
-Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match 'Test-ProcessTreeContainsVsCode') `
-	'Codex notification routing must detect VS Code hosts in the process tree.'
-Assert-Architecture ($agentController -match 'AgentChannelCatalogScript\.CHANNELS') `
-	'Agent channels must come from the shared catalog.'
-Assert-Architecture ($agentController -match 'RUNTIME_FILE_NAME') `
-	'Agent notifications must publish one runtime registration.'
 Assert-Architecture ($agentController -notmatch 'func _write_bridge_files') `
 	'Agent notifications must not write duplicate bridge flag files.'
-Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match 'Get-OpenDesktopPetRuntime') `
-	'Codex notifications must read the shared runtime registration.'
-Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match "'Stop' \{\s*\`$eventType = 'agent-turn-complete'") `
-	'Codex notifications must be driven by the completed-chat Stop hook.'
-Assert-Architecture ((Read-Source 'tools/install_codex_integration.ps1') -match "Matcher = '\^request_user_input") `
-	'The Codex PreToolUse hook must stay limited to the question tools.'
-Assert-Architecture ((Read-Source 'tools/install_codex_integration.ps1') -match 'Remove-LegacyNotifyIntegration') `
-	'Codex Stop-hook installation must remove the obsolete notify integration.'
-Assert-Architecture ($agentController -match 'agy_terminal_enabled') `
-	'Codex integration must keep Antigravity CLI terminal state separate.'
-Assert-Architecture ($agentCatalog -match 'install_antigravity_cli_integration\.ps1') `
-	'Codex integration must configure Antigravity CLI through its installer.'
-Assert-Architecture ($agentController -match 'pi_codex_enabled') `
-	'Agent integration must keep Pi state separate.'
-Assert-Architecture ($agentCatalog -match 'install_pi_integration\.ps1') `
-	'Agent integration must configure Pi through its installer.'
-Assert-Architecture ($agentCatalog -match '"runtime_key": "pi_codex_terminal"') `
-	'Agent integration must publish a separate Pi runtime target.'
-Assert-Architecture ($piExtension -match 'agent_settled') `
-	'Pi notifications must use the settled-agent lifecycle event.'
-Assert-Architecture ($piExtension -match 'model_provider') `
-	'Pi notifications must include the selected model provider.'
-Assert-Architecture ($piExtension -notmatch 'openai-codex') `
-	'Pi notifications must support all Pi model providers.'
-Assert-Architecture ($piInstaller -match 'PI_CODING_AGENT_DIR') `
-	'Pi installer must honor the configured Pi agent directory.'
-Assert-Architecture ($agentRouter -match 'gemini_terminal') `
-	'Agent notification routing must define a Gemini CLI terminal target.'
-Assert-Architecture ($agentRouter -match 'agy_terminal') `
-	'Agent notification routing must define an Antigravity CLI terminal target.'
-Assert-Architecture ($agentController -match 'AgentNotificationRouterScript\.is_notification_enabled') `
-	'Codex notifications must be filtered by source target and enabled state.'
-Assert-Architecture ($agentRouter -match 'class_name AgentNotificationRouter') `
-	'Agent notification routing rules must have their own cohesive module.'
-Assert-Architecture ($agentController -match 'AgentNotificationRouterScript') `
-	'Codex integration must delegate Agent routing rules to the shared router.'
-Assert-Architecture ($agentController -match 'CodexHookTrustServiceScript') `
-	'Codex integration must delegate Hook trust protocol handling to a cohesive service.'
-Assert-Architecture ($codexTrustService -match 'parse_status_output') `
-	'Codex Hook trust status parsing must be independently testable.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match '(?s)Start-Process.*-WindowStyle Normal') `
-	'Codex Hook review must explicitly create a visible Windows console.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match 'OpenDesktopPetCodexHookReview') `
-	'Codex Hook review must prevent duplicate interactive windows.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "TERM = 'xterm-256color'") `
-	'Codex Hook review must launch its TUI with an interactive terminal mode.'
-Assert-Architecture ($codexTrustService -notmatch '"-NoExit"') `
-	'Codex Hook review must not leave an empty PowerShell host behind.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "method = 'hooks/list'") `
-	'Codex Hook trust checks must inspect the Codex-reported status.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "ValidateSet\('Availability', 'Status', 'Launch', 'Review'\)") `
-	'Codex Hook review must provide a separate executable availability check.'
-Assert-Architecture ($agentController -match '(?s)func _run_codex_setup_task.*get_codex_availability_status\(\).*_run_codex_configuration_tool.*get_codex_hook_trust_status\(\)') `
-	'Codex availability must be checked before installing or validating hooks.'
-Assert-Architecture ($agentController -match '(?s)Thread\.new\(\).*_run_codex_setup_task') `
-	'Codex setup and Hook status checks must not block the UI thread.'
 Assert-Architecture ($agentController -notmatch 'CODEX_TRUST_POLL_INTERVALS_MS|_poll_codex_trust_monitor|_schedule_next_codex_trust_check') `
 	'Codex Hook trust must not be checked by background polling.'
-Assert-Architecture ($agentController -match 'func recheck_pending_codex_trust') `
-	'Codex Hook trust must expose an explicit user-triggered recheck action.'
-Assert-Architecture ($agentController -match 'CODEX_SETUP_SETTINGS_SECTION.*pending_target') `
-	'Pending Codex notification setup must survive closing the review window or restarting the pet.'
-Assert-Architecture ($agentController -match '(?s)is_trusted\(status\).*_set_codex_target_enabled\(target, true\).*codex_trust_ready\.emit') `
-	'Every successful Codex trust check must enable the requested target and report success.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "(?s)\`$reviewArguments = @\('--no-alt-screen'\).*& \`$codexExecutable @reviewArguments") `
-	'Codex Hook review must launch the interactive Codex TUI.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "\`$reviewArguments \+= '--no-daemon'") `
-	'Codex Hook review must bypass the Desktop CLI background server when supported.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -notmatch "--no-alt-screen '/hooks'") `
-	'Codex Hook review must not submit /hooks as an Agent prompt.'
-Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match [regex]::Escape('.vscode\extensions')) `
-	'Codex Hook review must support the executable bundled with the VS Code extension.'
 Assert-Architecture ($main -notmatch '_reopen_codex_trust_dialog') `
 	'Opening Codex Hook review must not immediately reopen the blocking trust dialog.'
-Assert-Architecture ($releasePreparation -match 'codex_hook_review\.ps1') `
-	'Windows releases must include the Codex Hook review helper.'
-Assert-Architecture ($releasePreparation -match 'install_pi_integration\.ps1') `
-	'Windows releases must include the Pi integration installer.'
-Assert-Architecture ($releasePreparation -match 'pi_agent_notify\.ts') `
-	'Windows releases must include the Pi notification extension.'
 Assert-Architecture ($agentController -notmatch 'func _normalize_agent|func _target_display_name') `
 	'Codex integration must not own cross-Agent display and normalization rules.'
-Assert-Architecture ($agentController -match 'ClassDB\.instantiate\("WindowsWindowActivator"\)') `
-	'Codex focus must use the in-process Windows GDExtension.'
-Assert-Architecture ($agentController -match 'focus_executable') `
-	'Codex focus must verify native window activation.'
-Assert-Architecture ($agentController -match '(?s)func load_settings\(\).*?refresh_enabled_executable_paths_if_invalid\(\)') `
-	'Agent executable paths must be refreshed when enabled integrations load at startup.'
-Assert-Architecture ($agentController -match '(?s)func _focus_target\(.*?_detect_executable_path\(target_app\)') `
-	'Agent focus must recover an invalid executable path on click.'
 Assert-Architecture ($agentController -notmatch 'SetForegroundWindow|AppActivate|WindowsForegroundAppMonitor') `
 	'Codex runtime integration must not launch a PowerShell foreground helper.'
-Assert-Architecture ($windowsActivator -match 'QueryFullProcessImageNameW') `
-	'The native activator must match windows by configured executable path.'
-Assert-Architecture ($windowsActivator -match 'SetForegroundWindow') `
-	'The native activator must use the Win32 foreground API in-process.'
-Assert-Architecture ($windowsActivator -match 'is_executable_foreground') `
-	'The native activator must support a one-shot foreground check.'
-Assert-Architecture ($windowsActivator -notmatch 'powershell|cmd\.exe|CreateProcess') `
-	'The native activator must not launch a shell or helper process.'
-Assert-Architecture ($main -match 'AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3\.0') `
-	'Codex notifications must use a three-second foreground duration.'
-Assert-Architecture ($reminderPanel -match 'TaskReminderSectionScript' -and $reminderPanel -match 'TaskReminderThemeScript') `
-	'Task reminders must compose cohesive section and theme modules.'
+Assert-Architecture ($main -notmatch 'HTTPRequest') `
+	'main.gd must delegate network requests to UpdateCheckCoordinator.'
+
+# Shared policies that must stay in one module.
+Assert-Architecture ($manager -match 'CharacterPackValidatorScript') `
+	'CharacterPackManager must use the shared action validator.'
+Assert-Architecture ($statsCoordinator -match 'panel\.theme = _create_details_theme\(\)') `
+	'StatsWindowCoordinator must apply the complete details-window theme.'
+Assert-Architecture ($state -match 'PetVisualScaleScript' -and $visual -match 'PetVisualScaleScript') `
+	'State and rendering must share the visual-size policy.'
+
+# Task reminder layering.
 Assert-Architecture ($reminderPanel -notmatch 'StyleBoxFlat\.new') `
 	'TaskReminderPanel must delegate visual tokens and styles to TaskReminderTheme.'
-Assert-Architecture ($reminderSection -match 'TaskReminderItemScript') `
-	'TaskReminderSection must delegate row interactions to TaskReminderItem.'
 Assert-Architecture ($reminderItem -notmatch '_coordinator') `
 	'TaskReminderItem must communicate through signals instead of depending on the coordinator.'
 Assert-Architecture ($reminderItem -notmatch 'CheckBox|in_progress|cancelled') `
@@ -314,12 +136,60 @@ Assert-Architecture ($reminderPresentation -notmatch '\b(Control|Container|Butto
 	'TaskReminderPresentationCoordinator must not depend on UI controls.'
 Assert-Architecture ($reminderBadge -notmatch 'TaskReminderCoordinator|today_count|overdue_count') `
 	'TaskReminderBadge must render a display state without reminder-domain rules.'
-Assert-Architecture ($reminderBadgeState -match 'class_name TaskReminderBadgeState') `
-	'Task reminder badge display state must be explicit and reusable.'
-Assert-Architecture ($reminderTheme -match 'class_name TaskReminderTheme') `
-	'Task reminder visual tokens must have one shared theme module.'
-Assert-Architecture ($main -match '(?s)populate_today_reminders\(menu, reminders\).*append_exit\(menu\)') `
-	'Task reminders must be inserted before the final save-and-exit menu action.'
+
+# Codex hook review helper: Codex CLI behavior that only shows up by hand.
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match '(?s)Start-Process.*-WindowStyle Normal') `
+	'Codex Hook review must explicitly create a visible Windows console.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match 'OpenDesktopPetCodexHookReview') `
+	'Codex Hook review must prevent duplicate interactive windows.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "TERM = 'xterm-256color'") `
+	'Codex Hook review must launch its TUI with an interactive terminal mode.'
+Assert-Architecture ($codexTrustService -notmatch '"-NoExit"') `
+	'Codex Hook review must not leave an empty PowerShell host behind.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "method = 'hooks/list'") `
+	'Codex Hook trust checks must inspect the Codex-reported status.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "ValidateSet\('Availability', 'Status', 'Launch', 'Review'\)") `
+	'Codex Hook review must provide a separate executable availability check.'
+Assert-Architecture ($agentController -match '(?s)func _run_codex_setup_task.*get_codex_availability_status\(\).*_run_codex_configuration_tool.*get_codex_hook_trust_status\(\)') `
+	'Codex availability must be checked before installing or validating hooks.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "(?s)\`$reviewArguments = @\('--no-alt-screen'\).*& \`$codexExecutable @reviewArguments") `
+	'Codex Hook review must launch the interactive Codex TUI.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match "\`$reviewArguments \+= '--no-daemon'") `
+	'Codex Hook review must bypass the Desktop CLI background server when supported.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -notmatch "--no-alt-screen '/hooks'") `
+	'Codex Hook review must not submit /hooks as an Agent prompt.'
+Assert-Architecture ((Read-Source 'tools/codex_hook_review.ps1') -match [regex]::Escape('.vscode\extensions')) `
+	'Codex Hook review must support the executable bundled with the VS Code extension.'
+
+# Agent window focus: clicking a notification returns to the right app.
+Assert-Architecture ($agentController -match '_focus_target\(TARGET_VSCODE\)') `
+	'Codex focus must route VS Code notifications to the configured VS Code target.'
+Assert-Architecture ($agentController -match '"--reuse-window"') `
+	'Codex focus must reuse the selected VS Code window.'
+Assert-Architecture ($agentController -match '_detect_claude_app_from_appx') `
+	'Claude Desktop detection must support Microsoft Store Appx installations.'
+Assert-Architecture ($agentController -match 'ClassDB\.instantiate\("WindowsWindowActivator"\)') `
+	'Codex focus must use the in-process Windows GDExtension.'
+Assert-Architecture ($agentController -match 'focus_executable') `
+	'Codex focus must verify native window activation.'
+Assert-Architecture ($agentController -match '(?s)func _focus_target\(.*?_detect_executable_path\(target_app\)') `
+	'Agent focus must recover an invalid executable path on click.'
+Assert-Architecture ($windowsActivator -match 'QueryFullProcessImageNameW') `
+	'The native activator must match windows by configured executable path.'
+Assert-Architecture ($windowsActivator -match 'SetForegroundWindow') `
+	'The native activator must use the Win32 foreground API in-process.'
+Assert-Architecture ($windowsActivator -match 'is_executable_foreground') `
+	'The native activator must support a one-shot foreground check.'
+Assert-Architecture ($windowsActivator -notmatch 'powershell|cmd\.exe|CreateProcess') `
+	'The native activator must not launch a shell or helper process.'
+
+# Release, export and update safety.
+Assert-Architecture ($releasePreparation -match 'codex_hook_review\.ps1') `
+	'Windows releases must include the Codex Hook review helper.'
+Assert-Architecture ($releasePreparation -match 'install_pi_integration\.ps1') `
+	'Windows releases must include the Pi integration installer.'
+Assert-Architecture ($releasePreparation -match 'pi_agent_notify\.ts') `
+	'Windows releases must include the Pi notification extension.'
 Assert-Architecture ($windowsExtension -match 'windows\.debug\.x86_64') `
 	'The Windows GDExtension must provide an x64 debug library.'
 Assert-Architecture ($windowsExtension -match 'windows\.release\.x86_64') `
@@ -328,16 +198,8 @@ Assert-Architecture ($releasePreparation -match [regex]::Escape('open_desktop_pe
 	'The release package must include the native Windows GDExtension.'
 Assert-Architecture ($exportPresets -match 'exclude_filter=.*tmp/\*') `
 	'The public export must exclude local temporary and test artifacts.'
-
-$updateCoordinator = Read-Source 'scripts/update_check_coordinator.gd'
-Assert-Architecture ($main -notmatch 'HTTPRequest') `
-	'main.gd must delegate network requests to UpdateCheckCoordinator.'
-Assert-Architecture ($updateCoordinator -match 'auto_check", false\)') `
-	'Automatic update checks must stay opt-in.'
 Assert-Architecture ($updateCoordinator -match 'max_redirects = 0') `
 	'Update checks must not follow redirects to other hosts.'
-Assert-Architecture ($settingsTab -match 'release_page_url\(\)' -and $settingsTab -notmatch 'html_url') `
-	'The release page must be rebuilt from the version, never taken from the response.'
 
 & git -C $projectRoot diff --check
 if ($LASTEXITCODE -ne 0) {
