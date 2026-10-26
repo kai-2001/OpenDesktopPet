@@ -487,7 +487,7 @@
   call signal codex_unavailable VS Code 找不到 Codex
   call worker detect vscode
   call worker trust query_availability
-  say %s 通知無法開啟：找不到支援 Hook 審查的 Codex。請先安裝或更新 Codex Desktop、VS Code Codex 擴充功能或 Codex CLI。
+  say VS Code 通知無法開啟：找不到支援 Hook 審查的 Codex。請先安裝或更新 Codex Desktop、VS Code Codex 擴充功能或 Codex CLI。
 ## submit VscodeExecutablePath
   controller.executable_path = C:/ODP-golden/VscodeExecutablePath.exe
   settings.codex.executable_path = C:/ODP-golden/VscodeExecutablePath.exe

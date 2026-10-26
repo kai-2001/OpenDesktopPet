@@ -212,8 +212,10 @@ func _handle_configuration_failed(target_name: String) -> void:
 
 func _handle_codex_unavailable(target_name: String, _message: String) -> void:
 	speech_requested.emit(
-		"%s 通知無法開啟：找不到支援 Hook 審查的 Codex。請先安裝或更新 "
-		+ "Codex Desktop、VS Code Codex 擴充功能或 Codex CLI。" % target_name,
+		(
+			"%s 通知無法開啟：找不到支援 Hook 審查的 Codex。請先安裝或更新 "
+			+ "Codex Desktop、VS Code Codex 擴充功能或 Codex CLI。"
+		) % target_name,
 		8.0
 	)
 
