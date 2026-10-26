@@ -5,6 +5,7 @@
 
 #include "windows_click_through.h"
 #include "windows_display_recovery_monitor.h"
+#include "windows_ime_char_repair.h"
 #include "windows_window_activator.h"
 
 using namespace godot;
@@ -16,6 +17,7 @@ void initialize_open_desktop_pet_windows(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(WindowsWindowActivator);
 	GDREGISTER_CLASS(WindowsDisplayRecoveryMonitor);
 	GDREGISTER_CLASS(WindowsClickThrough);
+	GDREGISTER_CLASS(WindowsImeCharRepair);
 }
 
 void uninitialize_open_desktop_pet_windows(ModuleInitializationLevel p_level) {

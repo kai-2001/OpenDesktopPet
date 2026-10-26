@@ -275,6 +275,12 @@ try {
     if ($taskReminderVisualExitCode -ne 0 -or -not ($taskReminderVisualOutput -match 'TASK_REMINDER_VISUAL_TEST_OK')) {
         throw 'Task reminder visual validation failed.'
     }
+    $imeCharRepairOutput = & $GodotExe --path $projectRoot --script 'res://tests/windows_ime_char_repair_test.gd' 2>&1
+    $imeCharRepairExitCode = $LASTEXITCODE
+    $imeCharRepairOutput | Write-Output
+    if ($imeCharRepairExitCode -ne 0 -or -not ($imeCharRepairOutput -match 'WINDOWS_IME_CHAR_REPAIR_TEST_OK')) {
+        throw 'Windows IME character repair validation failed.'
+    }
     $taskReminderBadgeVisualOutput = & $GodotExe --path $projectRoot --script 'res://tests/task_reminder_badge_visual_test.gd' 2>&1
     $taskReminderBadgeVisualExitCode = $LASTEXITCODE
     $taskReminderBadgeVisualOutput | Write-Output

@@ -33,6 +33,7 @@ var agent_tab
 var character_tab
 var window: Window
 var tab_buttons: Array[Button] = []
+var _ime_char_repair
 
 
 func build(owner: Node) -> Dictionary:
@@ -47,6 +48,7 @@ func build(owner: Node) -> Dictionary:
 	window.visible = false
 	window.close_requested.connect(func() -> void: close_requested.emit())
 	window.window_input.connect(func(event: InputEvent) -> void: window_input.emit(event))
+	window.visibility_changed.connect(_repair_ime_input)
 	owner.add_child(window)
 
 	var panel := PanelContainer.new()
@@ -176,6 +178,23 @@ func _apply_tab_button_style(button: Button, selected: bool) -> void:
 	)
 	button.add_theme_color_override("font_pressed_color", Color("#ffffff"))
 	button.add_theme_font_size_override("font_size", 15)
+
+
+# Godot drops ! " # $ % & ' ( - . when a Windows IME commits them
+# (godotengine/godot#74043), so Chinese input could not type these symbols.
+# Showing the window may create a new native window, so attach on each show.
+func _repair_ime_input() -> void:
+	if not is_instance_valid(window) or not window.visible:
+		return
+	if _ime_char_repair == null:
+		if not ClassDB.class_exists("WindowsImeCharRepair"):
+			return
+		_ime_char_repair = ClassDB.instantiate("WindowsImeCharRepair")
+	var handle := DisplayServer.window_get_native_handle(
+		DisplayServer.WINDOW_HANDLE, window.get_window_id()
+	)
+	if handle != 0 and not bool(_ime_char_repair.attach(handle)):
+		push_warning("IME character repair failed: %s" % _ime_char_repair.get_last_error())
 
 
 func destroy() -> void:

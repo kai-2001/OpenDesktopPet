@@ -29,6 +29,16 @@ Godot 的 `mouse_passthrough_polygon`：在 Windows 上它是 `SetWindowRgn`，�
 `tests/run_native_click_through_test.ps1` 會開真實視窗並移動滑鼠，驗證透明、穿透、
 拖曳、角色大小與 FPS；它不在 `run_validation.ps1` 內，需要手動執行。
 
+## 輸入法符號修正
+
+Godot 4.6 在 Windows 處理輸入法送出的文字時，會把 `! " # $ % & ' ( - .` 這 10 個字元
+誤判成延伸鍵而丟掉（godotengine/godot#74043），所以用中文輸入法打不出這些符號，英文
+模式則正常。`WindowsImeCharRepair` 以 `SetWindowSubclass` 攔截詳細面板視窗的
+`WM_CHAR`：遇到這些字元且前面沒有對應的實體按鍵時，先補一個 `VK_PROCESSKEY` 按下訊息，
+讓 Godot 從它取得字元。`StatsWindowCoordinator` 在視窗每次顯示時掛上。
+`tests/windows_ime_char_repair_test.gd` 以 `PostMessageW` 模擬輸入法送出文字來驗證。
+Godot 上游修正後即可移除。
+
 ## 編譯
 
 在 Windows PowerShell 由專案根目錄執行：
