@@ -1,0 +1,1307 @@
+## startup
+  say 莓角守宮來了！右鍵操作・雙擊摸摸
+  effects = missing
+  engine.max_fps = 30
+  packs =
+  pet.character = open_desktop_pet_default
+  settings.agy_terminal.enabled = false
+  settings.character.selected_id = open_desktop_pet_default
+  settings.claude_code_app.enabled = false
+  settings.claude_code_app.executable_path =
+  settings.claude_code_terminal.enabled = false
+  settings.claude_code_vscode.enabled = false
+  settings.codex.enabled = false
+  settings.codex.executable_path =
+  settings.codex.port = 49875
+  settings.codex.vscode_enabled = false
+  settings.codex.vscode_executable_path =
+  settings.codex_app.enabled = false
+  settings.codex_app.executable_path =
+  settings.codex_setup.pending_target =
+  settings.codex_setup.pending_target_name =
+  settings.codex_terminal.enabled = false
+  settings.codex_terminal.executable_path =
+  settings.copilot.enabled = false
+  settings.gemini_terminal.enabled = false
+  settings.opencode_app.enabled = false
+  settings.opencode_app.executable_path =
+  settings.opencode_terminal.enabled = false
+  settings.opencode_vscode.enabled = false
+  settings.pi_codex_terminal.enabled = false
+  state.affection = 1
+  state.auto_care_quiet = false
+  state.auto_feeder_enabled = false
+  state.auto_feeder_owned = false
+  state.coins = 20
+  state.energy = 80.0
+  state.hunger = 80.0
+  state.level = 1
+  state.mood = 72.0
+  state.thirst = 80.0
+  state.visual_scale = 1.0
+  state.xp = 0
+  window = closed
+## open details window on the status tab
+  window = name=StatsWindow visible=true
+  window/0:PanelContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/0:Button = visible=true disabled=false pressed=false text=狀態
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/1:Button = visible=true disabled=false pressed=false text=待辦
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/2:Button = visible=true disabled=false pressed=false text=設定
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/3:Button = visible=true disabled=false pressed=false text=Agent
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/4:Button = visible=true disabled=false pressed=false text=角色
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer = name=DetailsTabs visible=true current=0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer = name=狀態 visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=養成狀態 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=下一動作：翻肚撒嬌　需要 Lv.5、親密度 15 color=6f65a8ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label = visible=true text=最近訊息：尚無紀錄 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/0:Control = visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=照顧操作 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/0:Label = visible=true text=🍽 自動餵食器 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/1:Label = visible=true text=(?) color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/2:Button = visible=true disabled=true pressed=false text=🔒 需要親密 100 tooltip=陪伴它到親密 100，就能購買自動餵食器。目前親密 1。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/3:Button = name=AutoFeederToggle visible=false disabled=false pressed=false text=關
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/4:Label = visible=false text= color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/0:Button = visible=true disabled=false pressed=false text=🫐 餵莓果
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/1:Button = visible=true disabled=false pressed=false text=💧 喝水
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/2:Button = visible=true disabled=false pressed=false text=✋ 摸摸
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/3:Button = visible=true disabled=false pressed=false text=🪲 狩獵
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/4:Button = visible=true disabled=false pressed=false text=💤 睡覺
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  20 金幣  ·  XP 0/20 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = visible=true text=陪伴紀錄 : 連續陪伴 1 天 color=6f65a8ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:Label = visible=true text=願望：目前沒有願望 color=a66b16ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/0:Label = visible=true text=飽食 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/1:ProgressBar = visible=true value=80.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/0:Label = visible=true text=水分 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/1:ProgressBar = visible=true value=80.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label = visible=true text=體力 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:ProgressBar = visible=true value=80.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/0:Label = visible=true text=心情 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/1:ProgressBar = visible=true value=72.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label = visible=true text=親密 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:ProgressBar = visible=true value=1.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/1:ScrollContainer = name=待辦 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer = name=設定 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=桌寵設定 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=開啟後會停止桌寵自主移動、吃飯、喝水、睡覺與其他自主動作；手動操作仍可使用。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:CheckBox = visible=true disabled=false pressed=false text=保持螢幕喚醒（阻止系統休眠）
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:Label = visible=true text=開啟後會要求 Windows 保持螢幕喚醒；關閉後恢復系統電源計畫。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:CheckBox = visible=true disabled=true pressed=false text=登入 Windows 時自動開啟桌寵
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label = visible=true text=目前平台不支援 Windows 開機啟動設定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/0:Label = visible=true text=版本更新 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/1:Label = visible=true text=目前版本 v<version> color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/19:CheckBox = visible=true disabled=false pressed=false text=自動檢查新版本（每天最多一次）
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label = visible=true text=桌寵幀率（FPS） color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:OptionButton = visible=true disabled=false pressed=false text=30 FPS selected=1
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:Label = visible=true text=預設關閉。檢查時只會向 GitHub 查詢最新的版本號，不會傳送你的設定、存檔、角色、Agent 資料或任何識別資訊；GitHub 仍會看到你的 IP 位址。桌寵只會開啟本專案的 GitHub 下載頁，不會自行下載或安裝。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label = visible=true text=尚未檢查。 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Button = visible=true disabled=false pressed=false text=立即檢查
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/1:Button = visible=false disabled=false pressed=false text=前往下載頁
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/2:Button = visible=false disabled=false pressed=false text=略過這個版本
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = visible=true text=控制整個桌寵的更新率（15–60）；30 FPS 適合日常使用，降低可省電。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Label = visible=true text=詳細面板主題 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:OptionButton = visible=true disabled=false pressed=false text=淺色 selected=0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:Label = visible=true text=切換詳細面板的完整配色；設定會自動保存。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/0:Label = visible=true text=桌寵大小 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=100% color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider = name=VisualScaleSlider visible=true value=1.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider/0:Timer =
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/2:Label = visible=true text=可調整為原始顯示大小的 50%–150%；設定會保存。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:CheckBox = visible=true disabled=false pressed=false text=專注模式（不自主移動或做動作）
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer = name=Agent通知 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=Agent 通知 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/0:Label = visible=true text=　Claude Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/1:Button = name=ClaudeCodeVscodeEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 VS Code 中的 Claude Code 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/0:Label = visible=true text=　Copilot color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/1:Button = name=CopilotEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 Copilot Agent 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/0:Label = visible=true text=　OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/1:Button = name=VscodeOpenCodeEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 VS Code 中的 OpenCode 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:LineEdit = name=CodexAppExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/0:Label = visible=true text=ChatGPT color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/2:Button = name=CodexAppExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇 ChatGPT 執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label = name=CodexAppExecutableHint visible=false text=尚未找到 ChatGPT；請按資料夾按鈕選擇執行檔。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/0:Label = visible=true text=　Codex color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/1:Button = name=CodexAppEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 ChatGPT 中的 Codex 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/19:LineEdit = name=OpenCodeAppExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label = visible=true text=Agent 通知 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:Label = visible=true text=通訊埠 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=AgentPortSpinBox visible=true value=49875.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/0:Label = visible=true text=OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/2:Button = name=OpenCodeAppExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇 OpenCode Desktop 執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label = name=OpenCodeAppExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Label = visible=true text=　OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/1:Button = name=OpenCodeAppEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 OpenCode Desktop 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/23:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/24:LineEdit = name=ClaudeAppExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/0:Label = visible=true text=Claude color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/2:Button = name=ClaudeAppExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇 Claude Code 執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/26:Label = name=ClaudeAppExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/0:Label = visible=true text=　Claude Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/1:Button = name=ClaudeDesktopEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 Claude Desktop Code 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/28:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/29:LineEdit = name=TerminalExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = name=AgentStatusLabel visible=true text=狀態: 已關閉 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/0:Label = visible=true text=終端機 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/2:Button = name=TerminalExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇終端機執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/31:Label = name=TerminalExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/0:Label = visible=true text=　Codex color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/1:Button = name=TerminalCodexEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 Codex CLI 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/0:Label = visible=true text=　Pi color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/1:Button = name=PiCodexEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 Pi 中所有模型的通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/0:Label = visible=true text=　OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/1:Button = name=TerminalOpenCodeEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 OpenCode 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/0:Label = visible=true text=　Gemini CLI（舊版） color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/1:Button = name=GeminiCliTerminalEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 Gemini CLI 舊版通知（企業/API Key）
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/0:Label = visible=true text=　Antigravity CLI color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/1:Button = name=AgyTerminalEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 Antigravity CLI 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/0:Label = visible=true text=　Claude Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/1:Button = name=ClaudeCodeTerminalEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 Claude Code 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:ProgressBar = name=CodexSetupProgressBar visible=false value=0.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Button = name=CodexHookTrustPageReviewButton visible=false disabled=false pressed=false text=開啟 Codex 信任畫面 tooltip=前往 Codex 檢視並信任桌寵的 Stop Hook
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:Button = name=CodexHookTrustRecheckButton visible=false disabled=false pressed=false text=我已信任，檢查通知 tooltip=檢查桌寵的 Codex Stop Hook 是否已受信任
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:LineEdit = name=VscodeExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label = visible=true text=VS Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/2:Button = name=VscodeExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇 VS Code 執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:Label = name=VscodeExecutableHint visible=false text=尚未找到 VS Code；請按資料夾按鈕選擇執行檔。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label = visible=true text=　Codex color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:Button = name=CodexEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 VS Code 中的 Codex 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/1:ConfirmationDialog = name=CodexHookTrustDialog visible=false text=Codex 必須先信任桌寵的 Stop、PermissionRequest、PreToolUse Hook，通知才會生效。\n\n1. 按「開啟 Codex 信任畫面」。\n2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，每一項都按 Enter 開啟詳細內容。\n4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n6. 回到桌寵，按「我已信任，檢查通知」。\n\n選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。\n\n不需另外安裝 CLI；桌寵會使用已安裝 Codex 產品提供的核心。\n\n審查選單會顯示在「Codex Hook Review」PowerShell 視窗，不會出現在 GPT Codex 或 VS Code 面板裡。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer = name=角色 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=角色管理 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=角色清單只會在開啟這個頁面時讀取，不會增加平常常駐耗能。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:ItemList = name=CharacterList visible=true items=
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer = name=MaskEffectEditor visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer = name=MaskEffectHeader visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/0:Label = visible=true text=Codex Pet 眼罩特效校正 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/1:Label = visible=true text=設定 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label = visible=true text=▾ color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label = visible=true text=只套用到目前使用中的 Codex Pet；點擊上方列展開預覽與調整，按「套用」保存並鎖定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/0:Label = visible=true text=X color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=Y color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/2:Label = visible=true text=大小 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/3:Control = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox = name=MaskEffectX visible=true value=0.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/1:SpinBox = name=MaskEffectY visible=true value=0.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=MaskEffectScale visible=true value=0.05 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/3:Button = name=MaskEffectApplyButton visible=true disabled=false pressed=false text=套用
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/4:Button = name=MaskEffectResetButton visible=true disabled=false pressed=false text=重設預設
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/0:Button = name=CharacterUseButton visible=true disabled=true pressed=false text=使用選取角色
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/1:Button = name=CharacterDeleteButton visible=true disabled=true pressed=false text=刪除角色包
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer/0:Button = name=CharacterImportButton visible=true disabled=false pressed=false text=匯入角色包
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer/1:Button = name=CharacterPacksFolderButton visible=true disabled=false pressed=false text=開啟角色資料夾
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label = visible=true text=切換角色會儲存目前進度，並直接在目前視窗載入。 color=238b9dff
+  window/1:FileDialog = name=CharacterImportDialog visible=false text=
+  window/2:ConfirmationDialog = name=CharacterUpdateDialog visible=false text=
+  window/3:ConfirmationDialog = name=CharacterDeleteDialog visible=false text=
+  window/4:AcceptDialog = name=MaskEffectFeedbackDialog visible=false text=
+## feed from the status tab
+  say 莓果好甜！一下就吃光了！
+  state.coins = 17
+  state.hunger = 100.0
+  state.mood = 75.0
+  state.xp = 1
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label = visible=true text=最近訊息：莓果好甜！一下就吃光了！ color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  17 金幣  ·  XP 1/20 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/1:ProgressBar = visible=true value=100.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/1:ProgressBar = visible=true value=75.0
+## give water from the status tab
+  say 舔舔舔，好清爽！
+  state.coins = 16
+  state.mood = 78.0
+  state.thirst = 100.0
+  state.xp = 2
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label = visible=true text=最近訊息：舔舔舔，好清爽！ color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  16 金幣  ·  XP 2/20 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/1:ProgressBar = visible=true value=100.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/1:ProgressBar = visible=true value=78.0
+## reach the auto feeder requirements
+  state.affection = 100
+  state.coins = 600
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/2:Button = visible=true disabled=false pressed=false text=購買 500 金幣 tooltip=花 500 枚金幣購買，買了就永久擁有，可以隨時開關。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  600 金幣  ·  XP 2/20 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:ProgressBar = visible=true value=100.0
+## buy the auto feeder
+  say 買到自動餵食器了！之後的飽食、水分和體力交給它照顧。
+  state.auto_feeder_enabled = true
+  state.auto_feeder_owned = true
+  state.coins = 100
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label = visible=true text=最近訊息：買到自動餵食器了！之後的飽食、水分和體力交給它照顧。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/2:Button = visible=false disabled=false pressed=false text=購買 500 金幣 tooltip=花 500 枚金幣購買，買了就永久擁有，可以隨時開關。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/3:Button = name=AutoFeederToggle visible=true disabled=false pressed=true text=關 tooltip=自動餵食器運作中。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  100 金幣  ·  XP 2/20 color=238b9dff
+## turn the auto feeder on
+## turn the auto feeder off
+  state.auto_feeder_enabled = false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/3:Button = name=AutoFeederToggle visible=true disabled=false pressed=false text=關 tooltip=開啟後會自動照顧飽食、水分與體力。
+## select the settings tab
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer = name=DetailsTabs visible=true current=2
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer = name=狀態 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer = name=設定 visible=true
+## choose 60 FPS
+  engine.max_fps = 60
+  settings.performance.target_fps = 60
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:OptionButton = visible=true disabled=false pressed=false text=60 FPS selected=2
+## turn focus mode on
+  settings.behavior.focus_mode = true
+  state.auto_care_quiet = true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:CheckBox = visible=true disabled=false pressed=true text=專注模式（不自主移動或做動作）
+## keep the screen awake
+  settings.power.keep_screen_on = true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:CheckBox = visible=true disabled=false pressed=true text=保持螢幕喚醒（阻止系統休眠）
+## enlarge the pet to 120%
+  state.visual_scale = 1.2
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=120% color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider = name=VisualScaleSlider visible=true value=1.2
+## switch the details window to the dark theme
+  settings.appearance.details_theme = dark
+  settings.details_window.height = 480
+  settings.details_window.width = 360
+  window = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=養成狀態 color=f0f0f0ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=下一動作：翻肚撒嬌　需要 Lv.5、親密度 15 color=c8a7ffff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label = visible=true text=最近訊息：買到自動餵食器了！之後的飽食、水分和體力交給它照顧。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=照顧操作 color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/0:Label = visible=true text=🍽 自動餵食器 color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/1:Label = visible=true text=(?) color=4fc1ffff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/2:Button = visible=false disabled=false pressed=false text=
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/4:Label = visible=false text= color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  100 金幣  ·  XP 2/20 color=4fc1ffff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = visible=true text=陪伴紀錄 : 連續陪伴 1 天 color=c8a7ffff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:Label = visible=true text=願望：目前沒有願望 color=dcdcaaff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/0:Label = visible=true text=飽食 color=ccccccff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/0:Label = visible=true text=水分 color=ccccccff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label = visible=true text=體力 color=ccccccff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/0:Label = visible=true text=心情 color=ccccccff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label = visible=true text=親密 color=ccccccff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=桌寵設定 color=f0f0f0ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=開啟後會停止桌寵自主移動、吃飯、喝水、睡覺與其他自主動作；手動操作仍可使用。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:Label = visible=true text=開啟後會要求 Windows 保持螢幕喚醒；關閉後恢復系統電源計畫。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label = visible=true text=目前平台不支援 Windows 開機啟動設定。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/0:Label = visible=true text=版本更新 color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/1:Label = visible=true text=目前版本 v<version> color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label = visible=true text=桌寵幀率（FPS） color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:Label = visible=true text=預設關閉。檢查時只會向 GitHub 查詢最新的版本號，不會傳送你的設定、存檔、角色、Agent 資料或任何識別資訊；GitHub 仍會看到你的 IP 位址。桌寵只會開啟本專案的 GitHub 下載頁，不會自行下載或安裝。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label = visible=true text=尚未檢查。 color=4fc1ffff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = visible=true text=控制整個桌寵的更新率（15–60）；30 FPS 適合日常使用，降低可省電。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Label = visible=true text=詳細面板主題 color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:OptionButton = visible=true disabled=false pressed=false text=深色 selected=1
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:Label = visible=true text=切換詳細面板的完整配色；設定會自動保存。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/0:Label = visible=true text=桌寵大小 color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=120% color=4fc1ffff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/2:Label = visible=true text=可調整為原始顯示大小的 50%–150%；設定會保存。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=Agent 通知 color=f0f0f0ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/0:Label = visible=true text=　Claude Code color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/0:Label = visible=true text=　Copilot color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/0:Label = visible=true text=　OpenCode color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/0:Label = visible=true text=ChatGPT color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label = name=CodexAppExecutableHint visible=false text=尚未找到 ChatGPT；請按資料夾按鈕選擇執行檔。 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/0:Label = visible=true text=　Codex color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label = visible=true text=Agent 通知 color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:Label = visible=true text=通訊埠 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/0:Label = visible=true text=OpenCode color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label = name=OpenCodeAppExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Label = visible=true text=　OpenCode color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/0:Label = visible=true text=Claude color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/26:Label = name=ClaudeAppExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/0:Label = visible=true text=　Claude Code color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = name=AgentStatusLabel visible=true text=狀態: 已關閉 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/0:Label = visible=true text=終端機 color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/31:Label = name=TerminalExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/0:Label = visible=true text=　Codex color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/0:Label = visible=true text=　Pi color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/0:Label = visible=true text=　OpenCode color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/0:Label = visible=true text=　Gemini CLI（舊版） color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/0:Label = visible=true text=　Antigravity CLI color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/0:Label = visible=true text=　Claude Code color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label = visible=true text=VS Code color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:Label = name=VscodeExecutableHint visible=false text=尚未找到 VS Code；請按資料夾按鈕選擇執行檔。 color=ff8c8cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label = visible=true text=　Codex color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=角色管理 color=f0f0f0ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=角色清單只會在開啟這個頁面時讀取，不會增加平常常駐耗能。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/0:Label = visible=true text=Codex Pet 眼罩特效校正 color=f0f0f0ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/1:Label = visible=true text=設定 color=d4d4d4ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label = visible=true text=▾ color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label = visible=true text=只套用到目前使用中的 Codex Pet；點擊上方列展開預覽與調整，按「套用」保存並鎖定。 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/0:Label = visible=true text=X color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=Y color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/2:Label = visible=true text=大小 color=9da1a6ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label = visible=true text=切換角色會儲存目前進度，並直接在目前視窗載入。 color=4fc1ffff
+## turn focus mode off in the rebuilt window
+  settings.behavior.focus_mode = false
+  state.auto_care_quiet = false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:CheckBox = visible=true disabled=false pressed=false text=專注模式（不自主移動或做動作）
+## switch back to the light theme
+  settings.appearance.details_theme = light
+  window = name=StatsWindow visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=養成狀態 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=下一動作：翻肚撒嬌　需要 Lv.5、親密度 15 color=6f65a8ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label = visible=true text=最近訊息：買到自動餵食器了！之後的飽食、水分和體力交給它照顧。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=照顧操作 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/0:Label = visible=true text=🍽 自動餵食器 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/1:Label = visible=true text=(?) color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/4:Label = visible=false text= color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  100 金幣  ·  XP 2/20 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = visible=true text=陪伴紀錄 : 連續陪伴 1 天 color=6f65a8ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:Label = visible=true text=願望：目前沒有願望 color=a66b16ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/0:Label = visible=true text=飽食 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/0:Label = visible=true text=水分 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label = visible=true text=體力 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/0:Label = visible=true text=心情 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label = visible=true text=親密 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=桌寵設定 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=開啟後會停止桌寵自主移動、吃飯、喝水、睡覺與其他自主動作；手動操作仍可使用。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:Label = visible=true text=開啟後會要求 Windows 保持螢幕喚醒；關閉後恢復系統電源計畫。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label = visible=true text=目前平台不支援 Windows 開機啟動設定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/0:Label = visible=true text=版本更新 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/1:Label = visible=true text=目前版本 v<version> color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label = visible=true text=桌寵幀率（FPS） color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:Label = visible=true text=預設關閉。檢查時只會向 GitHub 查詢最新的版本號，不會傳送你的設定、存檔、角色、Agent 資料或任何識別資訊；GitHub 仍會看到你的 IP 位址。桌寵只會開啟本專案的 GitHub 下載頁，不會自行下載或安裝。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label = visible=true text=尚未檢查。 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = visible=true text=控制整個桌寵的更新率（15–60）；30 FPS 適合日常使用，降低可省電。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Label = visible=true text=詳細面板主題 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:OptionButton = visible=true disabled=false pressed=false text=淺色 selected=0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:Label = visible=true text=切換詳細面板的完整配色；設定會自動保存。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/0:Label = visible=true text=桌寵大小 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=120% color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/2:Label = visible=true text=可調整為原始顯示大小的 50%–150%；設定會保存。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=Agent 通知 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/0:Label = visible=true text=　Claude Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/0:Label = visible=true text=　Copilot color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/0:Label = visible=true text=　OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/0:Label = visible=true text=ChatGPT color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label = name=CodexAppExecutableHint visible=false text=尚未找到 ChatGPT；請按資料夾按鈕選擇執行檔。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/0:Label = visible=true text=　Codex color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label = visible=true text=Agent 通知 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:Label = visible=true text=通訊埠 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/0:Label = visible=true text=OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label = name=OpenCodeAppExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Label = visible=true text=　OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/0:Label = visible=true text=Claude color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/26:Label = name=ClaudeAppExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/0:Label = visible=true text=　Claude Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = name=AgentStatusLabel visible=true text=狀態: 已關閉 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/0:Label = visible=true text=終端機 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/31:Label = name=TerminalExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/0:Label = visible=true text=　Codex color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/0:Label = visible=true text=　Pi color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/0:Label = visible=true text=　OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/0:Label = visible=true text=　Gemini CLI（舊版） color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/0:Label = visible=true text=　Antigravity CLI color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/0:Label = visible=true text=　Claude Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label = visible=true text=VS Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:Label = name=VscodeExecutableHint visible=false text=尚未找到 VS Code；請按資料夾按鈕選擇執行檔。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label = visible=true text=　Codex color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=角色管理 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=角色清單只會在開啟這個頁面時讀取，不會增加平常常駐耗能。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/0:Label = visible=true text=Codex Pet 眼罩特效校正 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/1:Label = visible=true text=設定 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label = visible=true text=▾ color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label = visible=true text=只套用到目前使用中的 Codex Pet；點擊上方列展開預覽與調整，按「套用」保存並鎖定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/0:Label = visible=true text=X color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=Y color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/2:Label = visible=true text=大小 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label = visible=true text=切換角色會儲存目前進度，並直接在目前視窗載入。 color=238b9dff
+## select the Agent tab
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer = name=DetailsTabs visible=true current=3
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer = name=設定 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer = name=Agent通知 visible=true
+## select the character tab
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer = name=DetailsTabs visible=true current=4
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer = name=Agent通知 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer = name=角色 visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:ItemList = name=CharacterList visible=true items=*預設桌寵  v內建 〔使用中〕\nID: open_desktop_pet_default
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/0:Button = name=CharacterUseButton visible=true disabled=false pressed=false text=重新載入角色
+## import a Codex Pet archive
+  packs = golden-codex
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:ItemList = name=CharacterList visible=true items=*預設桌寵  v內建 〔使用中〕\nID: open_desktop_pet_default | Golden Codex  vcodex-v1\nID: golden-codex
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label = visible=true text=已安裝「Golden Codex」vcodex-v1；角色進度保持不變。 color=238b9dff
+## select the imported Codex Pet
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:ItemList = name=CharacterList visible=true items=預設桌寵  v內建 〔使用中〕\nID: open_desktop_pet_default | *Golden Codex  vcodex-v1\nID: golden-codex
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/0:Button = name=CharacterUseButton visible=true disabled=false pressed=false text=使用選取角色
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/1:Button = name=CharacterDeleteButton visible=true disabled=false pressed=false text=刪除角色包
+## use the imported Codex Pet
+  bubble hidden
+  pet.character = golden-codex
+  settings.character.selected_id = golden-codex
+  state.affection = 1
+  state.auto_feeder_owned = false
+  state.coins = 20
+  state.hunger = 80.0
+  state.mood = 72.0
+  state.thirst = 80.0
+  state.visual_scale = 1.0
+  state.xp = 0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=下一動作：揮手　需要 Lv.3、親密度 0 color=6f65a8ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label = visible=true text=最近訊息：右鍵操作・雙擊摸摸 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/2:Button = visible=true disabled=true pressed=false text=🔒 需要親密 100 tooltip=陪伴它到親密 100，就能購買自動餵食器。目前親密 1。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/3:Button = name=AutoFeederToggle visible=false disabled=false pressed=false text=關 tooltip=開啟後會自動照顧飽食、水分與體力。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/0:Button = visible=true disabled=false pressed=false text=🥕 餵食
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/3:Button = visible=true disabled=false pressed=false text=🪙 工作
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  20 金幣  ·  XP 0/20 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/1:ProgressBar = visible=true value=80.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/1:ProgressBar = visible=true value=80.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/1:ProgressBar = visible=true value=72.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:ProgressBar = visible=true value=1.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=100% color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider = name=VisualScaleSlider visible=true value=1.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:ItemList = name=CharacterList visible=true items=預設桌寵  v內建\nID: open_desktop_pet_default | *Golden Codex  vcodex-v1 〔使用中〕\nID: golden-codex
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer = name=MaskEffectEditor visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label = visible=false text=只套用到目前使用中的 Codex Pet；點擊上方列展開預覽與調整，按「套用」保存並鎖定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer = visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox = name=MaskEffectX visible=true value=0.0 editable=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/1:SpinBox = name=MaskEffectY visible=true value=-20.0 editable=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=MaskEffectScale visible=true value=0.38 editable=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/3:Button = name=MaskEffectApplyButton visible=false disabled=false pressed=false text=套用
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/4:Button = name=MaskEffectResetButton visible=true disabled=true pressed=false text=重設預設
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/0:Button = name=CharacterUseButton visible=true disabled=false pressed=false text=重新載入角色
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label = visible=true text=已切換為「Golden Codex」。 color=238b9dff
+## open the eye mask editor
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label = visible=true text=▴ color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label = visible=true text=只套用到目前使用中的 Codex Pet；點擊上方列展開預覽與調整，按「套用」保存並鎖定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox = name=MaskEffectX visible=true value=0.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/1:SpinBox = name=MaskEffectY visible=true value=-20.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=MaskEffectScale visible=true value=0.38 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/3:Button = name=MaskEffectApplyButton visible=true disabled=false pressed=false text=套用
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/4:Button = name=MaskEffectResetButton visible=true disabled=false pressed=false text=重設預設
+## move and resize the eye mask
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox = name=MaskEffectX visible=true value=12.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=MaskEffectScale visible=true value=0.5 editable=true
+## apply the eye mask
+  effects = {
+	"characters": {
+		"golden-codex": {
+			"effects": {
+				"mask": {
+					"anchor": [
+						12.0,
+						-20.0
+					],
+					"scale": 0.5
+				}
+			}
+		}
+	},
+	"version": 1
+}
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label = visible=true text=▾ color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label = visible=false text=只套用到目前使用中的 Codex Pet；點擊上方列展開預覽與調整，按「套用」保存並鎖定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer = visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox = name=MaskEffectX visible=true value=12.0 editable=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/1:SpinBox = name=MaskEffectY visible=true value=-20.0 editable=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=MaskEffectScale visible=true value=0.5 editable=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/3:Button = name=MaskEffectApplyButton visible=false disabled=false pressed=false text=套用
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/4:Button = name=MaskEffectResetButton visible=true disabled=true pressed=false text=重設預設
+  window/4:AcceptDialog = name=MaskEffectFeedbackDialog visible=true text=眼罩位置與大小已保存。
+## reopen the eye mask editor
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label = visible=true text=▴ color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label = visible=true text=只套用到目前使用中的 Codex Pet；點擊上方列展開預覽與調整，按「套用」保存並鎖定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox = name=MaskEffectX visible=true value=12.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/1:SpinBox = name=MaskEffectY visible=true value=-20.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=MaskEffectScale visible=true value=0.5 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/3:Button = name=MaskEffectApplyButton visible=true disabled=false pressed=false text=套用
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/4:Button = name=MaskEffectResetButton visible=true disabled=false pressed=false text=重設預設
+  window/4:AcceptDialog = name=MaskEffectFeedbackDialog visible=false text=眼罩位置與大小已保存。
+## reset the eye mask
+  effects = {
+	"characters": {
+
+	},
+	"version": 1.0
+}
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox = name=MaskEffectX visible=true value=0.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=MaskEffectScale visible=true value=0.38 editable=true
+## close the eye mask editor without applying
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label = visible=true text=▾ color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label = visible=false text=只套用到目前使用中的 Codex Pet；點擊上方列展開預覽與調整，按「套用」保存並鎖定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer = visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox = name=MaskEffectX visible=true value=0.0 editable=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/1:SpinBox = name=MaskEffectY visible=true value=-20.0 editable=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=MaskEffectScale visible=true value=0.38 editable=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/3:Button = name=MaskEffectApplyButton visible=false disabled=false pressed=false text=套用
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/4:Button = name=MaskEffectResetButton visible=true disabled=true pressed=false text=重設預設
+## import the same Codex Pet again
+  window/2:ConfirmationDialog = name=CharacterUpdateDialog visible=true text=已安裝「Golden Codex」vcodex-v1。\n準備匯入同一角色ID的vcodex-v1。\n\n更新會替換角色圖片與設定，但保留遊戲進度。
+## confirm the update
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label = visible=true text=已更新「Golden Codex」vcodex-v1；角色進度保持不變。 color=238b9dff
+  window/2:ConfirmationDialog = name=CharacterUpdateDialog visible=false text=已安裝「Golden Codex」vcodex-v1。\n準備匯入同一角色ID的vcodex-v1。\n\n更新會替換角色圖片與設定，但保留遊戲進度。
+## ask to delete the active Codex Pet
+  window/3:ConfirmationDialog = name=CharacterDeleteDialog visible=true text=確定要刪除「Golden Codex」嗎？\n\n角色包會被移除，但遊戲進度會保留。
+## delete the active Codex Pet
+  bubble hidden
+  packs =
+  pet.character = open_desktop_pet_default
+  settings.character.selected_id = open_desktop_pet_default
+  state.affection = 100.0
+  state.auto_feeder_owned = true
+  state.coins = 100
+  state.hunger = 100.0
+  state.mood = 78.0
+  state.thirst = 100.0
+  state.visual_scale = 1.2
+  state.xp = 2
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=下一動作：翻肚撒嬌　需要 Lv.5、親密度 15 color=6f65a8ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label = visible=true text=最近訊息：莓角守宮來了！右鍵操作・雙擊摸摸 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/2:Button = visible=false disabled=true pressed=false text=🔒 需要親密 100 tooltip=陪伴它到親密 100，就能購買自動餵食器。目前親密 1。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/3:Button = name=AutoFeederToggle visible=true disabled=false pressed=false text=關 tooltip=開啟後會自動照顧飽食、水分與體力。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/0:Button = visible=true disabled=false pressed=false text=🫐 餵莓果
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/3:Button = visible=true disabled=false pressed=false text=🪲 狩獵
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  100 金幣  ·  XP 2/20 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/1:ProgressBar = visible=true value=100.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/1:ProgressBar = visible=true value=100.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/1:ProgressBar = visible=true value=78.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:ProgressBar = visible=true value=100.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=120% color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider = name=VisualScaleSlider visible=true value=1.2
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:ItemList = name=CharacterList visible=true items=*預設桌寵  v內建 〔使用中〕\nID: open_desktop_pet_default
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer = name=MaskEffectEditor visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/1:Button = name=CharacterDeleteButton visible=true disabled=true pressed=false text=刪除角色包
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label = visible=true text=已切換為「莓角守宮」。 color=238b9dff
+  window/3:ConfirmationDialog = name=CharacterDeleteDialog visible=false text=確定要刪除「Golden Codex」嗎？\n\n角色包會被移除，但遊戲進度會保留。
+## close details window
+  window = closed
+  window/0:PanelContainer removed
+  window/0:PanelContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/3:Button removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/4:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/0:Control removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/3:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/4:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/3:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/4:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/1:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:CheckBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:CheckBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/19:CheckBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:OptionButton removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:OptionButton removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider/0:Timer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:CheckBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/19:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/23:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/24:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/26:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/28:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/29:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/31:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/1:ConfirmationDialog removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:ItemList removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/3:Control removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/1:SpinBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/3:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/4:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label removed
+  window/1:FileDialog removed
+  window/2:ConfirmationDialog removed
+  window/3:ConfirmationDialog removed
+  window/4:AcceptDialog removed
+## reopen details window on the character tab
+  window = name=StatsWindow visible=true
+  window/0:PanelContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/0:Button = visible=true disabled=false pressed=false text=狀態
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/1:Button = visible=true disabled=false pressed=false text=待辦
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/2:Button = visible=true disabled=false pressed=false text=設定
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/3:Button = visible=true disabled=false pressed=false text=Agent
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/4:Button = visible=true disabled=false pressed=false text=角色
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer = name=DetailsTabs visible=true current=4
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer = name=狀態 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=養成狀態 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=下一動作：翻肚撒嬌　需要 Lv.5、親密度 15 color=6f65a8ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label = visible=true text=最近訊息：莓角守宮來了！右鍵操作・雙擊摸摸 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/0:Control = visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=照顧操作 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/0:Label = visible=true text=🍽 自動餵食器 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/1:Label = visible=true text=(?) color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/2:Button = visible=false disabled=false pressed=false text=
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/3:Button = name=AutoFeederToggle visible=true disabled=false pressed=false text=關 tooltip=開啟後會自動照顧飽食、水分與體力。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/4:Label = visible=false text= color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/0:Button = visible=true disabled=false pressed=false text=🫐 餵莓果
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/1:Button = visible=true disabled=false pressed=false text=💧 喝水
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/2:Button = visible=true disabled=false pressed=false text=✋ 摸摸
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/3:Button = visible=true disabled=false pressed=false text=🪲 狩獵
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/4:Button = visible=true disabled=false pressed=false text=💤 睡覺
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=Lv.1  ·  100 金幣  ·  XP 2/20 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = visible=true text=陪伴紀錄 : 連續陪伴 1 天 color=6f65a8ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:Label = visible=true text=願望：目前沒有願望 color=a66b16ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/0:Label = visible=true text=飽食 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/1:ProgressBar = visible=true value=100.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/0:Label = visible=true text=水分 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/1:ProgressBar = visible=true value=100.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label = visible=true text=體力 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:ProgressBar = visible=true value=80.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/0:Label = visible=true text=心情 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/1:ProgressBar = visible=true value=78.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label = visible=true text=親密 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:ProgressBar = visible=true value=100.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/1:ScrollContainer = name=待辦 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer = name=設定 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=桌寵設定 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label = visible=true text=開啟後會停止桌寵自主移動、吃飯、喝水、睡覺與其他自主動作；手動操作仍可使用。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:CheckBox = visible=true disabled=false pressed=true text=保持螢幕喚醒（阻止系統休眠）
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:Label = visible=true text=開啟後會要求 Windows 保持螢幕喚醒；關閉後恢復系統電源計畫。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:CheckBox = visible=true disabled=true pressed=false text=登入 Windows 時自動開啟桌寵
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label = visible=true text=目前平台不支援 Windows 開機啟動設定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/0:Label = visible=true text=版本更新 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/1:Label = visible=true text=目前版本 v<version> color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/19:CheckBox = visible=true disabled=false pressed=false text=自動檢查新版本（每天最多一次）
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label = visible=true text=桌寵幀率（FPS） color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:OptionButton = visible=true disabled=false pressed=false text=60 FPS selected=2
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:Label = visible=true text=預設關閉。檢查時只會向 GitHub 查詢最新的版本號，不會傳送你的設定、存檔、角色、Agent 資料或任何識別資訊；GitHub 仍會看到你的 IP 位址。桌寵只會開啟本專案的 GitHub 下載頁，不會自行下載或安裝。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label = visible=true text=尚未檢查。 color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Button = visible=true disabled=false pressed=false text=立即檢查
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/1:Button = visible=false disabled=false pressed=false text=前往下載頁
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/2:Button = visible=false disabled=false pressed=false text=略過這個版本
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = visible=true text=控制整個桌寵的更新率（15–60）；30 FPS 適合日常使用，降低可省電。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Label = visible=true text=詳細面板主題 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:OptionButton = visible=true disabled=false pressed=false text=淺色 selected=0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:Label = visible=true text=切換詳細面板的完整配色；設定會自動保存。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/0:Label = visible=true text=桌寵大小 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=120% color=238b9dff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider = name=VisualScaleSlider visible=true value=1.2
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider/0:Timer =
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/2:Label = visible=true text=可調整為原始顯示大小的 50%–150%；設定會保存。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:CheckBox = visible=true disabled=false pressed=false text=專注模式（不自主移動或做動作）
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer = name=Agent通知 visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=Agent 通知 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/0:Label = visible=true text=　Claude Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/1:Button = name=ClaudeCodeVscodeEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 VS Code 中的 Claude Code 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/0:Label = visible=true text=　Copilot color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/1:Button = name=CopilotEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 Copilot Agent 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/0:Label = visible=true text=　OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/1:Button = name=VscodeOpenCodeEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 VS Code 中的 OpenCode 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:LineEdit = name=CodexAppExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/0:Label = visible=true text=ChatGPT color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/2:Button = name=CodexAppExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇 ChatGPT 執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label = name=CodexAppExecutableHint visible=false text=尚未找到 ChatGPT；請按資料夾按鈕選擇執行檔。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/0:Label = visible=true text=　Codex color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/1:Button = name=CodexAppEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 ChatGPT 中的 Codex 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/19:LineEdit = name=OpenCodeAppExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label = visible=true text=Agent 通知 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:Label = visible=true text=通訊埠 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=AgentPortSpinBox visible=true value=49875.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/0:Label = visible=true text=OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/2:Button = name=OpenCodeAppExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇 OpenCode Desktop 執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label = name=OpenCodeAppExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Label = visible=true text=　OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/1:Button = name=OpenCodeAppEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 OpenCode Desktop 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/23:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/24:LineEdit = name=ClaudeAppExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/0:Label = visible=true text=Claude color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/2:Button = name=ClaudeAppExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇 Claude Code 執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/26:Label = name=ClaudeAppExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/0:Label = visible=true text=　Claude Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/1:Button = name=ClaudeDesktopEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 Claude Desktop Code 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/28:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/29:LineEdit = name=TerminalExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label = name=AgentStatusLabel visible=true text=狀態: 已關閉 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/0:Label = visible=true text=終端機 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/2:Button = name=TerminalExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇終端機執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/31:Label = name=TerminalExecutableHint visible=false text=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/0:Label = visible=true text=　Codex color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/1:Button = name=TerminalCodexEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 Codex CLI 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/0:Label = visible=true text=　Pi color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/1:Button = name=PiCodexEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 Pi 中所有模型的通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/0:Label = visible=true text=　OpenCode color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/1:Button = name=TerminalOpenCodeEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 OpenCode 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/0:Label = visible=true text=　Gemini CLI（舊版） color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/1:Button = name=GeminiCliTerminalEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 Gemini CLI 舊版通知（企業/API Key）
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/0:Label = visible=true text=　Antigravity CLI color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/1:Button = name=AgyTerminalEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 Antigravity CLI 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/0:Label = visible=true text=　Claude Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/1:Button = name=ClaudeCodeTerminalEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉終端機中的 Claude Code 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:ProgressBar = name=CodexSetupProgressBar visible=false value=0.0
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Button = name=CodexHookTrustPageReviewButton visible=false disabled=false pressed=false text=開啟 Codex 信任畫面 tooltip=前往 Codex 檢視並信任桌寵的 Stop Hook
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:Button = name=CodexHookTrustRecheckButton visible=false disabled=false pressed=false text=我已信任，檢查通知 tooltip=檢查桌寵的 Codex Stop Hook 是否已受信任
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HSeparator = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:LineEdit = name=VscodeExecutablePath visible=false text= editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label = visible=true text=VS Code color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:Label = visible=true text=點擊通知氣泡會切回：未設定 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/2:Button = name=VscodeExecutableBrowseButton visible=true disabled=false pressed=false text=📁 tooltip=選擇 VS Code 執行檔
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:Label = name=VscodeExecutableHint visible=false text=尚未找到 VS Code；請按資料夾按鈕選擇執行檔。 color=b44949ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label = visible=true text=　Codex color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:Button = name=CodexEnabledToggle visible=true disabled=false pressed=false text=關 tooltip=開啟或關閉 VS Code 中的 Codex 通知
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/1:ConfirmationDialog = name=CodexHookTrustDialog visible=false text=Codex 必須先信任桌寵的 Stop、PermissionRequest、PreToolUse Hook，通知才會生效。\n\n1. 按「開啟 Codex 信任畫面」。\n2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，每一項都按 Enter 開啟詳細內容。\n4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n6. 回到桌寵，按「我已信任，檢查通知」。\n\n選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。\n\n不需另外安裝 CLI；桌寵會使用已安裝 Codex 產品提供的核心。\n\n審查選單會顯示在「Codex Hook Review」PowerShell 視窗，不會出現在 GPT Codex 或 VS Code 面板裡。
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer = name=角色 visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label = visible=true text=角色管理 color=20272bff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label = visible=true text=角色清單只會在開啟這個頁面時讀取，不會增加平常常駐耗能。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:ItemList = name=CharacterList visible=true items=*預設桌寵  v內建 〔使用中〕\nID: open_desktop_pet_default
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer = name=MaskEffectEditor visible=false
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer = name=MaskEffectHeader visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/0:Label = visible=true text=Codex Pet 眼罩特效校正 color=30383cff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/1:Label = visible=true text=設定 color=445057ff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label = visible=true text=▾ color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label = visible=true text=只套用到目前使用中的 Codex Pet；點擊上方列展開預覽與調整，按「套用」保存並鎖定。 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/0:Label = visible=true text=X color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/1:Label = visible=true text=Y color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/2:Label = visible=true text=大小 color=68747aff
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/3:Control = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox = name=MaskEffectX visible=true value=0.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/1:SpinBox = name=MaskEffectY visible=true value=0.0 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox = name=MaskEffectScale visible=true value=0.05 editable=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/3:Button = name=MaskEffectApplyButton visible=true disabled=false pressed=false text=套用
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/4:Button = name=MaskEffectResetButton visible=true disabled=false pressed=false text=重設預設
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/0:Button = name=CharacterUseButton visible=true disabled=false pressed=false text=重新載入角色
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/1:Button = name=CharacterDeleteButton visible=true disabled=true pressed=false text=刪除角色包
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer = visible=true
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer/0:Button = name=CharacterImportButton visible=true disabled=false pressed=false text=匯入角色包
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer/1:Button = name=CharacterPacksFolderButton visible=true disabled=false pressed=false text=開啟角色資料夾
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label = visible=true text=切換角色會儲存目前進度，並直接在目前視窗載入。 color=238b9dff
+  window/1:FileDialog = name=CharacterImportDialog visible=false text=
+  window/2:ConfirmationDialog = name=CharacterUpdateDialog visible=false text=
+  window/3:ConfirmationDialog = name=CharacterDeleteDialog visible=false text=
+  window/4:AcceptDialog = name=MaskEffectFeedbackDialog visible=false text=
+## shutdown
+  bubble hidden
+  window = closed
+  window/0:PanelContainer removed
+  window/0:PanelContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/3:Button removed
+  window/0:PanelContainer/0:VBoxContainer/0:MarginContainer/0:HBoxContainer/4:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/0:Control removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/3:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:VBoxContainer/1:CenterContainer/0:HBoxContainer/4:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/3:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HFlowContainer/4:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/0:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/1:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:CheckBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:CheckBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/19:CheckBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:OptionButton removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:OptionButton removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/1:HSlider/0:Timer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:VBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/2:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:CheckBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/10:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/11:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/12:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/13:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/14:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/15:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/16:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/17:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/18:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/19:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/20:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/21:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/22:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/23:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/24:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/25:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/26:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/27:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/28:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/29:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/30:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/31:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/32:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/33:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/34:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/35:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/36:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/37:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:ProgressBar removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HSeparator removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:LineEdit removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/7:HBoxContainer/2:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/8:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/0:MarginContainer/0:VBoxContainer/9:HBoxContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/3:ScrollContainer/1:ConfirmationDialog removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/2:ItemList removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/0:PanelContainer/0:HBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/0:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/1:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/2:Label removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/0:HBoxContainer/3:Control removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/0:SpinBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/1:SpinBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/2:SpinBox removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/3:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/3:VBoxContainer/2:CenterContainer/0:VBoxContainer/1:HBoxContainer/4:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/4:HFlowContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer/0:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/5:HFlowContainer/1:Button removed
+  window/0:PanelContainer/0:VBoxContainer/1:TabContainer/4:ScrollContainer/0:MarginContainer/0:VBoxContainer/6:Label removed
+  window/1:FileDialog removed
+  window/2:ConfirmationDialog removed
+  window/3:ConfirmationDialog removed
+  window/4:AcceptDialog removed

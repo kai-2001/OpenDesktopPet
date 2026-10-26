@@ -241,6 +241,12 @@ try {
     if ($codexTrustCheckExitCode -ne 0 -or -not ($codexTrustCheckOutput -match 'CODEX_TRUST_CHECK_TEST_OK')) {
         throw 'Codex trust check validation failed.'
     }
+    $detailsWindowGoldenOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/details_window_golden_test.gd' 2>&1
+    $detailsWindowGoldenExitCode = $LASTEXITCODE
+    $detailsWindowGoldenOutput | Write-Output
+    if ($detailsWindowGoldenExitCode -ne 0 -or -not ($detailsWindowGoldenOutput -match 'DETAILS_WINDOW_GOLDEN_TEST_OK')) {
+        throw 'Details window golden validation failed.'
+    }
     $codexSleepTransitionOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_sleep_transition_test.gd' 2>&1
     $codexSleepTransitionExitCode = $LASTEXITCODE
     $codexSleepTransitionOutput | Write-Output
