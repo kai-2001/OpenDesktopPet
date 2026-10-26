@@ -291,6 +291,10 @@ func _assert_schedule_is_typed_or_picked() -> void:
 	var date_edit := panel.find_child("ReminderDate", true, false) as LineEdit
 	_assert_true(time_edit != null and date_edit != null, "date and time can be typed")
 	_assert_true(not time_edit.editable, "all-day reminders need no time")
+	_assert_true(
+		time_edit.text.is_empty() and time_edit.placeholder_text.is_empty(),
+		"an all-day reminder leaves the time field empty"
+	)
 	panel._title_edit.text = "選時間的待辦"
 	panel._all_day_check_box.button_pressed = false
 	_assert_true(time_edit.editable, "timed reminders can type a time")
@@ -337,6 +341,9 @@ func _assert_schedule_is_typed_or_picked() -> void:
 	_assert_equal(String(saved[0].get("due_time", "")), "10:36", "the time is saved")
 	_assert_true(not bool(saved[0].get("all_day", true)), "a timed reminder is saved")
 
+	panel._all_day_check_box.button_pressed = true
+	_assert_true(time_edit.text.is_empty(), "choosing all-day clears the time")
+	panel._all_day_check_box.button_pressed = false
 	panel._show_edit_form(saved[0])
 	_assert_equal(time_edit.text, "10:36", "editing shows the saved time")
 	panel.queue_free()

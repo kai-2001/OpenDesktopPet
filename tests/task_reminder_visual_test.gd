@@ -117,10 +117,17 @@ func _run() -> void:
 			]:
 				var scroll := column[0] as ScrollContainer
 				var chosen := column[1] as Button
-				_assert_true(
-					scroll.get_global_rect().encloses(chosen.get_global_rect()),
-					"%s time picker scrolls to the selected value" % theme_mode
-				)
+				_assert_middle_row(scroll, chosen, "%s time picker centres %s" % [theme_mode, chosen.text])
+			panel._time_picker.hide()
+			await process_frame
+			panel._time_picker.open_for(panel._time_edit, "21:00")
+			for _edge_frame: int in 3:
+				await process_frame
+			_assert_middle_row(
+				panel._time_picker._minute_scroll,
+				panel._time_picker._minute_buttons[0],
+				"%s time picker centres minute 00" % theme_mode
+			)
 			var time_picker_size: Vector2i = panel._time_picker.size
 			var time_content_size: Vector2 = panel._time_picker.get_child(0).get_combined_minimum_size()
 			_assert_true(
@@ -207,6 +214,13 @@ func _relative_date(days: int) -> String:
 	var timestamp := Time.get_unix_time_from_datetime_dict(now) + days * 86400
 	var value := Time.get_datetime_dict_from_unix_time(timestamp)
 	return "%04d-%02d-%02d" % [value.year, value.month, value.day]
+
+
+func _assert_middle_row(scroll: ScrollContainer, chosen: Button, label: String) -> void:
+	var offset := absf(
+		chosen.get_global_rect().get_center().y - scroll.get_global_rect().get_center().y
+	)
+	_assert_true(offset <= 2.0, "%s (offset %.1f)" % [label, offset])
 
 
 func _cleanup() -> void:

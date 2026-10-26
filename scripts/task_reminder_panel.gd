@@ -512,7 +512,7 @@ func _on_all_day_toggled(enabled: bool) -> void:
 		_editing_time = _next_whole_hour()
 	_time_edit.editable = not enabled
 	_time_edit.text = "" if enabled else _editing_time
-	_time_edit.placeholder_text = "不需時間" if enabled else "09:30"
+	_time_edit.placeholder_text = "" if enabled else "09:30"
 	_time_pick_button.disabled = enabled
 
 

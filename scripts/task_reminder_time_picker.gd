@@ -3,8 +3,11 @@ extends "res://scripts/task_reminder_popup.gd"
 
 signal time_selected(time: String)
 
+# An odd row count keeps the selected value on the middle row.
 const VISIBLE_ROWS := 7
-const ROW_HEIGHT := 32
+const ROW_HEIGHT := 30
+const ROW_GAP := 2
+const COLUMN_WIDTH := 76
 
 var _hour := 0
 var _minute := 0
@@ -17,7 +20,7 @@ var _minute_buttons: Array[Button] = []
 func _init() -> void:
 	super()
 	name = "TaskReminderTimePicker"
-	size = Vector2i(220, 330)
+	size = Vector2i(204, 300)
 
 
 func open_for(anchor: Control, time: String) -> void:
@@ -54,9 +57,16 @@ func _build() -> void:
 	header.add_child(now_button)
 
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 8)
+	columns.alignment = BoxContainer.ALIGNMENT_CENTER
+	columns.add_theme_constant_override("separation", 10)
 	content.add_child(columns)
 	_hour_scroll = _column(columns, "時", 24, _hour_buttons, _choose_hour)
+	var divider := VSeparator.new()
+	var divider_line := StyleBoxLine.new()
+	divider_line.color = _theme.color("border")
+	divider_line.vertical = true
+	divider.add_theme_stylebox_override("separator", divider_line)
+	columns.add_child(divider)
 	_minute_scroll = _column(columns, "分", 60, _minute_buttons, _choose_minute)
 	_refresh_selection()
 
@@ -65,7 +75,7 @@ func _column(
 	parent: Control, heading: String, count: int, buttons: Array[Button], chosen: Callable
 ) -> ScrollContainer:
 	var column := VBoxContainer.new()
-	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.custom_minimum_size.x = COLUMN_WIDTH
 	column.add_theme_constant_override("separation", 4)
 	parent.add_child(column)
 	var label := Label.new()
@@ -74,14 +84,20 @@ func _column(
 	label.add_theme_font_size_override("font_size", 12)
 	label.add_theme_color_override("font_color", _theme.color("text_muted"))
 	column.add_child(label)
+	# The scroll bar is hidden like common time pickers; the wheel and
+	# dragging still scroll.
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size.y = VISIBLE_ROWS * (ROW_HEIGHT + 2)
+	scroll.custom_minimum_size.y = VISIBLE_ROWS * (ROW_HEIGHT + ROW_GAP)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	column.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	list.add_theme_constant_override("separation", 2)
+	list.add_theme_constant_override("separation", ROW_GAP)
 	scroll.add_child(list)
+	# Padding lets the first and last values reach the middle row too.
+	var padding := (VISIBLE_ROWS - 1) / 2 * (ROW_HEIGHT + ROW_GAP)
+	list.add_child(_spacer(padding))
 	for value: int in count:
 		var button := Button.new()
 		button.text = "%02d" % value
@@ -89,7 +105,15 @@ func _column(
 		button.pressed.connect(func() -> void: chosen.call(value))
 		list.add_child(button)
 		buttons.append(button)
+	list.add_child(_spacer(padding))
 	return scroll
+
+
+func _spacer(height: int) -> Control:
+	var spacer := Control.new()
+	spacer.custom_minimum_size.y = height
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return spacer
 
 
 func _choose_hour(hour: int) -> void:
@@ -125,17 +149,42 @@ func _now() -> String:
 
 func _refresh_selection() -> void:
 	for hour: int in _hour_buttons.size():
-		_theme.style_button(_hour_buttons[hour], "primary" if hour == _hour else "quiet")
+		_style_row(_hour_buttons[hour], hour == _hour)
 	for minute: int in _minute_buttons.size():
-		_theme.style_button(_minute_buttons[minute], "primary" if minute == _minute else "quiet")
+		_style_row(_minute_buttons[minute], minute == _minute)
 
 
-# Centre each column on its selected value once the popup has laid out.
+func _style_row(button: Button, selected: bool) -> void:
+	_theme.style_button(button, "primary" if selected else "quiet")
+	# Buttons take the height of their tallest state, including states left
+	# to the default theme, so give every state the same compact style.
+	var compact := {}
+	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var style := (button.get_theme_stylebox(state) as StyleBoxFlat).duplicate() as StyleBoxFlat
+		style.content_margin_top = 2
+		style.content_margin_bottom = 2
+		compact[state] = style
+	compact["hover_pressed"] = compact["pressed"]
+	for state: String in compact.keys():
+		button.add_theme_stylebox_override(state, compact[state])
+		if state != "focus":
+			button.add_theme_stylebox_override(state + "_mirrored", compact[state])
+
+
+# Centre each column on its selected value. The padding rows make that
+# offset depend only on the value. Set it again once the popup has laid
+# out, because a scroll container clamps offsets to its current content.
 func _scroll_to_selection() -> void:
+	_apply_scroll()
 	await get_tree().process_frame
-	if not visible:
-		return
-	for pair: Array in [[_hour_scroll, _hour_buttons[_hour]], [_minute_scroll, _minute_buttons[_minute]]]:
-		var scroll := pair[0] as ScrollContainer
-		var button := pair[1] as Button
-		scroll.scroll_vertical = int(button.position.y - (scroll.size.y - button.size.y) / 2.0)
+	if visible:
+		_apply_scroll()
+
+
+# Re-sort as well: an offset set while the popup was hidden is stored but the
+# rows are not moved, and setting the same offset again does not move them.
+func _apply_scroll() -> void:
+	_hour_scroll.scroll_vertical = _hour * (ROW_HEIGHT + ROW_GAP)
+	_minute_scroll.scroll_vertical = _minute * (ROW_HEIGHT + ROW_GAP)
+	_hour_scroll.queue_sort()
+	_minute_scroll.queue_sort()
