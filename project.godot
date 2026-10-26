@@ -34,10 +34,6 @@ window/size/window_height_override=320
 window/stretch/mode="canvas_items"
 window/per_pixel_transparency/allowed=true
 
-[gui]
-
-theme/default_font_multichannel_signed_distance_field=true
-
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
