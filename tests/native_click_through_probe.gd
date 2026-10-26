@@ -21,7 +21,7 @@ func _init() -> void:
 	for _i in 3:
 		await process_frame
 	main._idle_behavior_timer.stop()
-	main._set_target_fps(int(options.get("fps", "30")))
+	main._settings_tab.set_target_fps(int(options.get("fps", "30")))
 	main.state.set_visual_scale(float(options.get("scale", "1.0")))
 	var usable := DisplayServer.screen_get_usable_rect(DisplayServer.get_primary_screen())
 	DisplayServer.window_set_position(usable.get_center() - DisplayServer.window_get_size() / 2)

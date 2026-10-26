@@ -11,6 +11,9 @@ const PetInputControllerScript = preload("res://scripts/pet_input_controller.gd"
 const PetMenuBuilderScript = preload("res://scripts/pet_menu_builder.gd")
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const StatsWindowCoordinatorScript = preload("res://scripts/stats_window_coordinator.gd")
+const StatusTabPresenterScript = preload("res://scripts/status_tab_presenter.gd")
+const SettingsTabControllerScript = preload("res://scripts/settings_tab_controller.gd")
+const CharacterTabControllerScript = preload("res://scripts/character_tab_controller.gd")
 const TaskReminderCoordinatorScript = preload("res://scripts/task_reminder_coordinator.gd")
 const TaskReminderPresentationCoordinatorScript = preload(
 	"res://scripts/task_reminder_presentation_coordinator.gd"
@@ -25,10 +28,6 @@ const CharacterEffectPreferencesScript = preload(
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_STATS_SIZE := StatsWindowCoordinatorScript.DEFAULT_WINDOW_SIZE
 const MIN_STATS_SIZE := StatsWindowCoordinatorScript.MIN_WINDOW_SIZE
-const DEFAULT_TARGET_FPS := 30
-const TARGET_FPS_OPTIONS := [15, 30, 60]
-const DEFAULT_KEEP_SCREEN_ON := false
-const DEFAULT_FOCUS_MODE := false
 const AGENT_NOTIFICATION_DURATION_SECONDS := 60.0
 const AGENT_FOREGROUND_NOTIFICATION_DURATION_SECONDS := 3.0
 const WINDOW_REVEAL_FRAMES := 3
@@ -50,54 +49,6 @@ const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
 var _stats_window: Window
 var _stats_tabs: TabContainer
 var _stats_tab_buttons: Array[Button] = []
-var _stats_status: Label
-var _companion_status: Label
-var _wish_status: Label
-var _unlock_status: Label
-var _last_message_status: Label
-var _fps_option_button: OptionButton
-var _details_theme_option_button: OptionButton
-var _visual_scale_slider: HSlider
-var _visual_scale_value_label: Label
-var _focus_mode_check_box: CheckBox
-var _keep_screen_on_check_box: CheckBox
-var _autostart_check_box: CheckBox
-var _settings_feedback: Label
-var _update_auto_check_box: CheckBox
-var _update_status_label: Label
-var _update_check_button: Button
-var _update_release_page_button: Button
-var _update_skip_button: Button
-var _character_list: ItemList
-var _character_feedback: Label
-var _character_use_button: Button
-var _character_delete_button: Button
-var _mask_effect_panel: Control
-var _mask_effect_hint: Control
-var _mask_effect_values: Control
-var _mask_effect_x_spin: SpinBox
-var _mask_effect_y_spin: SpinBox
-var _mask_effect_scale_spin: SpinBox
-var _mask_effect_header_state: Label
-var _mask_effect_header_chevron: Label
-var _mask_effect_apply_button: Button
-var _mask_effect_reset_button: Button
-var _mask_effect_feedback_dialog: AcceptDialog
-var _mask_effect_editing := false
-var _pending_mask_anchor := Vector2.ZERO
-var _pending_mask_scale := 0.38
-var _character_tab_index := -1
-var _character_tab_loaded := false
-var _character_entries: Array[Dictionary] = []
-var _character_import_dialog: FileDialog
-var _character_update_dialog: ConfirmationDialog
-var _character_delete_dialog: ConfirmationDialog
-var _pending_character_archive := ""
-var _stats_bars: Dictionary = {}
-var _care_action_buttons: Dictionary = {}
-var _auto_feeder_buy_button: Button
-var _auto_feeder_toggle: Button
-var _auto_feeder_status: Label
 var _autostart_service
 var _window_service
 var _window_reveal_token := 0
@@ -119,18 +70,15 @@ var _pet_interaction_polygon := PackedVector2Array()
 var _status_indicator: StatusIndicator
 var _tray_menu: PopupMenu
 var _today_reminder_ids: Dictionary = {}
-var _details_theme_mode := "light"
-var _keep_screen_on := DEFAULT_KEEP_SCREEN_ON
-var _focus_mode := DEFAULT_FOCUS_MODE
 var _agent_controller: AgentIntegrationController
 var _agent_settings_panel
 # Tests swap in a recording subclass before the node enters the tree.
 var agent_controller_script: Script = AgentIntegrationControllerScript
 var _update_check_coordinator
-var _status_tab_view
 var _reminders_tab_view
-var _settings_tab_view
-var _character_tab_view
+var _status_tab
+var _settings_tab
+var _character_tab
 var _agent_notification_active := false
 var _active_agent_target_app := AgentIntegrationControllerScript.TARGET_VSCODE
 var _active_agent := "codex"
@@ -176,7 +124,20 @@ func _ready() -> void:
 	task_reminder_badge.pressed.connect(_open_task_reminders_from_badge)
 	task_reminder_badge.visibility_changed.connect(_refresh_interaction_polygon)
 	task_reminder_badge.resized.connect(_on_task_reminder_badge_resized)
-	_load_runtime_settings()
+	_status_tab = StatusTabPresenterScript.new()
+	_status_tab.configure(
+		state, pet, Callable(self, "_interaction_label"), Callable(self, "_interaction_icon")
+	)
+	_status_tab.care_action_requested.connect(_run_care_action)
+	_status_tab.dialogue_requested.connect(_say_dialogue)
+	_settings_tab = SettingsTabControllerScript.new()
+	_settings_tab.configure(state, pet, _gameplay_coordinator)
+	_settings_tab.theme_changed.connect(_on_details_theme_changed)
+	_settings_tab.load_runtime_settings()
+	_character_tab = CharacterTabControllerScript.new()
+	_character_tab.configure(
+		_character_coordinator, pet, state, Callable(self, "_apply_character_without_restart")
+	)
 	get_viewport().transparent_bg = true
 	get_viewport().gui_embed_subwindows = false
 	_style_bubble()
@@ -436,7 +397,7 @@ func _setup_agent_integration() -> void:
 func _setup_update_check() -> void:
 	_update_check_coordinator = UpdateCheckCoordinatorScript.new()
 	_update_check_coordinator.name = "UpdateCheckCoordinator"
-	_update_check_coordinator.state_changed.connect(_refresh_update_ui)
+	_settings_tab.set_update_check(_update_check_coordinator)
 	_update_check_coordinator.update_found.connect(_on_update_found)
 	add_child(_update_check_coordinator)
 
@@ -445,53 +406,9 @@ func _on_update_found(version: String) -> void:
 	say("有新版本 v%s，可以到詳細面板的「設定」頁前往下載。" % version, 8.0)
 
 
-func _refresh_update_ui() -> void:
-	if _update_check_coordinator == null:
-		return
-	if is_instance_valid(_update_auto_check_box):
-		_update_auto_check_box.set_pressed_no_signal(
-			_update_check_coordinator.auto_check_enabled
-		)
-	if is_instance_valid(_update_status_label):
-		_update_status_label.text = _update_check_coordinator.status_text()
-	var checking: bool = (
-		_update_check_coordinator.state == UpdateCheckCoordinatorScript.STATE_CHECKING
-	)
-	if is_instance_valid(_update_check_button):
-		_update_check_button.disabled = checking
-	var has_update: bool = _update_check_coordinator.has_update()
-	if is_instance_valid(_update_release_page_button):
-		_update_release_page_button.visible = has_update
-	if is_instance_valid(_update_skip_button):
-		_update_skip_button.visible = has_update
-
-
-func _on_update_auto_check_toggled(enabled: bool) -> void:
-	if _update_check_coordinator != null:
-		_update_check_coordinator.set_auto_check_enabled(enabled)
-
-
-func _on_update_check_requested() -> void:
-	if _update_check_coordinator != null:
-		_update_check_coordinator.check_now()
-
-
-func _on_update_release_page_requested() -> void:
-	if _update_check_coordinator == null:
-		return
-	var url: String = _update_check_coordinator.release_page_url()
-	if not url.is_empty():
-		OS.shell_open(url)
-
-
-func _on_update_skip_requested() -> void:
-	if _update_check_coordinator != null:
-		_update_check_coordinator.skip_latest_version()
-
-
 func _setup_autostart_service() -> void:
 	_autostart_service = WindowsAutostartServiceScript.new()
-	_autostart_service.operation_completed.connect(_finish_autostart_operation)
+	_settings_tab.set_autostart_service(_autostart_service)
 
 
 func _handle_agent_notification(
@@ -510,8 +427,7 @@ func _enqueue_agent_status(
 	_active_agent_target_app = target_app
 	_active_agent = agent
 	_last_state_message = message
-	if is_instance_valid(_last_message_status):
-		_last_message_status.text = "最近訊息：%s" % message
+	_status_tab.set_last_message(message)
 	var target_is_foreground := (
 		_agent_controller != null
 		and _agent_controller.is_target_foreground(target_app)
@@ -566,8 +482,7 @@ func _show_state_message(key: String, fallback: String) -> void:
 	var suffix := "" if newline_at < 0 else fallback.substr(newline_at)
 	var text: String = pet.get_dialogue(key, base_text) + suffix
 	_last_state_message = text.replace("\n", "　")
-	if is_instance_valid(_last_message_status):
-		_last_message_status.text = "最近訊息：%s" % _last_state_message
+	_status_tab.set_last_message(_last_state_message)
 	say(text, 6.0)
 
 
@@ -786,7 +701,7 @@ func _setup_idle_behavior() -> void:
 func _can_act_autonomously(require_mouse_idle := false) -> bool:
 	var mouse_is_idle := Time.get_ticks_msec() - _last_user_activity_ms >= 4500
 	return (not require_mouse_idle or mouse_is_idle) \
-		and not _focus_mode \
+		and not _settings_tab.focus_mode \
 		and not context_menu.visible \
 		and not _is_stats_window_open() \
 		and not _input_controller.is_dragging() \
@@ -795,7 +710,7 @@ func _can_act_autonomously(require_mouse_idle := false) -> bool:
 
 
 func _run_autonomous_action() -> void:
-	if _focus_mode:
+	if _settings_tab.focus_mode:
 		return
 	var mouse_is_idle := Time.get_ticks_msec() - _last_user_activity_ms >= 4500
 	_gameplay_coordinator.run_autonomous_action(mouse_is_idle)
@@ -806,18 +721,16 @@ func _autonomous_small_roll() -> void:
 
 
 func _build_stats_window() -> void:
-	_stats_bars.clear()
-	_care_action_buttons.clear()
 	_stats_window_coordinator = StatsWindowCoordinatorScript.new()
-	_stats_window_coordinator.theme_mode = _details_theme_mode
+	_stats_window_coordinator.theme_mode = _settings_tab.theme_mode
 	_stats_window_coordinator.reminder_coordinator = _task_reminder_coordinator
 	_stats_window_coordinator.last_state_message = _last_state_message
 	_stats_window_coordinator.agent_settings = (
 		_agent_controller.get_settings_snapshot() if _agent_controller != null else {}
 	)
-	_stats_window_coordinator.autostart_supported = _is_autostart_supported()
-	_stats_window_coordinator.keep_screen_on = _keep_screen_on
-	_stats_window_coordinator.focus_mode = _focus_mode
+	_stats_window_coordinator.autostart_supported = _settings_tab.is_autostart_supported()
+	_stats_window_coordinator.keep_screen_on = _settings_tab.keep_screen_on
+	_stats_window_coordinator.focus_mode = _settings_tab.focus_mode
 	_stats_window_coordinator.visual_scale = float(
 		state.get_snapshot().get("visual_scale", PetVisualScaleScript.DEFAULT_VALUE)
 	)
@@ -827,457 +740,39 @@ func _build_stats_window() -> void:
 	_stats_window = refs["window"] as Window
 	_stats_tabs = refs["tabs"] as TabContainer
 	_stats_tab_buttons = refs["tab_buttons"] as Array[Button]
-	_status_tab_view = refs["status_tab"]
 	_reminders_tab_view = refs["reminders_tab"]
-	_settings_tab_view = refs["settings_tab"]
-	_character_tab_view = refs["character_tab"]
-	_connect_details_window_signals()
 	_stats_window_coordinator.close_requested.connect(_destroy_stats_window)
 	_stats_window_coordinator.window_input.connect(_on_stats_window_input)
 	_stats_window_coordinator.tab_selected.connect(_select_stats_tab)
 	_stats_window_coordinator.tab_changed.connect(_on_stats_tab_changed)
-	var status_refs: Dictionary = refs["status_refs"]
-	_stats_status = status_refs["stats_status"] as Label
-	_companion_status = status_refs["companion_status"] as Label
-	_wish_status = status_refs["wish_status"] as Label
-	_unlock_status = status_refs["unlock_status"] as Label
-	_last_message_status = status_refs["last_message_status"] as Label
-	_care_action_buttons = status_refs["care_action_buttons"] as Dictionary
-	_auto_feeder_buy_button = status_refs["auto_feeder_buy_button"] as Button
-	_auto_feeder_toggle = status_refs["auto_feeder_toggle"] as Button
-	_auto_feeder_status = status_refs["auto_feeder_status"] as Label
-	_stats_bars = status_refs["stats_bars"] as Dictionary
-
-	var settings_refs: Dictionary = refs["settings_refs"]
-	_fps_option_button = settings_refs["fps_option_button"] as OptionButton
-	_details_theme_option_button = settings_refs["details_theme_option_button"] as OptionButton
-	_visual_scale_slider = settings_refs["visual_scale_slider"] as HSlider
-	_visual_scale_value_label = settings_refs["visual_scale_value_label"] as Label
-	_focus_mode_check_box = settings_refs["focus_mode_check_box"] as CheckBox
-	_keep_screen_on_check_box = settings_refs["keep_screen_on_check_box"] as CheckBox
-	_autostart_check_box = settings_refs["autostart_check_box"] as CheckBox
-	_settings_feedback = settings_refs["settings_feedback"] as Label
-	_update_auto_check_box = settings_refs["update_auto_check_box"] as CheckBox
-	_update_status_label = settings_refs["update_status_label"] as Label
-	_update_check_button = settings_refs["update_check_button"] as Button
-	_update_release_page_button = settings_refs["update_release_page_button"] as Button
-	_update_skip_button = settings_refs["update_skip_button"] as Button
-	_refresh_update_ui()
+	_status_tab.bind(refs["status_tab"], refs["status_refs"])
+	_settings_tab.bind(refs["settings_tab"], refs["settings_refs"])
 	_agent_settings_panel.bind(
-		refs["agent_tab"], refs["agent_refs"], _details_theme_mode
+		refs["agent_tab"], refs["agent_refs"], _settings_tab.theme_mode
 	)
-	# The settings builder cannot request this before its signals and control
-	# references exist. Queue the initial query only after initialization.
-	if _is_autostart_supported():
-		call_deferred("_start_autostart_operation", "query", false)
-
-	var character_refs: Dictionary = refs["character_refs"]
-	_character_tab_index = int(character_refs["character_tab_index"])
-	_character_list = character_refs["character_list"] as ItemList
-	_character_use_button = character_refs["character_use_button"] as Button
-	_character_delete_button = character_refs["character_delete_button"] as Button
-	_mask_effect_panel = character_refs["mask_effect_panel"] as Control
-	_mask_effect_hint = character_refs["mask_effect_hint"] as Control
-	_mask_effect_values = character_refs["mask_effect_values"] as Control
-	_mask_effect_x_spin = character_refs["mask_effect_x"] as SpinBox
-	_mask_effect_y_spin = character_refs["mask_effect_y"] as SpinBox
-	_mask_effect_scale_spin = character_refs["mask_effect_scale"] as SpinBox
-	_mask_effect_header_state = character_refs["mask_effect_header_state"] as Label
-	_mask_effect_header_chevron = character_refs["mask_effect_header_chevron"] as Label
-	_mask_effect_apply_button = character_refs["mask_effect_apply_button"] as Button
-	_mask_effect_reset_button = character_refs["mask_effect_reset_button"] as Button
-	_mask_effect_feedback_dialog = character_refs["mask_effect_feedback_dialog"] as AcceptDialog
-	_refresh_mask_effect_editor()
-	_character_feedback = character_refs["character_feedback"] as Label
-	_character_import_dialog = character_refs["character_import_dialog"] as FileDialog
-	_character_update_dialog = character_refs["character_update_dialog"] as ConfirmationDialog
-	_character_delete_dialog = character_refs["character_delete_dialog"] as ConfirmationDialog
+	_settings_tab.query_autostart()
+	_character_tab.bind(refs["character_tab"], refs["character_refs"])
 	_select_stats_tab(0)
 
 
-func _connect_details_window_signals() -> void:
-	_status_tab_view.care_action_requested.connect(
-		_on_care_action_requested
-	)
-	_status_tab_view.auto_feeder_buy_requested.connect(_on_auto_feeder_buy_requested)
-	_status_tab_view.auto_feeder_toggled.connect(_on_auto_feeder_toggled)
-	_settings_tab_view.target_fps_selected.connect(_on_target_fps_selected)
-	_settings_tab_view.details_theme_selected.connect(_on_details_theme_selected)
-	_settings_tab_view.autostart_toggled.connect(_on_autostart_toggled)
-	_settings_tab_view.keep_screen_on_toggled.connect(_on_keep_screen_on_toggled)
-	_settings_tab_view.focus_mode_toggled.connect(_on_focus_mode_toggled)
-	_settings_tab_view.update_auto_check_toggled.connect(
-		_on_update_auto_check_toggled
-	)
-	_settings_tab_view.update_check_requested.connect(_on_update_check_requested)
-	_settings_tab_view.update_release_page_requested.connect(
-		_on_update_release_page_requested
-	)
-	_settings_tab_view.update_skip_requested.connect(_on_update_skip_requested)
-	_settings_tab_view.visual_scale_previewed.connect(_on_visual_scale_previewed)
-	_settings_tab_view.visual_scale_changed.connect(_on_visual_scale_changed)
-	_character_tab_view.character_selected.connect(_on_character_selected)
-	_character_tab_view.character_use_requested.connect(_use_selected_character)
-	_character_tab_view.character_delete_requested.connect(
-		_confirm_delete_selected_character
-	)
-	_character_tab_view.character_import_requested.connect(
-		_open_character_import_dialog
-	)
-	_character_tab_view.open_character_packs_folder_requested.connect(
-		_open_character_packs_folder
-	)
-	_character_tab_view.character_archive_selected.connect(
-		_install_character_archive
-	)
-	_character_tab_view.character_update_confirmed.connect(
-		_install_pending_character_archive
-	)
-	_character_tab_view.character_delete_confirmed.connect(
-		_delete_selected_character
-	)
-	_character_tab_view.mask_effect_changed.connect(
-		_on_mask_effect_changed
-	)
-	_character_tab_view.mask_effect_toggle_requested.connect(
-		_on_mask_effect_toggle_requested
-	)
-	_character_tab_view.mask_effect_apply_requested.connect(
-		_on_mask_effect_apply_requested
-	)
-	_character_tab_view.mask_effect_reset_requested.connect(
-		_on_mask_effect_reset_requested
-	)
-
-
-func _on_care_action_requested(action: String) -> void:
-	match action:
-		"feed":
-			_run_care_action(1)
-		"water":
-			_run_care_action(2)
-		"pet":
-			_run_care_action(3)
-		"work":
-			_run_care_action(4)
-		"sleep":
-			_run_care_action(5)
-
-
 func _on_stats_tab_changed(tab_index: int) -> void:
-	_refresh_stats_tab_buttons(tab_index)
-	if tab_index != _character_tab_index and _mask_effect_editing:
-		_cancel_mask_effect_editing()
+	_stats_window_coordinator.refresh_tab_buttons(tab_index)
+	_character_tab.on_tab_changed(tab_index)
 	if tab_index == AGENT_TAB_INDEX and _agent_controller != null:
 		_agent_controller.refresh_enabled_executable_paths_if_invalid()
-	if tab_index != _character_tab_index or _character_tab_loaded:
-		return
-	_refresh_character_list()
 
 
 func _select_stats_tab(tab_index: int) -> void:
 	if not is_instance_valid(_stats_tabs):
 		return
 	_stats_tabs.current_tab = clampi(tab_index, 0, _stats_tabs.get_tab_count() - 1)
-	_refresh_stats_tab_buttons(_stats_tabs.current_tab)
-
-
-func _refresh_stats_tab_buttons(selected_index: int) -> void:
-	for index: int in _stats_tab_buttons.size():
-		_apply_stats_tab_button_style(
-			_stats_tab_buttons[index], index == selected_index
-		)
-
-
-func _apply_stats_tab_button_style(button: Button, selected: bool) -> void:
-	var normal_bg := _details_color("#0f0f0f", "#37373d") \
-			if selected else _details_color("#e6e6e6", "#252526")
-	var normal_border := _details_color("#0f0f0f", "#3794ff") \
-			if selected else _details_color("#f2f2f2", "#333333")
-	var hover_bg := normal_bg if selected \
-			else _details_color("#e5e5e5", "#2a2d2e")
-	var pressed_bg := _details_color("#272727", "#094771") \
-			if selected else _details_color("#d9d9d9", "#333337")
-	var normal_style := _details_style(normal_bg, normal_border, 8)
-	var hover_style := _details_style(
-		hover_bg,
-		normal_border if selected else _details_color("#e5e5e5", "#4e4e4e"),
-		8
-	)
-	var pressed_style := _details_style(pressed_bg, normal_border, 8)
-	if _details_theme_mode == "dark" and selected:
-		normal_style.border_width_bottom = 2
-		hover_style.border_width_bottom = 2
-		pressed_style.border_width_bottom = 2
-	button.add_theme_stylebox_override("normal", normal_style)
-	button.add_theme_stylebox_override("hover", hover_style)
-	button.add_theme_stylebox_override("pressed", pressed_style)
-	button.add_theme_stylebox_override("focus", normal_style)
-	button.add_theme_color_override(
-		"font_color", Color("#ffffff") if selected \
-		else _details_color("#0f0f0f", "#cccccc")
-	)
-	button.add_theme_color_override(
-		"font_hover_color", Color("#ffffff") if selected \
-		else _details_color("#0f0f0f", "#ffffff")
-	)
-	button.add_theme_color_override("font_pressed_color", Color("#ffffff"))
-	button.add_theme_font_size_override("font_size", 15)
-
-
-func _refresh_character_list(message := "") -> void:
-	if not is_instance_valid(_character_list):
-		return
-	_character_tab_loaded = true
-	_character_entries.clear()
-	_character_list.clear()
-	_character_entries.append({
-		"id": "open_desktop_pet_default",
-		"name": "預設桌寵",
-		"version": "內建",
-		"installed": false,
-		"builtin": true,
-	})
-	_character_entries.append_array(_character_coordinator.list_entries().slice(1))
-	var active_id: String = pet.get_character_id()
-	var active_found := false
-	for entry: Dictionary in _character_entries:
-		if String(entry.id) == active_id:
-			active_found = true
-			break
-	if not active_found:
-		_character_entries.append({
-			"id": active_id,
-			"name": pet.get_character_name(),
-			"version": pet.get_character_version(),
-			"installed": false,
-			"builtin": true,
-		})
-	for index in _character_entries.size():
-		var entry: Dictionary = _character_entries[index]
-		var active_marker := " 〔使用中〕" if String(entry.id) == active_id else ""
-		_character_list.add_item("%s  v%s%s\nID: %s" % [
-			String(entry.name),
-			String(entry.version),
-			active_marker,
-			String(entry.id),
-		])
-		if String(entry.id) == active_id:
-			_character_list.select(index)
-	if not message.is_empty():
-		_character_feedback.text = message
-	_update_character_buttons()
-	_refresh_mask_effect_editor()
-
-
-func _on_character_selected(_index: int) -> void:
-	_update_character_buttons()
-
-
-func _refresh_mask_effect_editor() -> void:
-	if not is_instance_valid(_mask_effect_x_spin) \
-			or not is_instance_valid(_mask_effect_header_state):
-		return
-	var enabled: bool = bool(pet.is_codex_pet())
-	_mask_effect_panel.visible = enabled
-	if not enabled:
-		_mask_effect_editing = false
-		pet.set_effect_preview("mask", false)
-		return
-	_load_mask_effect_editor_values()
-	_set_mask_effect_editing(false)
-
-
-func _load_mask_effect_editor_values() -> void:
-	var definition: Dictionary = pet.effect_editor_definition("mask")
-	var raw_anchor: Variant = definition.get("anchor", [0.0, -20.0])
-	var anchor := Vector2.ZERO
-	if raw_anchor is Array and raw_anchor.size() >= 2:
-		anchor = Vector2(float(raw_anchor[0]), float(raw_anchor[1]))
-	var scale := float(definition.get("scale", 0.38))
-	_pending_mask_anchor = anchor
-	_pending_mask_scale = scale
-	_mask_effect_x_spin.set_value_no_signal(anchor.x)
-	_mask_effect_y_spin.set_value_no_signal(anchor.y)
-	_mask_effect_scale_spin.set_value_no_signal(scale)
-
-
-func _set_mask_effect_editing(editing: bool) -> void:
-	_mask_effect_editing = editing
-	_mask_effect_hint.visible = editing
-	_mask_effect_values.visible = editing
-	_mask_effect_x_spin.editable = editing
-	_mask_effect_y_spin.editable = editing
-	_mask_effect_scale_spin.editable = editing
-	_character_tab_view.configure_mask_effect_header(
-		_mask_effect_header_state, _mask_effect_header_chevron, editing
-	)
-	_mask_effect_apply_button.visible = editing
-	_mask_effect_reset_button.disabled = not editing
-	pet.set_effect_preview("mask", editing)
-
-
-func _cancel_mask_effect_editing() -> void:
-	if not _mask_effect_editing:
-		pet.set_effect_preview("mask", false)
-		return
-	pet.reload_effect_overrides()
-	_load_mask_effect_editor_values()
-	_set_mask_effect_editing(false)
-
-
-func _on_mask_effect_changed(anchor: Vector2, scale: float) -> void:
-	if not pet.is_codex_pet():
-		return
-	if not _mask_effect_editing:
-		return
-	_pending_mask_anchor = anchor
-	_pending_mask_scale = clampf(scale, 0.05, 2.0)
-	pet.apply_effect_override("mask", _pending_mask_effect_definition())
-
-
-func _on_mask_effect_toggle_requested() -> void:
-	if not pet.is_codex_pet():
-		return
-	if not _mask_effect_editing:
-		_set_mask_effect_editing(true)
-		return
-	_cancel_mask_effect_editing()
-
-
-func _on_mask_effect_apply_requested() -> void:
-	if not pet.is_codex_pet() or not _mask_effect_editing:
-		return
-	var saved := CharacterEffectPreferencesScript.set_effect(
-		pet.get_character_id(), "mask", _pending_mask_effect_definition()
-	)
-	if saved:
-		pet.apply_effect_override("mask", _pending_mask_effect_definition())
-		_set_mask_effect_editing(false)
-		_show_mask_effect_feedback("眼罩位置與大小已保存。")
-	else:
-		_show_mask_effect_feedback("保存失敗，請稍後再試。")
-
-
-func _on_mask_effect_reset_requested() -> void:
-	if not pet.is_codex_pet():
-		return
-	CharacterEffectPreferencesScript.clear_effect(
-		pet.get_character_id(), "mask"
-	)
-	pet.apply_effect_override("mask", {})
-	_load_mask_effect_editor_values()
-	_set_mask_effect_editing(true)
-
-
-func _show_mask_effect_feedback(message: String) -> void:
-	if not is_instance_valid(_mask_effect_feedback_dialog):
-		return
-	_mask_effect_feedback_dialog.dialog_text = message
-	_mask_effect_feedback_dialog.popup_centered()
-
-
-func _pending_mask_effect_definition() -> Dictionary:
-	return {
-		"anchor": [_pending_mask_anchor.x, _pending_mask_anchor.y],
-		"scale": _pending_mask_scale,
-	}
-
-
-func _selected_character_entry() -> Dictionary:
-	if not is_instance_valid(_character_list):
-		return {}
-	var selected := _character_list.get_selected_items()
-	if selected.is_empty():
-		return {}
-	var index := int(selected[0])
-	if index < 0 or index >= _character_entries.size():
-		return {}
-	return _character_entries[index]
-
-
-func _update_character_buttons() -> void:
-	var entry := _selected_character_entry()
-	var has_entry := not entry.is_empty()
-	if is_instance_valid(_character_use_button):
-		var is_active: bool = has_entry \
-			and String(entry.id) == pet.get_character_id()
-		_character_use_button.text = "重新載入角色" if is_active \
-			else "使用選取角色"
-		_character_use_button.disabled = not has_entry
-	if is_instance_valid(_character_delete_button):
-		_character_delete_button.disabled = not has_entry \
-			or not bool(entry.get("installed", false))
-
-
-func _open_character_import_dialog() -> void:
-	_cancel_mask_effect_editing()
-	if is_instance_valid(_character_import_dialog):
-		_character_import_dialog.popup_centered_ratio(0.75)
-
-
-func _install_character_archive(path: String) -> void:
-	var inspection: Dictionary = _character_coordinator.inspect_archive(path)
-	if not bool(inspection.get("ok", false)):
-		_character_feedback.text = "匯入失敗：%s" % String(inspection.get(
-			"message", "未知錯誤"
-		))
-		return
-	for entry: Dictionary in _character_coordinator.list_entries():
-		if String(entry.id) != String(inspection.id):
-			continue
-		_pending_character_archive = path
-		_character_update_dialog.dialog_text = (
-			"已安裝「%s」v%s。\n準備匯入同一角色ID的v%s。\n\n"
-			+ "更新會替換角色圖片與設定，但保留遊戲進度。"
-		) % [
-			String(entry.name),
-			String(entry.version),
-			String(inspection.version),
-		]
-		_character_update_dialog.popup_centered()
-		return
-	_install_character_archive_now(path)
-
-
-func _install_pending_character_archive() -> void:
-	if _pending_character_archive.is_empty():
-		return
-	var path := _pending_character_archive
-	_pending_character_archive = ""
-	_install_character_archive_now(path)
-
-
-func _install_character_archive_now(path: String) -> void:
-	_character_feedback.text = "正在驗證並安裝角色包…"
-	var result: Dictionary = _character_coordinator.install_archive(path)
-	if not bool(result.get("ok", false)):
-		_character_feedback.text = "匯入失敗：%s" % String(result.get(
-			"message", "未知錯誤"
-		))
-		return
-	var verb := "更新" if bool(result.get("updated", false)) else "安裝"
-	_refresh_character_list("已%s「%s」v%s；角色進度保持不變。" % [
-		verb,
-		String(result.name),
-		String(result.version),
-	])
-
-
-func _use_selected_character() -> void:
-	_cancel_mask_effect_editing()
-	var entry := _selected_character_entry()
-	if entry.is_empty():
-		return
-	var is_reload: bool = String(entry.id) == pet.get_character_id()
-	state.save_state()
-	_apply_character_without_restart(String(entry.id), is_reload)
+	_stats_window_coordinator.refresh_tab_buttons(_stats_tabs.current_tab)
 
 
 func _apply_character_without_restart(character_id: String, is_reload: bool) -> bool:
 	var switch_result: Dictionary = _character_coordinator.switch_character(character_id)
 	if not bool(switch_result.get("ok", false)):
-		_character_feedback.text = "角色載入失敗，已恢復原本角色。"
+		_character_tab.set_feedback("角色載入失敗，已恢復原本角色。")
 		_refresh_interaction_polygon()
 		return false
 	_known_unlocked_actions.clear()
@@ -1290,7 +785,7 @@ func _apply_character_without_restart(character_id: String, is_reload: bool) -> 
 	_refresh_ui(state.get_snapshot())
 	_refresh_interaction_polygon()
 	call_deferred("_reposition_after_character_switch", character_id)
-	_refresh_character_list(
+	_character_tab.refresh_list(
 		"已重新載入「%s」。" % pet.get_character_name()
 		if is_reload
 		else "已切換為「%s」。" % pet.get_character_name()
@@ -1310,93 +805,24 @@ func _reposition_after_character_switch(expected_character_id: String) -> void:
 
 func _refresh_json_driven_ui() -> void:
 	_apply_care_menu_labels()
-	for action: String in _care_action_buttons:
-		var button: Button = _care_action_buttons[action]
-		if is_instance_valid(button):
-			button.text = "%s %s" % [
-				_interaction_icon(action), _interaction_label(action)
-			]
+	_status_tab.refresh_care_labels()
 	_bubble_token += 1
 	bubble.visible = false
 	bubble_tail.visible = false
 	_last_state_message = pet.get_dialogue(
 		"startup", "右鍵操作・雙擊摸摸"
 	)
-	if is_instance_valid(_last_message_status):
-		_last_message_status.text = "最近訊息：%s" % _last_state_message
-
-
-func _set_selected_character_id(character_id: String) -> void:
-	_character_coordinator.save_selected_character_id(character_id)
-
-
-func _confirm_delete_selected_character() -> void:
-	_cancel_mask_effect_editing()
-	var entry := _selected_character_entry()
-	if entry.is_empty() or not bool(entry.get("installed", false)):
-		return
-	_character_delete_dialog.dialog_text = (
-		"確定要刪除「%s」嗎？\n\n角色包會被移除，但遊戲進度會保留。"
-		% String(entry.name)
-	)
-	_character_delete_dialog.popup_centered()
-
-
-func _delete_selected_character() -> void:
-	var entry := _selected_character_entry()
-	if entry.is_empty() or not bool(entry.get("installed", false)):
-		return
-	var character_id := String(entry.id)
-	var was_active: bool = character_id == pet.get_character_id()
-	if was_active:
-		_set_selected_character_id("open_desktop_pet_default")
-		state.save_state()
-	var result: Dictionary = _character_coordinator.remove_pack(character_id)
-	if not bool(result.get("ok", false)):
-		_character_feedback.text = "刪除失敗：%s" % String(result.get(
-			"message", "未知錯誤"
-		))
-		return
-	_refresh_character_list("已刪除角色包；遊戲進度仍保留。")
-	if was_active:
-		_apply_character_without_restart("open_desktop_pet_default", false)
-
-
-func _open_character_packs_folder() -> void:
-	_cancel_mask_effect_editing()
-	if _character_coordinator.ensure_packs_root() != OK:
-		_character_feedback.text = "無法建立角色包資料夾。"
-		return
-	OS.shell_open(ProjectSettings.globalize_path(
-		_character_coordinator.packs_root()
-	))
+	_status_tab.set_last_message(_last_state_message)
 
 
 func _run_care_action(id: int) -> void:
-	_cancel_mask_effect_editing()
+	_character_tab.cancel_mask_editing()
 	var result: String = _gameplay_coordinator.request_care_action(id)
 	if result == "woke":
 		_last_user_activity_ms = Time.get_ticks_msec()
 		return
 	if result == "busy":
 		_say_dialogue("action_busy", "先等目前的動作完成～", 1.5)
-
-
-func _details_color(light: String, dark: String) -> Color:
-	return Color(dark if _details_theme_mode == "dark" else light)
-
-
-func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = background
-	style.border_color = border
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(radius)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
-	return style
 
 
 func _show_stats_window(
@@ -1460,63 +886,18 @@ func _is_stats_window_open() -> bool:
 
 func _destroy_stats_window() -> void:
 	_save_stats_window_size()
-	_cancel_mask_effect_editing()
+	_character_tab.cancel_mask_editing()
 	if _stats_window_coordinator != null:
 		_stats_window_coordinator.destroy()
 		_stats_window_coordinator = null
-	_status_tab_view = null
 	_reminders_tab_view = null
-	_settings_tab_view = null
-	_character_tab_view = null
 	_agent_settings_panel.unbind()
+	_status_tab.unbind()
+	_settings_tab.unbind()
+	_character_tab.unbind()
 	_stats_window = null
 	_stats_tabs = null
 	_stats_tab_buttons.clear()
-	_stats_status = null
-	_companion_status = null
-	_wish_status = null
-	_unlock_status = null
-	_last_message_status = null
-	_auto_feeder_buy_button = null
-	_auto_feeder_toggle = null
-	_auto_feeder_status = null
-	_fps_option_button = null
-	_details_theme_option_button = null
-	_visual_scale_slider = null
-	_visual_scale_value_label = null
-	_focus_mode_check_box = null
-	_keep_screen_on_check_box = null
-	_update_auto_check_box = null
-	_update_status_label = null
-	_update_check_button = null
-	_update_release_page_button = null
-	_update_skip_button = null
-	_autostart_check_box = null
-	_settings_feedback = null
-	_character_list = null
-	_character_feedback = null
-	_character_use_button = null
-	_character_delete_button = null
-	_mask_effect_panel = null
-	_mask_effect_hint = null
-	_mask_effect_values = null
-	_mask_effect_x_spin = null
-	_mask_effect_y_spin = null
-	_mask_effect_scale_spin = null
-	_mask_effect_header_state = null
-	_mask_effect_header_chevron = null
-	_mask_effect_apply_button = null
-	_mask_effect_reset_button = null
-	_mask_effect_feedback_dialog = null
-	_character_import_dialog = null
-	_character_update_dialog = null
-	_character_delete_dialog = null
-	_pending_character_archive = ""
-	_character_entries.clear()
-	_character_tab_index = -1
-	_character_tab_loaded = false
-	_stats_bars.clear()
-	_care_action_buttons.clear()
 
 
 func _load_stats_window_size() -> Vector2i:
@@ -1535,82 +916,7 @@ func _load_stats_window_size() -> Vector2i:
 	)
 
 
-func _load_runtime_settings() -> void:
-	var config := ConfigFile.new()
-	var target_fps := DEFAULT_TARGET_FPS
-	var keep_screen_on := DEFAULT_KEEP_SCREEN_ON
-	var focus_mode := DEFAULT_FOCUS_MODE
-	if config.load(UI_SETTINGS_PATH) == OK:
-		target_fps = int(config.get_value(
-			"performance", "target_fps", DEFAULT_TARGET_FPS
-		))
-		_details_theme_mode = String(config.get_value(
-			"appearance", "details_theme", "light"
-		))
-		keep_screen_on = bool(config.get_value(
-			"power", "keep_screen_on", DEFAULT_KEEP_SCREEN_ON
-		))
-		focus_mode = bool(config.get_value(
-			"behavior", "focus_mode", DEFAULT_FOCUS_MODE
-		))
-	if _details_theme_mode not in ["light", "dark"]:
-		_details_theme_mode = "light"
-	Engine.max_fps = _normalize_target_fps(target_fps)
-	_apply_keep_screen_on(keep_screen_on)
-	_apply_focus_mode(focus_mode)
-
-
-func _apply_keep_screen_on(enabled: bool) -> void:
-	_keep_screen_on = enabled
-	if DisplayServer.get_name() != "headless":
-		DisplayServer.screen_set_keep_on(enabled)
-	if is_instance_valid(_keep_screen_on_check_box):
-		_keep_screen_on_check_box.set_pressed_no_signal(enabled)
-
-
-func _apply_focus_mode(enabled: bool) -> void:
-	_focus_mode = enabled
-	state.auto_care_quiet = enabled
-	if enabled and _gameplay_coordinator != null:
-		_gameplay_coordinator.cancel_autonomous_action()
-	if is_instance_valid(_focus_mode_check_box):
-		_focus_mode_check_box.set_pressed_no_signal(enabled)
-
-
-func _normalize_target_fps(value: int) -> int:
-	var nearest: int = TARGET_FPS_OPTIONS[0]
-	for candidate: int in TARGET_FPS_OPTIONS:
-		if absi(candidate - value) < absi(nearest - value):
-			nearest = candidate
-	return nearest
-
-
-func _on_target_fps_selected(index: int) -> void:
-	_set_target_fps(_fps_option_button.get_item_id(index))
-
-
-func _set_target_fps(value: int) -> void:
-	var target_fps := _normalize_target_fps(value)
-	Engine.max_fps = target_fps
-	if is_instance_valid(_fps_option_button):
-		var target_index := _fps_option_button.get_item_index(target_fps)
-		if target_index >= 0 and _fps_option_button.selected != target_index:
-			_fps_option_button.select(target_index)
-	var config := ConfigFile.new()
-	config.load(UI_SETTINGS_PATH)
-	config.set_value("performance", "target_fps", target_fps)
-	config.save(UI_SETTINGS_PATH)
-
-
-func _on_details_theme_selected(index: int) -> void:
-	var requested := "dark" if index == 1 else "light"
-	if requested == _details_theme_mode:
-		return
-	_details_theme_mode = requested
-	var config := ConfigFile.new()
-	config.load(UI_SETTINGS_PATH)
-	config.set_value("appearance", "details_theme", _details_theme_mode)
-	config.save(UI_SETTINGS_PATH)
+func _on_details_theme_changed() -> void:
 	if not is_instance_valid(_stats_window):
 		return
 	var previous_position := _stats_window.position
@@ -1621,30 +927,6 @@ func _on_details_theme_selected(index: int) -> void:
 		previous_position,
 		previous_size
 	)
-
-
-func _on_keep_screen_on_toggled(enabled: bool) -> void:
-	_apply_keep_screen_on(enabled)
-	var config := ConfigFile.new()
-	config.load(UI_SETTINGS_PATH)
-	config.set_value("power", "keep_screen_on", enabled)
-	config.save(UI_SETTINGS_PATH)
-
-
-func _on_focus_mode_toggled(enabled: bool) -> void:
-	_apply_focus_mode(enabled)
-	var config := ConfigFile.new()
-	config.load(UI_SETTINGS_PATH)
-	config.set_value("behavior", "focus_mode", enabled)
-	config.save(UI_SETTINGS_PATH)
-
-
-func _on_visual_scale_previewed(value: float) -> void:
-	pet.set_visual_size(value)
-
-
-func _on_visual_scale_changed(value: float) -> void:
-	state.set_visual_scale(value)
 
 
 func _rebuild_stats_window_after_theme_change(
@@ -1660,78 +942,6 @@ func _rebuild_stats_window_after_theme_change(
 	call_deferred("_bring_stats_window_forward")
 
 
-func _is_autostart_supported() -> bool:
-	return _autostart_service != null and _autostart_service.is_supported()
-
-
-func _on_autostart_toggled(enabled: bool) -> void:
-	if not _is_autostart_supported():
-		return
-	_start_autostart_operation("set", enabled)
-
-
-func _start_autostart_operation(operation: String, enabled: bool) -> void:
-	if is_instance_valid(_autostart_check_box):
-		_autostart_check_box.disabled = true
-	if is_instance_valid(_settings_feedback):
-		_settings_feedback.text = (
-			"正在讀取 Windows 開機啟動設定…"
-			if operation == "query"
-			else "正在套用開機啟動設定…"
-		)
-	if _autostart_service == null:
-		_finish_autostart_operation(
-			-1, operation, enabled,
-			{"exists": false, "matches": false, "success": false}
-		)
-		return
-	if operation == "query":
-		_autostart_service.query()
-	else:
-		_autostart_service.set_enabled(enabled)
-
-
-func _finish_autostart_operation(
-	operation_id: int,
-	operation: String,
-	enabled: bool,
-	result: Dictionary
-) -> void:
-	# A panel can be closed and recreated while an older registry request is
-	# finishing. Only the newest request may update the current controls.
-	if _autostart_service != null \
-			and operation_id >= 0 \
-			and not _autostart_service.is_latest_operation(operation_id):
-		return
-	if not is_instance_valid(_autostart_check_box) \
-			or _autostart_check_box.is_queued_for_deletion():
-		return
-	_autostart_check_box.disabled = false
-	if operation == "query":
-		var matches := bool(result.get("matches", false))
-		var exists := bool(result.get("exists", false))
-		var legacy_matches := bool(result.get("legacy_matches", false))
-		_autostart_check_box.set_pressed_no_signal(matches)
-		if matches:
-			_settings_feedback.text = "已設定由目前這個 EXE 隨 Windows 登入啟動。"
-		elif legacy_matches:
-			# Older builds stored Godot's forward-slash executable path. The
-			# entry already expresses the user's autostart preference, so
-			# migrate it to a native Windows command automatically.
-			_settings_feedback.text = "正在更新舊的開機啟動路徑…"
-			_start_autostart_operation("set", true)
-		elif exists:
-			_settings_feedback.text = "偵測到其他位置的舊設定；重新勾選即可更新。"
-		else:
-			_settings_feedback.text = "這項設定只套用到目前的 Windows 使用者。"
-	elif bool(result.get("success", false)):
-		_autostart_check_box.set_pressed_no_signal(enabled)
-		_settings_feedback.text = (
-			"已啟用開機自動啟動。" if enabled else "已關閉開機自動啟動。"
-		)
-	else:
-		_autostart_check_box.set_pressed_no_signal(not enabled)
-		_settings_feedback.text = "設定失敗，請稍後再試。"
 func _request_shutdown() -> void:
 	if _shutting_down:
 		return
@@ -1778,43 +988,18 @@ func _refresh_ui(snapshot: Dictionary) -> void:
 		"visual_scale", PetVisualScaleScript.DEFAULT_VALUE
 	))
 	pet.set_visual_size(current_visual_scale)
-	if is_instance_valid(_visual_scale_slider):
-		_visual_scale_slider.set_value_no_signal(current_visual_scale)
-	if is_instance_valid(_visual_scale_value_label):
-		_visual_scale_value_label.text = "%d%%" % roundi(current_visual_scale * 100.0)
+	_settings_tab.refresh_visual_scale(current_visual_scale)
 	_update_unlock_tracking()
 	var level_text := "Lv.%d  ·  %d 金幣  ·  XP %d/%d" % [
 		snapshot.level, snapshot.coins, snapshot.xp, snapshot.level * 20
 	]
-	if is_instance_valid(_stats_status):
-		_stats_status.text = level_text
-		_wish_status.text = "願望：%s" % _formatted_wish_text(snapshot)
-
-	if is_instance_valid(_companion_status):
-		_companion_status.text = (
-			"陪伴紀錄 : "
-			+ "連續陪伴 %d 天"
-		) % [
-			int(snapshot.get("companion_streak", 0)),
-		]
-		var next_unlock: Dictionary = pet.get_next_unlock()
-		if next_unlock.is_empty():
-			_unlock_status.text = "目前已解鎖所有角色動作"
-		else:
-			_unlock_status.text = "下一動作：%s　需要 Lv.%d、親密度 %d" % [
-				next_unlock.name, next_unlock.level, next_unlock.affection
-			]
-		# Round down so the shown percent never claims more than the rules see:
-		# 19.8 energy reads 19%, matching the 20-energy work requirement.
-		for key: String in _stats_bars:
-			(_stats_bars[key] as ProgressBar).value = floorf(float(snapshot[key]))
+	_status_tab.refresh(snapshot, level_text)
 	if context_menu.item_count > 0:
 		context_menu.set_item_text(0, level_text)
 	if is_instance_valid(_tray_menu) and _tray_menu.item_count > 0:
 		_tray_menu.set_item_text(0, level_text)
 	# Prices switch to the free emergency ration when the pet would be stuck.
 	_apply_care_menu_labels()
-	_refresh_auto_feeder_ui(snapshot)
 
 
 func _apply_care_menu_labels() -> void:
@@ -1825,71 +1010,6 @@ func _apply_care_menu_labels() -> void:
 			Callable(self, "_interaction_label"),
 			Callable(state, "care_cost_text")
 		)
-
-
-func _refresh_auto_feeder_ui(snapshot: Dictionary) -> void:
-	if not is_instance_valid(_auto_feeder_buy_button):
-		return
-	var owned := bool(snapshot.get("auto_feeder_owned", false))
-	var enabled := bool(snapshot.get("auto_feeder_enabled", false))
-	var coins := int(snapshot.get("coins", 0))
-	_auto_feeder_buy_button.visible = not owned
-	_auto_feeder_toggle.visible = owned
-	_auto_feeder_toggle.set_pressed_no_signal(enabled)
-	_auto_feeder_toggle.queue_redraw()
-	if not owned:
-		if not bool(snapshot.get("auto_feeder_unlocked", false)):
-			_auto_feeder_buy_button.text = "🔒 需要親密 %d" % (
-				PetState.AUTO_FEEDER_REQUIRED_AFFECTION
-			)
-			_auto_feeder_buy_button.disabled = true
-			_auto_feeder_buy_button.tooltip_text = (
-				"陪伴它到親密 %d，就能購買自動餵食器。目前親密 %d。" % [
-					PetState.AUTO_FEEDER_REQUIRED_AFFECTION,
-					int(snapshot.get("affection", 0)),
-				]
-			)
-			_set_auto_feeder_status("", "")
-			return
-		_auto_feeder_buy_button.text = "購買 %d 金幣" % PetState.AUTO_FEEDER_PRICE
-		var shortfall := PetState.AUTO_FEEDER_PRICE - coins
-		_auto_feeder_buy_button.disabled = shortfall > 0
-		_auto_feeder_buy_button.tooltip_text = (
-			"還差 %d 枚金幣。" % shortfall
-			if shortfall > 0
-			else "花 %d 枚金幣購買，買了就永久擁有，可以隨時開關。" % PetState.AUTO_FEEDER_PRICE
-		)
-		_set_auto_feeder_status("", "")
-		return
-	# The switch already shows on/off; only "paused" needs a word, because the
-	# switch reads on while the feeder is not actually working.
-	if not enabled:
-		_auto_feeder_toggle.tooltip_text = "開啟後會自動照顧飽食、水分與體力。"
-		_set_auto_feeder_status("", "")
-	elif bool(snapshot.get("auto_feeder_paused", false)):
-		var paused_text := "金幣只剩 %d 枚，已暫停；賺到更多金幣後會恢復運作。" % coins
-		_auto_feeder_toggle.tooltip_text = paused_text
-		_set_auto_feeder_status("已暫停", paused_text)
-	else:
-		_auto_feeder_toggle.tooltip_text = "自動餵食器運作中。"
-		_set_auto_feeder_status("", "")
-
-
-func _set_auto_feeder_status(text: String, tooltip: String) -> void:
-	if not is_instance_valid(_auto_feeder_status):
-		return
-	_auto_feeder_status.text = text
-	_auto_feeder_status.tooltip_text = tooltip
-	_auto_feeder_status.visible = not text.is_empty()
-
-
-func _on_auto_feeder_buy_requested() -> void:
-	if not state.buy_auto_feeder():
-		_say_dialogue("auto_feeder_cannot_buy", "現在還買不起自動餵食器。", 2.5)
-
-
-func _on_auto_feeder_toggled(enabled: bool) -> void:
-	state.set_auto_feeder_enabled(enabled)
 
 
 func _wish_icon(action: String) -> String:
@@ -1936,19 +1056,6 @@ func _default_interaction_icon(action: String) -> String:
 			return ""
 
 
-func _formatted_wish_text(snapshot: Dictionary) -> String:
-	var action := String(snapshot.get("wish_action", ""))
-	if action.is_empty() or not bool(snapshot.get("has_active_wish", false)):
-		return "目前沒有願望"
-	var remaining := maxi(
-		int(snapshot.get("wish_expires_at", 0)) - int(Time.get_unix_time_from_system()),
-		0
-	)
-	var minutes := maxi(ceili(remaining / 60.0), 1)
-	var fallback := String(snapshot.get("wish_text", "目前沒有願望"))
-	return pet.get_interaction_wish(action, fallback, minutes)
-
-
 func _update_unlock_tracking() -> void:
 	var unlocked: Array[String] = pet.get_unlocked_action_ids()
 	if not _unlock_tracking_ready:
@@ -1967,7 +1074,7 @@ func _celebrate_unlock(action: String) -> void:
 	await get_tree().create_timer(0.4).timeout
 	var unlock_fallback := "解鎖了新的動作：%s！" % action
 	say(pet.get_dialogue("action_unlocked", unlock_fallback).replace("{action}", action), 4.0)
-	if not _focus_mode and not pet.is_busy() and not state.is_action_busy():
+	if not _settings_tab.focus_mode and not pet.is_busy() and not state.is_action_busy():
 		pet.play_action(action)
 
 

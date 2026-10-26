@@ -22,6 +22,7 @@ $details = @(
 ) | ForEach-Object { Read-Source $_ } | Out-String
 $menu = Read-Source 'scripts/pet_menu_builder.gd'
 $main = Read-Source 'scripts/main.gd'
+$settingsTab = Read-Source 'scripts/settings_tab_controller.gd'
 $state = Read-Source 'scripts/pet_state.gd'
 $visual = Read-Source 'scripts/pet_visual.gd'
 $visualScale = Read-Source 'scripts/pet_visual_scale.gd'
@@ -72,7 +73,7 @@ Assert-Architecture ($autostart -match 'class_name WindowsAutostartService') `
 	'WindowsAutostartService is missing.'
 Assert-Architecture ($details -notmatch 'autostart_query_requested') `
 	'The settings tab must not emit autostart queries before signal wiring.'
-Assert-Architecture ($main -match '(?s)_autostart_check_box = settings_refs\["autostart_check_box"\].*call_deferred\("_start_autostart_operation", "query", false\)') `
+Assert-Architecture ($main -match '(?s)_settings_tab\.bind\(.*_settings_tab\.query_autostart\(\)' -and $settingsTab -match '(?s)func query_autostart\(\).*call_deferred\("_start_autostart_operation", "query", false\)') `
 	'The initial autostart query must start after settings controls are assigned.'
 Assert-Architecture ($runtime -match 'class_name CharacterPackRuntime') `
 	'CharacterPackRuntime is missing.'
@@ -335,7 +336,7 @@ Assert-Architecture ($updateCoordinator -match 'auto_check", false\)') `
 	'Automatic update checks must stay opt-in.'
 Assert-Architecture ($updateCoordinator -match 'max_redirects = 0') `
 	'Update checks must not follow redirects to other hosts.'
-Assert-Architecture ($main -match 'release_page_url\(\)' -and $main -notmatch 'html_url') `
+Assert-Architecture ($settingsTab -match 'release_page_url\(\)' -and $settingsTab -notmatch 'html_url') `
 	'The release page must be rebuilt from the version, never taken from the response.'
 
 & git -C $projectRoot diff --check

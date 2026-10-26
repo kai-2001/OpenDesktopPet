@@ -215,12 +215,12 @@ func _run() -> void:
 
 	await _press_toggle("PiCodexEnabledToggle", true)
 	await _step("enable Pi")
-	_main.call("_on_details_theme_selected", 1)
+	_select_details_theme(1)
 	await _settle()
 	await _step("switch the details window to the dark theme")
 	await _press_toggle("PiCodexEnabledToggle", false)
 	await _step("disable Pi in the rebuilt window")
-	_main.call("_on_details_theme_selected", 0)
+	_select_details_theme(0)
 	await _settle()
 	await _step("switch back to the light theme")
 
@@ -260,6 +260,18 @@ func _run() -> void:
 	_main.free()
 	_main = null
 	_finish()
+
+
+func _select_details_theme(index: int) -> void:
+	# Choose the theme through the settings tab like a user would.
+	var settings_tab := _find("設定")
+	for node: Node in settings_tab.find_children("*", "OptionButton", true, false):
+		var option := node as OptionButton
+		if option.item_count == 2 and option.get_item_text(1) == "深色":
+			option.select(index)
+			option.item_selected.emit(index)
+			return
+	_fail("missing details theme option")
 
 
 func _press_toggle(toggle_name: String, enabled: bool) -> void:

@@ -348,7 +348,7 @@ func _init() -> void:
 	main.state.data.energy = 19.8
 	main._refresh_ui(main.state.get_snapshot())
 	_assert_equal(
-		(main._stats_bars["energy"] as ProgressBar).value,
+		(main._status_tab.stats_bars["energy"] as ProgressBar).value,
 		19.0,
 		"stat bars round down so 19.8 energy does not read as the 20 work minimum"
 	)
@@ -357,11 +357,11 @@ func _init() -> void:
 	main._select_stats_tab(2)
 	await process_frame
 	_assert_true(
-		main._visual_scale_slider.visible and main._visual_scale_slider.size.y > 0.0,
+		main._settings_tab.visual_scale_slider.visible and main._settings_tab.visual_scale_slider.size.y > 0.0,
 		"settings tab visibly lays out the visual-size slider"
 	)
 	_assert_true(
-		main._focus_mode_check_box.visible and main._focus_mode_check_box.size.y > 0.0,
+		main._settings_tab.focus_mode_check_box.visible and main._settings_tab.focus_mode_check_box.size.y > 0.0,
 		"settings tab visibly lays out the focus-mode setting"
 	)
 	_assert_true(not main._stats_window.unresizable, "details window can be resized")
@@ -379,32 +379,32 @@ func _init() -> void:
 	)
 	main.context_menu.hide()
 	_assert_true(
-		not main._character_tab_loaded,
+		not main._character_tab.loaded,
 		"character packs are not scanned when the details window first opens"
 	)
-	main._on_stats_tab_changed(main._character_tab_index)
-	_assert_true(main._character_tab_loaded, "character tab scans only when selected")
+	main._on_stats_tab_changed(main._character_tab.tab_index)
+	_assert_true(main._character_tab.loaded, "character tab scans only when selected")
 	_assert_true(
-		main._character_entries.size() >= 1,
+		main._character_tab.entries.size() >= 1,
 		"character tab always lists the built-in public character"
 	)
 	_assert_equal(
-		main._character_use_button.text,
+		main._character_tab.use_button.text,
 		"重新載入角色",
 		"active character selection offers an explicit reload"
 	)
 	_assert_true(
-		not main._character_use_button.disabled,
+		not main._character_tab.use_button.disabled,
 		"active character reload remains available"
 	)
-	for character_index in main._character_entries.size():
-		if String(main._character_entries[character_index].id) \
+	for character_index in main._character_tab.entries.size():
+		if String(main._character_tab.entries[character_index].id) \
 				== main.pet.get_character_id():
 			continue
-		main._character_list.select(character_index)
-		main._update_character_buttons()
+		main._character_tab.list.select(character_index)
+		main._character_tab.update_buttons()
 		_assert_equal(
-			main._character_use_button.text,
+			main._character_tab.use_button.text,
 			"使用選取角色",
 			"inactive character selection keeps the switch action"
 		)
@@ -427,37 +427,37 @@ func _init() -> void:
 		"opening focuses the existing details window instead of recreating it"
 	)
 	_assert_true(
-		is_instance_valid(main._fps_option_button),
+		is_instance_valid(main._settings_tab.fps_option_button),
 		"details window includes an FPS preset selector"
 	)
 	_assert_true(
-		is_instance_valid(main._autostart_check_box),
+		is_instance_valid(main._settings_tab.autostart_check_box),
 		"details window includes a Windows autostart setting"
 	)
 	_assert_equal(
-		main._visual_scale_slider.min_value,
+		main._settings_tab.visual_scale_slider.min_value,
 		0.5,
 		"visual-size slider starts at the 50 percent limit"
 	)
 	_assert_equal(
-		main._visual_scale_slider.max_value,
+		main._settings_tab.visual_scale_slider.max_value,
 		1.5,
 		"visual-size slider ends at the 150 percent limit"
 	)
 	_assert_true(
-		not main._visual_scale_slider.scrollable,
+		not main._settings_tab.visual_scale_slider.scrollable,
 		"visual-size slider disables default parent scrolling"
 	)
 	_assert_true(
-		main._visual_scale_slider.get_theme_stylebox("slider") != null,
+		main._settings_tab.visual_scale_slider.get_theme_stylebox("slider") != null,
 		"visual-size slider has a local track style"
 	)
 	_assert_true(
-		main._visual_scale_slider.get_theme_icon("grabber") != null,
+		main._settings_tab.visual_scale_slider.get_theme_icon("grabber") != null,
 		"visual-size slider has a local grabber texture"
 	)
 	var visual_scale_grabber: Texture2D = (
-		main._visual_scale_slider.get_theme_icon("grabber")
+		main._settings_tab.visual_scale_slider.get_theme_icon("grabber")
 	)
 	_assert_equal(
 		visual_scale_grabber.get_size(),
@@ -478,32 +478,32 @@ func _init() -> void:
 		"visual-size grabber uses a white outer circle"
 	)
 	_assert_true(
-		main._visual_scale_slider.get_parent() is VBoxContainer,
+		main._settings_tab.visual_scale_slider.get_parent() is VBoxContainer,
 		"visual-size controls use the standard settings layout without a card"
 	)
-	var scale_before_wheel: float = main._visual_scale_slider.value
+	var scale_before_wheel: float = main._settings_tab.visual_scale_slider.value
 	var scale_wheel := InputEventMouseButton.new()
 	scale_wheel.button_index = MOUSE_BUTTON_WHEEL_UP
 	scale_wheel.pressed = true
-	main._visual_scale_slider.gui_input.emit(scale_wheel)
+	main._settings_tab.visual_scale_slider.gui_input.emit(scale_wheel)
 	_assert_equal(
-		main._visual_scale_slider.value,
-		minf(scale_before_wheel + main._visual_scale_slider.step, 1.5),
+		main._settings_tab.visual_scale_slider.value,
+		minf(scale_before_wheel + main._settings_tab.visual_scale_slider.step, 1.5),
 		"wheel input changes visual size only on the slider"
 	)
 	_assert_equal(
 		main.pet._visual_size,
-		main._visual_scale_slider.value,
+		main._settings_tab.visual_scale_slider.value,
 		"visual-size changes preview immediately"
 	)
 	await create_timer(0.25).timeout
 	_assert_equal(
 		float(main.state.data.visual_scale),
-		main._visual_scale_slider.value,
+		main._settings_tab.visual_scale_slider.value,
 		"visual-size changes persist after input settles"
 	)
-	var scale_before_bounds_test: float = main._visual_scale_slider.value
-	main._visual_scale_slider.value = 1.5
+	var scale_before_bounds_test: float = main._settings_tab.visual_scale_slider.value
+	main._settings_tab.visual_scale_slider.value = 1.5
 	await process_frame
 	var scaled_visual_bounds: Rect2 = main.pet.get_visual_bounds_in_canvas()
 	_assert_true(
@@ -555,17 +555,17 @@ func _init() -> void:
 		main.pet._busy = false
 		main.pet._current_action = ""
 		main.pet._restore_idle()
-	main._visual_scale_slider.value = scale_before_bounds_test
+	main._settings_tab.visual_scale_slider.value = scale_before_bounds_test
 	await create_timer(0.25).timeout
 
-	main._focus_mode_check_box.button_pressed = true
-	_assert_true(main._focus_mode, "focus-mode UI enables focus mode")
-	main._focus_mode_check_box.button_pressed = false
-	_assert_true(not main._focus_mode, "focus-mode UI disables focus mode")
-	main._keep_screen_on_check_box.button_pressed = true
-	_assert_true(main._keep_screen_on, "keep-awake UI enables the runtime setting")
-	main._keep_screen_on_check_box.button_pressed = false
-	_assert_true(not main._keep_screen_on, "keep-awake UI disables the runtime setting")
+	main._settings_tab.focus_mode_check_box.button_pressed = true
+	_assert_true(main._settings_tab.focus_mode, "focus-mode UI enables focus mode")
+	main._settings_tab.focus_mode_check_box.button_pressed = false
+	_assert_true(not main._settings_tab.focus_mode, "focus-mode UI disables focus mode")
+	main._settings_tab.keep_screen_on_check_box.button_pressed = true
+	_assert_true(main._settings_tab.keep_screen_on, "keep-awake UI enables the runtime setting")
+	main._settings_tab.keep_screen_on_check_box.button_pressed = false
+	_assert_true(not main._settings_tab.keep_screen_on, "keep-awake UI disables the runtime setting")
 	var runtime_settings := ConfigFile.new()
 	_assert_equal(
 		runtime_settings.load(main.UI_SETTINGS_PATH),
@@ -583,10 +583,10 @@ func _init() -> void:
 		"keep-awake persistence matches the UI"
 	)
 	var autostart_pressed_style := (
-		main._autostart_check_box.get_theme_stylebox("pressed") as StyleBoxFlat
+		main._settings_tab.autostart_check_box.get_theme_stylebox("pressed") as StyleBoxFlat
 	)
 	var autostart_hover_pressed_style := (
-		main._autostart_check_box.get_theme_stylebox("hover_pressed")
+		main._settings_tab.autostart_check_box.get_theme_stylebox("hover_pressed")
 		as StyleBoxFlat
 	)
 	_assert_true(
@@ -605,14 +605,14 @@ func _init() -> void:
 		"hovering a checked autostart option preserves its text alignment"
 	)
 	_assert_equal(
-		main._autostart_check_box.get_theme_constant(
+		main._settings_tab.autostart_check_box.get_theme_constant(
 			"align_to_largest_stylebox"
 		),
 		1,
 		"autostart checkbox keeps one layout across interaction states"
 	)
 	var original_target_fps := Engine.max_fps
-	main._set_target_fps(47)
+	main._settings_tab.set_target_fps(47)
 	_assert_equal(
 		Engine.max_fps,
 		60,
@@ -629,10 +629,10 @@ func _init() -> void:
 		60,
 		"persisted FPS setting matches the normalized preset"
 	)
-	main._set_target_fps(original_target_fps)
+	main._settings_tab.set_target_fps(original_target_fps)
 	if OS.has_feature("editor"):
 		_assert_true(
-			main._autostart_check_box.disabled,
+			main._settings_tab.autostart_check_box.disabled,
 			"development runs cannot register the editor for autostart"
 		)
 	if OS.get_name() == "Windows":
@@ -780,7 +780,7 @@ func _init() -> void:
 		"switching profiles does not celebrate actions that were already unlocked"
 	)
 	for action: String in ["feed", "water", "pet", "work", "sleep"]:
-		var button: Button = main._care_action_buttons[action]
+		var button: Button = main._status_tab.care_action_buttons[action]
 		_assert_equal(
 			button.text,
 			"%s %s" % [

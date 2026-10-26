@@ -32,6 +32,7 @@ var settings_tab
 var agent_tab
 var character_tab
 var window: Window
+var tab_buttons: Array[Button] = []
 
 
 func build(owner: Node) -> Dictionary:
@@ -73,7 +74,7 @@ func build(owner: Node) -> Dictionary:
 	var navigation := HBoxContainer.new()
 	navigation.add_theme_constant_override("separation", 8)
 	navigation_margin.add_child(navigation)
-	var tab_buttons: Array[Button] = []
+	tab_buttons = []
 	var tab_names: Array[String] = ["狀態", "待辦", "設定", "Agent", "角色"]
 	for tab_index: int in tab_names.size():
 		var navigation_button := Button.new()
@@ -136,10 +137,52 @@ func build(owner: Node) -> Dictionary:
 	}
 
 
+func refresh_tab_buttons(selected_index: int) -> void:
+	for index: int in tab_buttons.size():
+		_apply_tab_button_style(tab_buttons[index], index == selected_index)
+
+
+func _apply_tab_button_style(button: Button, selected: bool) -> void:
+	var normal_bg := _details_color("#0f0f0f", "#37373d") \
+			if selected else _details_color("#e6e6e6", "#252526")
+	var normal_border := _details_color("#0f0f0f", "#3794ff") \
+			if selected else _details_color("#f2f2f2", "#333333")
+	var hover_bg := normal_bg if selected \
+			else _details_color("#e5e5e5", "#2a2d2e")
+	var pressed_bg := _details_color("#272727", "#094771") \
+			if selected else _details_color("#d9d9d9", "#333337")
+	var normal_style := _details_style(normal_bg, normal_border, 8)
+	var hover_style := _details_style(
+		hover_bg,
+		normal_border if selected else _details_color("#e5e5e5", "#4e4e4e"),
+		8
+	)
+	var pressed_style := _details_style(pressed_bg, normal_border, 8)
+	if theme_mode == "dark" and selected:
+		normal_style.border_width_bottom = 2
+		hover_style.border_width_bottom = 2
+		pressed_style.border_width_bottom = 2
+	button.add_theme_stylebox_override("normal", normal_style)
+	button.add_theme_stylebox_override("hover", hover_style)
+	button.add_theme_stylebox_override("pressed", pressed_style)
+	button.add_theme_stylebox_override("focus", normal_style)
+	button.add_theme_color_override(
+		"font_color", Color("#ffffff") if selected \
+		else _details_color("#0f0f0f", "#cccccc")
+	)
+	button.add_theme_color_override(
+		"font_hover_color", Color("#ffffff") if selected \
+		else _details_color("#0f0f0f", "#ffffff")
+	)
+	button.add_theme_color_override("font_pressed_color", Color("#ffffff"))
+	button.add_theme_font_size_override("font_size", 15)
+
+
 func destroy() -> void:
 	if is_instance_valid(window):
 		window.queue_free()
 	window = null
+	tab_buttons = []
 	status_tab = null
 	reminders_tab = null
 	settings_tab = null
