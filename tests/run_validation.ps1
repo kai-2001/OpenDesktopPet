@@ -219,6 +219,18 @@ try {
     if ($agentSettingsUiExitCode -ne 0 -or -not ($agentSettingsUiOutput -match 'AGENT_SETTINGS_UI_TEST_OK')) {
         throw 'Agent settings UI validation failed.'
     }
+    $agentChannelCatalogOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/agent_channel_catalog_test.gd' 2>&1
+    $agentChannelCatalogExitCode = $LASTEXITCODE
+    $agentChannelCatalogOutput | Write-Output
+    if ($agentChannelCatalogExitCode -ne 0 -or -not ($agentChannelCatalogOutput -match 'AGENT_CHANNEL_CATALOG_TEST_OK')) {
+        throw 'Agent channel catalog validation failed.'
+    }
+    $agentSettingsGoldenOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/agent_settings_golden_test.gd' 2>&1
+    $agentSettingsGoldenExitCode = $LASTEXITCODE
+    $agentSettingsGoldenOutput | Write-Output
+    if ($agentSettingsGoldenExitCode -ne 0 -or -not ($agentSettingsGoldenOutput -match 'AGENT_SETTINGS_GOLDEN_TEST_OK')) {
+        throw 'Agent settings golden validation failed.'
+    }
 
     $ErrorActionPreference = 'Continue'
     $windowOutput = & $GodotExe --path $projectRoot --script 'res://tests/window_integration_test.gd' 2>&1

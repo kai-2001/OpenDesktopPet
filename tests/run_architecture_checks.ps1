@@ -29,6 +29,7 @@ $inputController = Read-Source 'scripts/pet_input_controller.gd'
 $characterCoordinator = Read-Source 'scripts/character_pack_coordinator.gd'
 $agentController = Read-Source 'scripts/agent_integration_controller.gd'
 $agentRouter = Read-Source 'scripts/agent_notification_router.gd'
+$agentCatalog = Read-Source 'scripts/agent_channel_catalog.gd'
 $piExtension = Read-Source 'tools/pi_agent_notify.ts'
 $piInstaller = Read-Source 'tools/install_pi_integration.ps1'
 $codexTrustService = Read-Source 'scripts/codex_hook_trust_service.gd'
@@ -135,6 +136,10 @@ Assert-Architecture ($characterCoordinator -match 'class_name CharacterPackCoord
 	'CharacterPackCoordinator is missing.'
 Assert-Architecture ($main -match 'CharacterPackCoordinatorScript') `
 	'main.gd must delegate character-pack coordination.'
+Assert-Architecture ($main -notmatch 'set_channel_enabled|set_target_executable_path|refresh_agent_executable_path|codex_trust_dialog') `
+	'main.gd must delegate the Agent tab to AgentSettingsPanelController.'
+Assert-Architecture ($details -notmatch 'signal agent_[a-z_]+_enabled_toggled|signal [a-z_]+_executable_path_changed\(path') `
+	'Agent tab switches and paths must be generated from AgentChannelCatalog.'
 Assert-Architecture ($main -notmatch 'CharacterPackManagerScript') `
 	'main.gd must not depend directly on CharacterPackManager.'
 Assert-Architecture ($main -notmatch '_agent_notification_queue') `
@@ -158,9 +163,9 @@ Assert-Architecture ($agentController -match '_detect_claude_app_from_appx') `
 	'Claude Desktop detection must support Microsoft Store Appx installations.'
 Assert-Architecture ($agentController -match 'terminal_opencode_enabled') `
 	'Codex integration must keep OpenCode terminal state separate from Codex.'
-Assert-Architecture ($agentController -match '_run_opencode_configuration_tool') `
+Assert-Architecture ($agentCatalog -match 'install_opencode_integration\.ps1') `
 	'Codex integration must configure OpenCode through its installer.'
-Assert-Architecture ($agentController -match '_run_claude_code_configuration_tool') `
+Assert-Architecture ($agentCatalog -match 'install_claude_code_integration\.ps1') `
 	'Codex integration must configure Claude Code through its installer.'
 Assert-Architecture ($agentController -match 'claude_vscode_enabled') `
 	'Codex integration must keep Claude Code VS Code state separate.'
@@ -168,10 +173,12 @@ Assert-Architecture ($agentController -match 'claude_terminal_enabled') `
 	'Codex integration must keep Claude Code terminal state separate.'
 Assert-Architecture ($agentController -match 'gemini_terminal_enabled') `
 	'Codex integration must keep Gemini CLI terminal state separate.'
-Assert-Architecture ($agentController -match '_run_gemini_cli_configuration_tool') `
+Assert-Architecture ($agentCatalog -match 'install_gemini_cli_integration\.ps1') `
 	'Codex integration must configure Gemini CLI through its installer.'
 Assert-Architecture ((Read-Source 'tools/codex_stop_notify.ps1') -match 'Test-ProcessTreeContainsVsCode') `
 	'Codex notification routing must detect VS Code hosts in the process tree.'
+Assert-Architecture ($agentController -match 'AgentChannelCatalogScript\.CHANNELS') `
+	'Agent channels must come from the shared catalog.'
 Assert-Architecture ($agentController -match 'RUNTIME_FILE_NAME') `
 	'Agent notifications must publish one runtime registration.'
 Assert-Architecture ($agentController -notmatch 'func _write_bridge_files') `
@@ -186,13 +193,13 @@ Assert-Architecture ((Read-Source 'tools/install_codex_integration.ps1') -match 
 	'Codex Stop-hook installation must remove the obsolete notify integration.'
 Assert-Architecture ($agentController -match 'agy_terminal_enabled') `
 	'Codex integration must keep Antigravity CLI terminal state separate.'
-Assert-Architecture ($agentController -match '_run_antigravity_cli_configuration_tool') `
+Assert-Architecture ($agentCatalog -match 'install_antigravity_cli_integration\.ps1') `
 	'Codex integration must configure Antigravity CLI through its installer.'
 Assert-Architecture ($agentController -match 'pi_codex_enabled') `
 	'Agent integration must keep Pi state separate.'
-Assert-Architecture ($agentController -match '_run_pi_configuration_tool') `
+Assert-Architecture ($agentCatalog -match 'install_pi_integration\.ps1') `
 	'Agent integration must configure Pi through its installer.'
-Assert-Architecture ($agentController -match 'pi_codex_terminal') `
+Assert-Architecture ($agentCatalog -match '"runtime_key": "pi_codex_terminal"') `
 	'Agent integration must publish a separate Pi runtime target.'
 Assert-Architecture ($piExtension -match 'agent_settled') `
 	'Pi notifications must use the settled-agent lifecycle event.'

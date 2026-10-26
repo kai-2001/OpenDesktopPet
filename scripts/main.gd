@@ -2,7 +2,9 @@ extends Node2D
 
 const CharacterPackCoordinatorScript = preload("res://scripts/character_pack_coordinator.gd")
 const AgentIntegrationControllerScript = preload("res://scripts/agent_integration_controller.gd")
-const CodexHookTrustService = preload("res://scripts/codex_hook_trust_service.gd")
+const AgentSettingsPanelControllerScript = preload(
+	"res://scripts/agent_settings_panel_controller.gd"
+)
 const DesktopWindowServiceScript = preload("res://scripts/desktop_window_service.gd")
 const PetGameplayCoordinatorScript = preload("res://scripts/pet_gameplay_coordinator.gd")
 const PetInputControllerScript = preload("res://scripts/pet_input_controller.gd")
@@ -66,40 +68,6 @@ var _update_status_label: Label
 var _update_check_button: Button
 var _update_release_page_button: Button
 var _update_skip_button: Button
-var _agent_codex_enabled_toggle: Button
-var _agent_codex_app_enabled_toggle: Button
-var _agent_terminal_codex_enabled_toggle: Button
-var _agent_terminal_opencode_enabled_toggle: Button
-var _agent_vscode_opencode_enabled_toggle: Button
-var _agent_opencode_app_enabled_toggle: Button
-var _agent_copilot_enabled_toggle: Button
-var _agent_claude_vscode_enabled_toggle: Button
-var _agent_claude_app_enabled_toggle: Button
-var _agent_claude_terminal_enabled_toggle: Button
-var _agent_gemini_terminal_enabled_toggle: Button
-var _agent_agy_terminal_enabled_toggle: Button
-var _agent_pi_codex_enabled_toggle: Button
-var _agent_port_spin_box: SpinBox
-var _agent_status_label: Label
-var _codex_setup_progress_bar: ProgressBar
-var _codex_trust_review_button: Button
-var _codex_trust_recheck_button: Button
-var _codex_trust_dialog: ConfirmationDialog
-var _vscode_executable_line_edit: LineEdit
-var _vscode_executable_hint: Label
-var _vscode_executable_summary: Label
-var _codex_app_executable_line_edit: LineEdit
-var _codex_app_executable_hint: Label
-var _codex_app_executable_summary: Label
-var _terminal_executable_line_edit: LineEdit
-var _terminal_executable_hint: Label
-var _terminal_executable_summary: Label
-var _opencode_app_executable_line_edit: LineEdit
-var _opencode_app_executable_hint: Label
-var _opencode_app_executable_summary: Label
-var _claude_app_executable_line_edit: LineEdit
-var _claude_app_executable_hint: Label
-var _claude_app_executable_summary: Label
 var _character_list: ItemList
 var _character_feedback: Label
 var _character_use_button: Button
@@ -155,6 +123,9 @@ var _details_theme_mode := "light"
 var _keep_screen_on := DEFAULT_KEEP_SCREEN_ON
 var _focus_mode := DEFAULT_FOCUS_MODE
 var _agent_controller: AgentIntegrationController
+var _agent_settings_panel
+# Tests swap in a recording subclass before the node enters the tree.
+var agent_controller_script: Script = AgentIntegrationControllerScript
 var _update_check_coordinator
 var _details_window_controller
 var _agent_notification_active := false
@@ -448,22 +419,14 @@ func _on_action_requested(action: String, _request_id: int) -> void:
 
 
 func _setup_agent_integration() -> void:
-	_agent_controller = AgentIntegrationControllerScript.new()
+	_agent_controller = agent_controller_script.new()
 	_agent_controller.notification_received.connect(_handle_agent_notification)
-	_agent_controller.configuration_failed.connect(_handle_agent_configuration_failed)
-	_agent_controller.codex_unavailable.connect(_handle_codex_unavailable)
-	_agent_controller.codex_trust_required.connect(_handle_codex_trust_required)
-	_agent_controller.codex_trust_ready.connect(_handle_codex_trust_ready)
-	_agent_controller.codex_trust_refresh_required.connect(
-		_handle_codex_trust_refresh_required
+	_agent_settings_panel = AgentSettingsPanelControllerScript.new()
+	_agent_settings_panel.configure(_agent_controller)
+	_agent_settings_panel.speech_requested.connect(
+		func(text: String, seconds: float) -> void: say(text, seconds)
 	)
-	_agent_controller.state_changed.connect(_refresh_agent_settings_ui)
-	_agent_controller.executable_path_detection_started.connect(
-		_on_executable_path_detection_started
-	)
-	_agent_controller.executable_path_detection_finished.connect(
-		_on_executable_path_detection_finished
-	)
+	_agent_settings_panel.agent_status_requested.connect(_enqueue_agent_status)
 	_agent_controller.load_settings()
 
 
@@ -523,256 +486,9 @@ func _on_update_skip_requested() -> void:
 		_update_check_coordinator.skip_latest_version()
 
 
-func _handle_agent_configuration_failed(target_name: String) -> void:
-	say("%s 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。" % target_name, 8.0)
-
-
-func _handle_codex_unavailable(target_name: String, _message: String) -> void:
-	say(
-		"%s 通知無法開啟：找不到支援 Hook 審查的 Codex。請先安裝或更新 "
-		+ "Codex Desktop、VS Code Codex 擴充功能或 Codex CLI。" % target_name,
-		8.0
-	)
-
-
-func _handle_codex_trust_required(
-	target_name: String, status: String, message: String
-) -> void:
-	_show_codex_trust_instructions(
-		"你正在開啟「%s Codex」通知。三種 Codex 共用同一組桌寵 Hook 信任。" % target_name,
-		target_name, status, message
-	)
-
-
-func _handle_codex_trust_refresh_required(
-	target_name: String, status: String, message: String
-) -> void:
-	_show_codex_trust_instructions(
-		"桌寵已更新 Codex 通知 Hook，Codex 需要重新信任後才會繼續通知。",
-		target_name, status, message
-	)
-
-
-func _show_codex_trust_instructions(
-	intro: String, target_name: String, status: String, message: String
-) -> void:
-	_apply_agent_control_state()
-	if not is_instance_valid(_codex_trust_dialog):
-		say("%s 的 Codex Hook 尚待信任，請開啟 Hook 審查。" % target_name, 8.0)
-		return
-	var status_hint := "目前狀態：%s" % message
-	if status == CodexHookTrustService.STATUS_UNAVAILABLE:
-		status_hint += "\n這台電腦找不到可用的 Codex 執行核心，請先安裝或更新 Codex。"
-	_codex_trust_dialog.dialog_text = (
-		"%s"
-		+ "\n\n%s\n\n"
-		+ "不需另外安裝 CLI；桌寵會使用 Codex Desktop、VS Code 擴充功能或"
-		+ "獨立 CLI 所提供的 Codex 核心。\n\n"
-		+ "1. 按「開啟 Codex 信任畫面」。\n"
-		+ "2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n"
-		+ "3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，"
-		+ "每一項都按 Enter 開啟詳細內容。\n"
-		+ "4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。"
-		+ "[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n"
-		+ "5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n"
-		+ "6. 回到桌寵，按「我已信任，檢查通知」。\n\n"
-		+ "選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。"
-	) % [intro, status_hint]
-	_codex_trust_dialog.popup_centered(Vector2i(700, 540))
-
-
-func _handle_codex_trust_ready(target_name: String, target_app: String) -> void:
-	if is_instance_valid(_codex_trust_dialog):
-		_codex_trust_dialog.hide()
-	_apply_agent_control_state()
-	_enqueue_agent_status(
-		"%s 的 Codex 通知已完成信任並啟用。" % target_name,
-		"idle",
-		target_app,
-		"codex"
-	)
-
-
-func _open_codex_hook_review() -> void:
-	if _agent_controller == null or not _agent_controller.open_codex_hook_review():
-		if is_instance_valid(_codex_trust_dialog):
-			_codex_trust_dialog.dialog_text = (
-				"無法開啟 Codex Hook 審查。請確認 Codex Desktop、VS Code 的 Codex "
-				+ "擴充功能或 Codex CLI 已安裝並更新，再重新嘗試。"
-			)
-			call_deferred("_show_codex_trust_dialog")
-		return
-	_apply_agent_control_state()
-
-
-func _recheck_codex_hook_trust() -> void:
-	if _agent_controller == null:
-		say("Codex 通知服務尚未就緒，請關閉並重新開啟桌寵。", 6.0)
-		return
-	if _agent_controller.is_codex_setup_busy():
-		say("正在檢查 Codex Hook，完成前不需要再按一次。", 6.0)
-		return
-	if not _agent_controller.has_pending_codex_trust():
-		say(
-			"尚未選擇要啟用哪一種 Codex 通知。請在下方找到你使用的程式"
-			+ "（VS Code、ChatGPT 或終端機），把它的 Codex 開關打開。",
-			8.0
-		)
-		return
-	if not _agent_controller.recheck_pending_codex_trust():
-		say("無法開始檢查，請重新開啟桌寵後再試。", 6.0)
-		return
-	_apply_agent_control_state()
-
-
-func _show_codex_trust_dialog() -> void:
-	if is_instance_valid(_codex_trust_dialog):
-		_codex_trust_dialog.popup_centered(Vector2i(580, 330))
-
-
-func _cancel_codex_hook_trust() -> void:
-	if _agent_controller != null:
-		_agent_controller.cancel_pending_codex_enable()
-	_apply_agent_control_state()
-
-
-func _on_executable_path_detection_started(targets: Array) -> void:
-	if _details_window_controller != null:
-		_details_window_controller.set_agent_executable_path_detection_state(
-			targets, true
-		)
-
-
-func _on_executable_path_detection_finished(targets: Array) -> void:
-	if _details_window_controller != null:
-		_details_window_controller.set_agent_executable_path_detection_state(
-			targets, false
-		)
-	_refresh_agent_settings_ui()
-
-
 func _setup_autostart_service() -> void:
 	_autostart_service = WindowsAutostartServiceScript.new()
 	_autostart_service.operation_completed.connect(_finish_autostart_operation)
-
-
-func _refresh_agent_settings_ui() -> void:
-	_apply_agent_control_state()
-	if _details_window_controller != null and _agent_controller != null:
-		_details_window_controller.refresh_executable_path_control(
-			_agent_controller.executable_path,
-			_vscode_executable_line_edit,
-			_vscode_executable_hint,
-			_vscode_executable_summary,
-			"VS Code",
-			true
-		)
-		_details_window_controller.refresh_executable_path_control(
-			_agent_controller.codex_app_executable_path,
-			_codex_app_executable_line_edit,
-			_codex_app_executable_hint,
-			_codex_app_executable_summary,
-			"ChatGPT",
-			true
-		)
-		_details_window_controller.refresh_executable_path_control(
-			_agent_controller.terminal_executable_path,
-			_terminal_executable_line_edit,
-			_terminal_executable_hint,
-			_terminal_executable_summary,
-			"終端機",
-			false
-		)
-		_details_window_controller.refresh_executable_path_control(
-			_agent_controller.opencode_app_executable_path,
-			_opencode_app_executable_line_edit,
-			_opencode_app_executable_hint,
-			_opencode_app_executable_summary,
-			"OpenCode",
-			false
-		)
-		_details_window_controller.refresh_executable_path_control(
-			_agent_controller.claude_app_executable_path,
-			_claude_app_executable_line_edit,
-			_claude_app_executable_hint,
-			_claude_app_executable_summary,
-			"Claude",
-			false
-		)
-	if not is_instance_valid(_agent_status_label):
-		return
-	var codex_trust_pending := (
-		_agent_controller != null and _agent_controller.has_pending_codex_trust()
-	)
-	var codex_setup_busy := (
-		_agent_controller != null and _agent_controller.is_codex_setup_busy()
-	)
-	if is_instance_valid(_codex_setup_progress_bar):
-		_codex_setup_progress_bar.visible = codex_setup_busy
-	if is_instance_valid(_codex_trust_review_button):
-		_codex_trust_review_button.visible = codex_trust_pending
-		_codex_trust_review_button.disabled = codex_setup_busy
-	if is_instance_valid(_codex_trust_recheck_button):
-		_codex_trust_recheck_button.visible = codex_trust_pending
-		_codex_trust_recheck_button.disabled = codex_setup_busy
-	if codex_setup_busy:
-		_agent_status_label.text = "狀態: 正在檢查 Codex 與通知設定…"
-		_agent_status_label.add_theme_color_override(
-			"font_color", _details_color("#238b9d", "#4fc1ff")
-		)
-		return
-	if codex_trust_pending:
-		_agent_status_label.text = (
-			"尚未啟用：請先在 Codex 信任桌寵 Hook，再按「我已信任，檢查通知」"
-		)
-		_agent_status_label.add_theme_color_override(
-			"font_color", _details_color("#a66b16", "#dcdcaa")
-		)
-		return
-	if _agent_controller == null or not _agent_controller.is_any_enabled():
-		_agent_status_label.text = "狀態: 已關閉"
-		_agent_status_label.add_theme_color_override(
-			"font_color", _details_color("#68747a", "#9da1a6")
-		)
-		return
-	if _agent_controller.is_running():
-		_agent_status_label.text = "狀態: 監聽中  127.0.0.1:%d" % _agent_controller.port
-		_agent_status_label.add_theme_color_override(
-			"font_color", _details_color("#238b9d", "#4fc1ff")
-		)
-	else:
-		_agent_status_label.text = "狀態: 無法監聽，通訊埠可能被占用"
-		_agent_status_label.add_theme_color_override(
-			"font_color", _details_color("#b44949", "#ff8c8c")
-		)
-
-
-func _apply_agent_control_state() -> void:
-	var enabled := _agent_controller != null and _agent_controller.is_any_enabled()
-	var codex_busy := (
-		_agent_controller != null and _agent_controller.is_codex_setup_busy()
-	)
-	_update_agent_enabled_toggles()
-	for toggle: Button in [
-		_agent_codex_enabled_toggle,
-		_agent_codex_app_enabled_toggle,
-		_agent_terminal_codex_enabled_toggle,
-	]:
-		if is_instance_valid(toggle):
-			toggle.disabled = codex_busy
-	if is_instance_valid(_agent_port_spin_box):
-		_agent_port_spin_box.editable = not enabled
-		_agent_port_spin_box.mouse_filter = (
-			Control.MOUSE_FILTER_IGNORE if enabled else Control.MOUSE_FILTER_STOP
-		)
-		var port_line_edit := _agent_port_spin_box.get_line_edit()
-		port_line_edit.editable = not enabled
-		port_line_edit.mouse_filter = (
-			Control.MOUSE_FILTER_IGNORE if enabled else Control.MOUSE_FILTER_STOP
-		)
-		_agent_port_spin_box.modulate = (
-			Color("#8c979b") if enabled else Color.WHITE
-		)
 
 
 func _handle_agent_notification(
@@ -1093,68 +809,8 @@ func _build_stats_window() -> void:
 	_stats_window_coordinator.theme_mode = _details_theme_mode
 	_stats_window_coordinator.reminder_coordinator = _task_reminder_coordinator
 	_stats_window_coordinator.last_state_message = _last_state_message
-	_stats_window_coordinator.codex_enabled = (
-		_agent_controller != null and _agent_controller.codex_enabled
-	)
-	_stats_window_coordinator.codex_app_enabled = (
-		_agent_controller != null and _agent_controller.codex_app_enabled
-	)
-	_stats_window_coordinator.terminal_codex_enabled = (
-		_agent_controller != null and _agent_controller.terminal_codex_enabled
-	)
-	_stats_window_coordinator.terminal_opencode_enabled = (
-		_agent_controller != null and _agent_controller.terminal_opencode_enabled
-	)
-	_stats_window_coordinator.vscode_opencode_enabled = (
-		_agent_controller != null and _agent_controller.vscode_opencode_enabled
-	)
-	_stats_window_coordinator.opencode_app_enabled = (
-		_agent_controller != null and _agent_controller.opencode_app_enabled
-	)
-	_stats_window_coordinator.copilot_enabled = (
-		_agent_controller != null and _agent_controller.copilot_enabled
-	)
-	_stats_window_coordinator.claude_vscode_enabled = (
-		_agent_controller != null and _agent_controller.claude_vscode_enabled
-	)
-	_stats_window_coordinator.claude_app_enabled = (
-		_agent_controller != null and _agent_controller.claude_app_enabled
-	)
-	_stats_window_coordinator.claude_terminal_enabled = (
-		_agent_controller != null and _agent_controller.claude_terminal_enabled
-	)
-	_stats_window_coordinator.gemini_terminal_enabled = (
-		_agent_controller != null and _agent_controller.gemini_terminal_enabled
-	)
-	_stats_window_coordinator.agy_terminal_enabled = (
-		_agent_controller != null and _agent_controller.agy_terminal_enabled
-	)
-	_stats_window_coordinator.pi_codex_enabled = (
-		_agent_controller != null and _agent_controller.pi_codex_enabled
-	)
-	_stats_window_coordinator.agent_port = (
-		_agent_controller.port
-		if _agent_controller != null
-		else AgentIntegrationControllerScript.DEFAULT_PORT
-	)
-	_stats_window_coordinator.codex_executable_path = (
-		_agent_controller.executable_path if _agent_controller != null else ""
-	)
-	_stats_window_coordinator.codex_app_executable_path = (
-		_agent_controller.codex_app_executable_path
-		if _agent_controller != null else ""
-	)
-	_stats_window_coordinator.terminal_executable_path = (
-		_agent_controller.terminal_executable_path
-		if _agent_controller != null else ""
-	)
-	_stats_window_coordinator.opencode_app_executable_path = (
-		_agent_controller.opencode_app_executable_path
-		if _agent_controller != null else ""
-	)
-	_stats_window_coordinator.claude_app_executable_path = (
-		_agent_controller.claude_app_executable_path
-		if _agent_controller != null else ""
+	_stats_window_coordinator.agent_settings = (
+		_agent_controller.get_settings_snapshot() if _agent_controller != null else {}
 	)
 	_stats_window_coordinator.autostart_supported = _is_autostart_supported()
 	_stats_window_coordinator.keep_screen_on = _keep_screen_on
@@ -1201,84 +857,9 @@ func _build_stats_window() -> void:
 	_update_release_page_button = settings_refs["update_release_page_button"] as Button
 	_update_skip_button = settings_refs["update_skip_button"] as Button
 	_refresh_update_ui()
-	var agent_refs: Dictionary = refs["agent_refs"]
-	_agent_port_spin_box = agent_refs["agent_port_spin_box"] as SpinBox
-	_agent_status_label = agent_refs["agent_status_label"] as Label
-	_codex_setup_progress_bar = (
-		agent_refs["codex_setup_progress_bar"] as ProgressBar
+	_agent_settings_panel.bind(
+		_details_window_controller, refs["agent_refs"], _details_theme_mode
 	)
-	_codex_trust_review_button = (
-		agent_refs["codex_trust_review_button"] as Button
-	)
-	_codex_trust_recheck_button = (
-		agent_refs["codex_trust_recheck_button"] as Button
-	)
-	_codex_trust_dialog = agent_refs["codex_trust_dialog"] as ConfirmationDialog
-	_codex_trust_dialog.confirmed.connect(_open_codex_hook_review)
-	_codex_trust_dialog.canceled.connect(_cancel_codex_hook_trust)
-	_agent_codex_enabled_toggle = agent_refs["codex_enabled_toggle"] as Button
-	_agent_codex_app_enabled_toggle = (
-		agent_refs["codex_app_enabled_toggle"] as Button
-	)
-	_agent_terminal_codex_enabled_toggle = (
-		agent_refs["terminal_codex_enabled_toggle"] as Button
-	)
-	_agent_terminal_opencode_enabled_toggle = (
-		agent_refs["terminal_opencode_enabled_toggle"] as Button
-	)
-	_agent_vscode_opencode_enabled_toggle = (
-		agent_refs["vscode_opencode_enabled_toggle"] as Button
-	)
-	_agent_opencode_app_enabled_toggle = (
-		agent_refs["opencode_app_enabled_toggle"] as Button
-	)
-	_agent_copilot_enabled_toggle = agent_refs["copilot_enabled_toggle"] as Button
-	_agent_claude_vscode_enabled_toggle = (
-		agent_refs["claude_vscode_enabled_toggle"] as Button
-	)
-	_agent_claude_app_enabled_toggle = (
-		agent_refs["claude_app_enabled_toggle"] as Button
-	)
-	_agent_claude_terminal_enabled_toggle = (
-		agent_refs["claude_terminal_enabled_toggle"] as Button
-	)
-	_agent_gemini_terminal_enabled_toggle = (
-		agent_refs["gemini_terminal_enabled_toggle"] as Button
-	)
-	_agent_agy_terminal_enabled_toggle = (
-		agent_refs["agy_terminal_enabled_toggle"] as Button
-	)
-	_agent_pi_codex_enabled_toggle = (
-		agent_refs["pi_codex_enabled_toggle"] as Button
-	)
-	_vscode_executable_line_edit = (
-		agent_refs["vscode_executable_line_edit"] as LineEdit
-	)
-	_vscode_executable_hint = agent_refs["vscode_executable_hint"] as Label
-	_vscode_executable_summary = agent_refs["vscode_executable_summary"] as Label
-	_codex_app_executable_line_edit = (
-		agent_refs["codex_app_executable_line_edit"] as LineEdit
-	)
-	_codex_app_executable_hint = agent_refs["codex_app_executable_hint"] as Label
-	_codex_app_executable_summary = agent_refs["codex_app_executable_summary"] as Label
-	_terminal_executable_line_edit = (
-		agent_refs["terminal_executable_line_edit"] as LineEdit
-	)
-	_terminal_executable_hint = agent_refs["terminal_executable_hint"] as Label
-	_terminal_executable_summary = agent_refs["terminal_executable_summary"] as Label
-	_opencode_app_executable_line_edit = (
-		agent_refs["opencode_app_executable_line_edit"] as LineEdit
-	)
-	_opencode_app_executable_hint = agent_refs["opencode_app_executable_hint"] as Label
-	_opencode_app_executable_summary = agent_refs["opencode_app_executable_summary"] as Label
-	_claude_app_executable_line_edit = (
-		agent_refs["claude_app_executable_line_edit"] as LineEdit
-	)
-	_claude_app_executable_hint = agent_refs["claude_app_executable_hint"] as Label
-	_claude_app_executable_summary = (
-		agent_refs["claude_app_executable_summary"] as Label
-	)
-	_refresh_agent_settings_ui()
 	# The settings builder cannot request this before its signals and control
 	# references exist. Queue the initial query only after initialization.
 	if _is_autostart_supported():
@@ -1316,67 +897,6 @@ func _connect_details_window_signals() -> void:
 	_details_window_controller.auto_feeder_toggled.connect(_on_auto_feeder_toggled)
 	_details_window_controller.target_fps_selected.connect(_on_target_fps_selected)
 	_details_window_controller.details_theme_selected.connect(_on_details_theme_selected)
-	_details_window_controller.agent_codex_enabled_toggled.connect(
-		_on_codex_enabled_toggled
-	)
-	_details_window_controller.agent_codex_app_enabled_toggled.connect(
-		_on_codex_app_enabled_toggled
-	)
-	_details_window_controller.agent_terminal_codex_enabled_toggled.connect(
-		_on_terminal_codex_enabled_toggled
-	)
-	_details_window_controller.agent_terminal_opencode_enabled_toggled.connect(
-		_on_terminal_opencode_enabled_toggled
-	)
-	_details_window_controller.agent_vscode_opencode_enabled_toggled.connect(
-		_on_vscode_opencode_enabled_toggled
-	)
-	_details_window_controller.agent_opencode_app_enabled_toggled.connect(
-		_on_opencode_app_enabled_toggled
-	)
-	_details_window_controller.agent_copilot_enabled_toggled.connect(
-		_on_copilot_enabled_toggled
-	)
-	_details_window_controller.agent_claude_vscode_enabled_toggled.connect(
-		_on_claude_vscode_enabled_toggled
-	)
-	_details_window_controller.agent_claude_app_enabled_toggled.connect(
-		_on_claude_app_enabled_toggled
-	)
-	_details_window_controller.agent_claude_terminal_enabled_toggled.connect(
-		_on_claude_terminal_enabled_toggled
-	)
-	_details_window_controller.agent_gemini_terminal_enabled_toggled.connect(
-		_on_gemini_terminal_enabled_toggled
-	)
-	_details_window_controller.agent_agy_terminal_enabled_toggled.connect(
-		_on_agy_terminal_enabled_toggled
-	)
-	_details_window_controller.agent_pi_codex_enabled_toggled.connect(
-		_on_pi_codex_enabled_toggled
-	)
-	_details_window_controller.agent_port_changed.connect(_on_agent_port_changed)
-	_details_window_controller.codex_trust_review_requested.connect(
-		_open_codex_hook_review
-	)
-	_details_window_controller.codex_trust_recheck_requested.connect(
-		_recheck_codex_hook_trust
-	)
-	_details_window_controller.vscode_executable_path_changed.connect(
-		_on_vscode_executable_path_changed
-	)
-	_details_window_controller.codex_app_executable_path_changed.connect(
-		_on_codex_app_executable_path_changed
-	)
-	_details_window_controller.terminal_executable_path_changed.connect(
-		_on_terminal_executable_path_changed
-	)
-	_details_window_controller.opencode_app_executable_path_changed.connect(
-		_on_opencode_app_executable_path_changed
-	)
-	_details_window_controller.claude_app_executable_path_changed.connect(
-		_on_claude_app_executable_path_changed
-	)
 	_details_window_controller.autostart_toggled.connect(_on_autostart_toggled)
 	_details_window_controller.keep_screen_on_toggled.connect(_on_keep_screen_on_toggled)
 	_details_window_controller.focus_mode_toggled.connect(_on_focus_mode_toggled)
@@ -1860,74 +1380,6 @@ func _details_color(light: String, dark: String) -> Color:
 	return Color(dark if _details_theme_mode == "dark" else light)
 
 
-func _update_agent_enabled_toggles() -> void:
-	if is_instance_valid(_agent_codex_enabled_toggle):
-		_agent_codex_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.codex_enabled
-		)
-	if is_instance_valid(_agent_codex_app_enabled_toggle):
-		_agent_codex_app_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.codex_app_enabled
-		)
-	if is_instance_valid(_agent_terminal_codex_enabled_toggle):
-		_agent_terminal_codex_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.terminal_codex_enabled
-		)
-	if is_instance_valid(_agent_terminal_opencode_enabled_toggle):
-		_agent_terminal_opencode_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.terminal_opencode_enabled
-		)
-	if is_instance_valid(_agent_vscode_opencode_enabled_toggle):
-		_agent_vscode_opencode_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.vscode_opencode_enabled
-		)
-	if is_instance_valid(_agent_opencode_app_enabled_toggle):
-		_agent_opencode_app_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.opencode_app_enabled
-		)
-	if is_instance_valid(_agent_copilot_enabled_toggle):
-		_agent_copilot_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.copilot_enabled
-		)
-	if is_instance_valid(_agent_claude_vscode_enabled_toggle):
-		_agent_claude_vscode_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.claude_vscode_enabled
-		)
-	if is_instance_valid(_agent_claude_app_enabled_toggle):
-		_agent_claude_app_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.claude_app_enabled
-		)
-	if is_instance_valid(_agent_claude_terminal_enabled_toggle):
-		_agent_claude_terminal_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.claude_terminal_enabled
-		)
-	if is_instance_valid(_agent_gemini_terminal_enabled_toggle):
-		_agent_gemini_terminal_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.gemini_terminal_enabled
-		)
-	if is_instance_valid(_agent_agy_terminal_enabled_toggle):
-		_agent_agy_terminal_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.agy_terminal_enabled
-		)
-	if is_instance_valid(_agent_pi_codex_enabled_toggle):
-		_agent_pi_codex_enabled_toggle.call(
-			"set_enabled_state",
-			_agent_controller != null and _agent_controller.pi_codex_enabled
-		)
-
-
 func _details_style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = background
@@ -2007,6 +1459,7 @@ func _destroy_stats_window() -> void:
 		_stats_window_coordinator.destroy()
 		_stats_window_coordinator = null
 	_details_window_controller = null
+	_agent_settings_panel.unbind()
 	_stats_window = null
 	_stats_tabs = null
 	_stats_tab_buttons.clear()
@@ -2029,40 +1482,6 @@ func _destroy_stats_window() -> void:
 	_update_check_button = null
 	_update_release_page_button = null
 	_update_skip_button = null
-	_agent_codex_enabled_toggle = null
-	_agent_codex_app_enabled_toggle = null
-	_agent_terminal_codex_enabled_toggle = null
-	_agent_terminal_opencode_enabled_toggle = null
-	_agent_vscode_opencode_enabled_toggle = null
-	_agent_opencode_app_enabled_toggle = null
-	_agent_copilot_enabled_toggle = null
-	_agent_claude_vscode_enabled_toggle = null
-	_agent_claude_app_enabled_toggle = null
-	_agent_claude_terminal_enabled_toggle = null
-	_agent_gemini_terminal_enabled_toggle = null
-	_agent_agy_terminal_enabled_toggle = null
-	_agent_pi_codex_enabled_toggle = null
-	_agent_port_spin_box = null
-	_agent_status_label = null
-	_codex_setup_progress_bar = null
-	_codex_trust_review_button = null
-	_codex_trust_recheck_button = null
-	_codex_trust_dialog = null
-	_vscode_executable_line_edit = null
-	_vscode_executable_hint = null
-	_vscode_executable_summary = null
-	_codex_app_executable_line_edit = null
-	_codex_app_executable_hint = null
-	_codex_app_executable_summary = null
-	_terminal_executable_line_edit = null
-	_terminal_executable_hint = null
-	_terminal_executable_summary = null
-	_opencode_app_executable_line_edit = null
-	_opencode_app_executable_hint = null
-	_opencode_app_executable_summary = null
-	_claude_app_executable_line_edit = null
-	_claude_app_executable_hint = null
-	_claude_app_executable_summary = null
 	_autostart_check_box = null
 	_settings_feedback = null
 	_character_list = null
@@ -2217,208 +1636,6 @@ func _on_visual_scale_previewed(value: float) -> void:
 
 func _on_visual_scale_changed(value: float) -> void:
 	state.set_visual_scale(value)
-
-
-func _on_codex_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_codex_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_VSCODE]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_codex_app_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_codex_app_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_CODEX_APP]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_terminal_codex_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_terminal_codex_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_TERMINAL]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_terminal_opencode_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_terminal_opencode_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_TERMINAL]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_vscode_opencode_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_vscode_opencode_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_VSCODE]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_opencode_app_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_opencode_app_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_OPENCODE_APP]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_claude_vscode_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_claude_vscode_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_VSCODE]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_claude_app_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_claude_app_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_CLAUDE_APP]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_claude_terminal_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_claude_terminal_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_TERMINAL]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_gemini_terminal_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_gemini_terminal_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_TERMINAL]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_agy_terminal_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_agy_terminal_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_TERMINAL]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_pi_codex_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_pi_codex_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_TERMINAL]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_copilot_enabled_toggled(enabled: bool) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_copilot_enabled(enabled)
-	if enabled:
-		_agent_controller.refresh_executable_paths_if_invalid(
-			[AgentIntegrationControllerScript.TARGET_VSCODE]
-		)
-	_apply_agent_control_state()
-	call_deferred("_apply_agent_control_state")
-
-
-func _on_agent_port_changed(value: float) -> void:
-	if _agent_controller == null:
-		return
-	if _agent_controller.is_any_enabled():
-		if is_instance_valid(_agent_port_spin_box):
-			_agent_port_spin_box.set_value_no_signal(_agent_controller.port)
-		return
-	var pending_port := _agent_controller.normalize_port(roundi(value))
-	_agent_controller.set_port(pending_port)
-
-
-func _on_vscode_executable_path_changed(path: String) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_executable_path(path)
-	_refresh_agent_settings_ui()
-
-
-func _on_codex_app_executable_path_changed(path: String) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_codex_app_executable_path(path)
-	_refresh_agent_settings_ui()
-
-
-func _on_terminal_executable_path_changed(path: String) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_terminal_executable_path(path)
-	_refresh_agent_settings_ui()
-
-
-func _on_opencode_app_executable_path_changed(path: String) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_opencode_app_executable_path(path)
-	_refresh_agent_settings_ui()
-
-
-func _on_claude_app_executable_path_changed(path: String) -> void:
-	if _agent_controller == null:
-		return
-	_agent_controller.set_claude_app_executable_path(path)
-	_refresh_agent_settings_ui()
 
 
 func _rebuild_stats_window_after_theme_change(

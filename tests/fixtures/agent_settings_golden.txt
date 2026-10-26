@@ -1,0 +1,866 @@
+## startup with VS Code Codex and terminal Claude Code saved as enabled
+  call install install_codex_integration.ps1
+  call install install_claude_code_integration.ps1
+  call refresh_paths terminal,vscode
+  call signal codex_trust_refresh_required VS Code untrusted 尚未信任
+  call worker detect terminal
+  call worker detect vscode
+  call worker trust query_status
+  say VS Code 的 Codex Hook 尚待信任，請開啟 Hook 審查。
+  controller.agy_terminal_enabled = false
+  controller.claude_app_enabled = false
+  controller.claude_app_executable_path = 
+  controller.claude_terminal_enabled = true
+  controller.claude_vscode_enabled = false
+  controller.codex_app_enabled = false
+  controller.codex_app_executable_path = 
+  controller.codex_enabled = true
+  controller.copilot_enabled = false
+  controller.enabled = true
+  controller.executable_path = 
+  controller.gemini_terminal_enabled = false
+  controller.opencode_app_enabled = false
+  controller.opencode_app_executable_path = 
+  controller.pending_codex_trust = true
+  controller.pi_codex_enabled = false
+  controller.port = 49871
+  controller.running = true
+  controller.terminal_codex_enabled = false
+  controller.terminal_executable_path = C:/ODP-golden/startup-terminal.exe
+  controller.terminal_opencode_enabled = false
+  controller.vscode_opencode_enabled = false
+  runtime.enabled_targets.agy_terminal = false
+  runtime.enabled_targets.claude_app = false
+  runtime.enabled_targets.claude_terminal = true
+  runtime.enabled_targets.claude_vscode = false
+  runtime.enabled_targets.codex_app = false
+  runtime.enabled_targets.codex_terminal = false
+  runtime.enabled_targets.codex_vscode = true
+  runtime.enabled_targets.copilot = false
+  runtime.enabled_targets.gemini_terminal = false
+  runtime.enabled_targets.opencode_app = false
+  runtime.enabled_targets.opencode_terminal = false
+  runtime.enabled_targets.opencode_vscode = false
+  runtime.enabled_targets.pi_codex_terminal = false
+  runtime.executable_paths.claude_app = 
+  runtime.executable_paths.codex_app = 
+  runtime.executable_paths.opencode_app = 
+  runtime.executable_paths.terminal = C:/ODP-golden/startup-terminal.exe
+  runtime.port = 49871.0
+  settings.agy_terminal.enabled = false
+  settings.claude_code_app.enabled = false
+  settings.claude_code_app.executable_path = 
+  settings.claude_code_terminal.enabled = true
+  settings.claude_code_vscode.enabled = false
+  settings.codex.enabled = true
+  settings.codex.executable_path = 
+  settings.codex.port = 49871
+  settings.codex.vscode_enabled = true
+  settings.codex.vscode_executable_path = 
+  settings.codex_app.enabled = false
+  settings.codex_app.executable_path = 
+  settings.codex_setup.pending_target = vscode
+  settings.codex_setup.pending_target_name = VS Code
+  settings.codex_terminal.enabled = false
+  settings.codex_terminal.executable_path = C:/ODP-golden/startup-terminal.exe
+  settings.copilot.enabled = false
+  settings.gemini_terminal.enabled = false
+  settings.opencode_app.enabled = false
+  settings.opencode_app.executable_path = 
+  settings.opencode_terminal.enabled = false
+  settings.opencode_vscode.enabled = false
+  settings.pi_codex_terminal.enabled = false
+  ui = closed
+## open details window
+  ui.AgyTerminalEnabledToggle = 　Antigravity CLI 關 disabled=false
+  ui.ClaudeAppExecutablePath = text= hint=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 summary=點擊通知氣泡會切回：未設定
+  ui.ClaudeCodeTerminalEnabledToggle = 　Claude Code 開 disabled=false
+  ui.ClaudeCodeVscodeEnabledToggle = 　Claude Code 關 disabled=false
+  ui.ClaudeDesktopEnabledToggle = 　Claude Code 關 disabled=false
+  ui.CodexAppEnabledToggle = 　Codex 關 disabled=false
+  ui.CodexAppExecutablePath = text= hint=尚未找到 ChatGPT；請按資料夾按鈕選擇執行檔。 summary=點擊通知氣泡會切回：未設定
+  ui.CodexEnabledToggle = 　Codex 開 disabled=false
+  ui.CodexHookTrustPageReviewButton = visible=true disabled=false
+  ui.CodexHookTrustRecheckButton = visible=true disabled=false
+  ui.CopilotEnabledToggle = 　Copilot 關 disabled=false
+  ui.GeminiCliTerminalEnabledToggle = 　Gemini CLI（舊版） 關 disabled=false
+  ui.OpenCodeAppEnabledToggle = 　OpenCode 關 disabled=false
+  ui.OpenCodeAppExecutablePath = text= hint=尚未設定終端機執行檔；外部 CLI 通知仍會顯示，但點擊時無法切回終端機。 summary=點擊通知氣泡會切回：未設定
+  ui.PiCodexEnabledToggle = 　Pi 關 disabled=false
+  ui.TerminalCodexEnabledToggle = 　Codex 關 disabled=false
+  ui.TerminalExecutablePath = text=C:/ODP-golden/startup-terminal.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：startup-terminal.exe
+  ui.TerminalOpenCodeEnabledToggle = 　OpenCode 關 disabled=false
+  ui.VscodeExecutablePath = text= hint=尚未找到 VS Code；請按資料夾按鈕選擇執行檔。 summary=點擊通知氣泡會切回：未設定
+  ui.VscodeOpenCodeEnabledToggle = 　OpenCode 關 disabled=false
+  ui.codex_progress_visible = false
+  ui.port = 49871 editable=false
+  ui.status = 尚未啟用：請先在 Codex 信任桌寵 Hook，再按「我已信任，檢查通知」 color=a66b16ff
+  ui.trust_dialog_text = Codex 必須先信任桌寵的 Stop、PermissionRequest、PreToolUse Hook，通知才會生效。\n\n1. 按「開啟 Codex 信任畫面」。\n2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，每一項都按 Enter 開啟詳細內容。\n4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n6. 回到桌寵，按「我已信任，檢查通知」。\n\n選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。\n\n不需另外安裝 CLI；桌寵會使用已安裝 Codex 產品提供的核心。\n\n審查選單會顯示在「Codex Hook Review」PowerShell 視窗，不會出現在 GPT Codex 或 VS Code 面板裡。
+  ui.trust_dialog_visible = false
+  ui removed
+## select Agent tab
+  call refresh_paths terminal,vscode
+  call worker detect terminal
+  call worker detect vscode
+## enable CodexEnabledToggle
+  call refresh_paths vscode
+  call signal codex_trust_ready VS Code vscode
+  call worker detect vscode
+  call worker trust query_availability
+  call worker trust query_status
+  say VS Code 的 Codex 通知已完成信任並啟用。
+  controller.pending_codex_trust = false
+  settings.codex_setup.pending_target = 
+  settings.codex_setup.pending_target_name = 
+  ui.CodexHookTrustPageReviewButton = visible=false disabled=false
+  ui.CodexHookTrustRecheckButton = visible=false disabled=false
+  ui.status = 狀態: 監聽中  127.0.0.1:49871 color=238b9dff
+## disable CodexEnabledToggle
+  controller.codex_enabled = false
+  controller.enabled = false
+  runtime.enabled_targets.codex_vscode = false
+  settings.codex.enabled = false
+  settings.codex.vscode_enabled = false
+  ui.CodexEnabledToggle = 　Codex 關 disabled=false
+## enable ClaudeCodeVscodeEnabledToggle
+  call refresh_paths vscode
+  call worker detect vscode
+  controller.claude_vscode_enabled = true
+  runtime.enabled_targets.claude_vscode = true
+  settings.claude_code_vscode.enabled = true
+  ui.ClaudeCodeVscodeEnabledToggle = 　Claude Code 開 disabled=false
+## disable ClaudeCodeVscodeEnabledToggle
+  controller.claude_vscode_enabled = false
+  runtime.enabled_targets.claude_vscode = false
+  settings.claude_code_vscode.enabled = false
+  ui.ClaudeCodeVscodeEnabledToggle = 　Claude Code 關 disabled=false
+## enable CopilotEnabledToggle
+  call install install_copilot_integration.ps1
+  call refresh_paths vscode
+  call worker detect vscode
+  controller.copilot_enabled = true
+  runtime.enabled_targets.copilot = true
+  settings.copilot.enabled = true
+  ui.CopilotEnabledToggle = 　Copilot 開 disabled=false
+## disable CopilotEnabledToggle
+  controller.copilot_enabled = false
+  runtime.enabled_targets.copilot = false
+  settings.copilot.enabled = false
+  ui.CopilotEnabledToggle = 　Copilot 關 disabled=false
+## enable VscodeOpenCodeEnabledToggle
+  call install install_opencode_integration.ps1
+  call refresh_paths vscode
+  call worker detect vscode
+  controller.vscode_opencode_enabled = true
+  runtime.enabled_targets.opencode_vscode = true
+  settings.opencode_vscode.enabled = true
+  ui.VscodeOpenCodeEnabledToggle = 　OpenCode 開 disabled=false
+## disable VscodeOpenCodeEnabledToggle
+  controller.vscode_opencode_enabled = false
+  runtime.enabled_targets.opencode_vscode = false
+  settings.opencode_vscode.enabled = false
+  ui.VscodeOpenCodeEnabledToggle = 　OpenCode 關 disabled=false
+## enable CodexAppEnabledToggle
+  call refresh_paths codex_app
+  call signal codex_trust_ready ChatGPT codex_app
+  call worker detect codex_app
+  call worker trust query_availability
+  call worker trust query_status
+  say ChatGPT 的 Codex 通知已完成信任並啟用。
+  controller.codex_app_enabled = true
+  runtime.enabled_targets.codex_app = true
+  settings.codex_app.enabled = true
+  ui.CodexAppEnabledToggle = 　Codex 開 disabled=false
+## disable CodexAppEnabledToggle
+  controller.codex_app_enabled = false
+  runtime.enabled_targets.codex_app = false
+  settings.codex_app.enabled = false
+  ui.CodexAppEnabledToggle = 　Codex 關 disabled=false
+## enable OpenCodeAppEnabledToggle
+  call refresh_paths opencode_app
+  call worker detect opencode_app
+  controller.opencode_app_enabled = true
+  runtime.enabled_targets.opencode_app = true
+  settings.opencode_app.enabled = true
+  ui.OpenCodeAppEnabledToggle = 　OpenCode 開 disabled=false
+## disable OpenCodeAppEnabledToggle
+  controller.opencode_app_enabled = false
+  runtime.enabled_targets.opencode_app = false
+  settings.opencode_app.enabled = false
+  ui.OpenCodeAppEnabledToggle = 　OpenCode 關 disabled=false
+## enable ClaudeDesktopEnabledToggle
+  call refresh_paths claude_app
+  call worker detect claude_app
+  controller.claude_app_enabled = true
+  runtime.enabled_targets.claude_app = true
+  settings.claude_code_app.enabled = true
+  ui.ClaudeDesktopEnabledToggle = 　Claude Code 開 disabled=false
+## disable ClaudeDesktopEnabledToggle
+  controller.claude_app_enabled = false
+  runtime.enabled_targets.claude_app = false
+  settings.claude_code_app.enabled = false
+  ui.ClaudeDesktopEnabledToggle = 　Claude Code 關 disabled=false
+## enable TerminalCodexEnabledToggle
+  call refresh_paths terminal
+  call signal codex_trust_ready 終端機 terminal
+  call worker detect terminal
+  call worker trust query_availability
+  call worker trust query_status
+  say 終端機 的 Codex 通知已完成信任並啟用。
+  controller.terminal_codex_enabled = true
+  runtime.enabled_targets.codex_terminal = true
+  settings.codex_terminal.enabled = true
+  ui.TerminalCodexEnabledToggle = 　Codex 開 disabled=false
+## disable TerminalCodexEnabledToggle
+  controller.terminal_codex_enabled = false
+  runtime.enabled_targets.codex_terminal = false
+  settings.codex_terminal.enabled = false
+  ui.TerminalCodexEnabledToggle = 　Codex 關 disabled=false
+## enable PiCodexEnabledToggle
+  call install install_pi_integration.ps1
+  call refresh_paths terminal
+  call worker detect terminal
+  controller.pi_codex_enabled = true
+  runtime.enabled_targets.pi_codex_terminal = true
+  settings.pi_codex_terminal.enabled = true
+  ui.PiCodexEnabledToggle = 　Pi 開 disabled=false
+## disable PiCodexEnabledToggle
+  controller.pi_codex_enabled = false
+  runtime.enabled_targets.pi_codex_terminal = false
+  settings.pi_codex_terminal.enabled = false
+  ui.PiCodexEnabledToggle = 　Pi 關 disabled=false
+## enable TerminalOpenCodeEnabledToggle
+  call refresh_paths terminal
+  call worker detect terminal
+  controller.terminal_opencode_enabled = true
+  runtime.enabled_targets.opencode_terminal = true
+  settings.opencode_terminal.enabled = true
+  ui.TerminalOpenCodeEnabledToggle = 　OpenCode 開 disabled=false
+## disable TerminalOpenCodeEnabledToggle
+  controller.terminal_opencode_enabled = false
+  runtime.enabled_targets.opencode_terminal = false
+  settings.opencode_terminal.enabled = false
+  ui.TerminalOpenCodeEnabledToggle = 　OpenCode 關 disabled=false
+## enable GeminiCliTerminalEnabledToggle
+  call install install_gemini_cli_integration.ps1
+  call refresh_paths terminal
+  call worker detect terminal
+  controller.gemini_terminal_enabled = true
+  runtime.enabled_targets.gemini_terminal = true
+  settings.gemini_terminal.enabled = true
+  ui.GeminiCliTerminalEnabledToggle = 　Gemini CLI（舊版） 開 disabled=false
+## disable GeminiCliTerminalEnabledToggle
+  controller.gemini_terminal_enabled = false
+  runtime.enabled_targets.gemini_terminal = false
+  settings.gemini_terminal.enabled = false
+  ui.GeminiCliTerminalEnabledToggle = 　Gemini CLI（舊版） 關 disabled=false
+## enable AgyTerminalEnabledToggle
+  call install install_antigravity_cli_integration.ps1
+  call refresh_paths terminal
+  call worker detect terminal
+  controller.agy_terminal_enabled = true
+  runtime.enabled_targets.agy_terminal = true
+  settings.agy_terminal.enabled = true
+  ui.AgyTerminalEnabledToggle = 　Antigravity CLI 開 disabled=false
+## disable AgyTerminalEnabledToggle
+  controller.agy_terminal_enabled = false
+  runtime.enabled_targets.agy_terminal = false
+  settings.agy_terminal.enabled = false
+  ui.AgyTerminalEnabledToggle = 　Antigravity CLI 關 disabled=false
+## enable ClaudeCodeTerminalEnabledToggle
+  call refresh_paths terminal
+  call worker detect terminal
+## disable ClaudeCodeTerminalEnabledToggle
+  controller.claude_terminal_enabled = false
+  controller.running = false
+  runtime = missing
+  settings.claude_code_terminal.enabled = false
+  ui.ClaudeCodeTerminalEnabledToggle = 　Claude Code 關 disabled=false
+  ui.port = 49871 editable=true
+  ui.status = 狀態: 已關閉 color=68747aff
+  runtime.port removed
+  runtime.enabled_targets.agy_terminal removed
+  runtime.enabled_targets.claude_app removed
+  runtime.enabled_targets.claude_terminal removed
+  runtime.enabled_targets.claude_vscode removed
+  runtime.enabled_targets.codex_app removed
+  runtime.enabled_targets.codex_terminal removed
+  runtime.enabled_targets.codex_vscode removed
+  runtime.enabled_targets.copilot removed
+  runtime.enabled_targets.gemini_terminal removed
+  runtime.enabled_targets.opencode_app removed
+  runtime.enabled_targets.opencode_terminal removed
+  runtime.enabled_targets.opencode_vscode removed
+  runtime.enabled_targets.pi_codex_terminal removed
+  runtime.executable_paths.claude_app removed
+  runtime.executable_paths.codex_app removed
+  runtime.executable_paths.opencode_app removed
+  runtime.executable_paths.terminal removed
+## enable CodexEnabledToggle while its installer fails
+  call refresh_paths vscode
+  call signal configuration_failed VS Code
+  call worker detect vscode
+  call worker install install_codex_integration.ps1
+  call worker trust query_availability
+## enable ClaudeCodeVscodeEnabledToggle while its installer fails
+  call install install_claude_code_integration.ps1
+  call signal configuration_failed Claude Code
+  call refresh_paths vscode
+  call worker detect vscode
+  say Claude Code 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable CopilotEnabledToggle while its installer fails
+  call install install_copilot_integration.ps1
+  call signal configuration_failed VS Code Copilot
+  call refresh_paths vscode
+  call worker detect vscode
+  say VS Code Copilot 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable VscodeOpenCodeEnabledToggle while its installer fails
+  call install install_opencode_integration.ps1
+  call signal configuration_failed 終端機 OpenCode
+  call refresh_paths vscode
+  call worker detect vscode
+  say 終端機 OpenCode 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable CodexAppEnabledToggle while its installer fails
+  call refresh_paths codex_app
+  call signal configuration_failed ChatGPT
+  call worker detect codex_app
+  call worker install install_codex_integration.ps1
+  call worker trust query_availability
+  say ChatGPT 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable OpenCodeAppEnabledToggle while its installer fails
+  call install install_opencode_integration.ps1
+  call signal configuration_failed 終端機 OpenCode
+  call refresh_paths opencode_app
+  call worker detect opencode_app
+  say 終端機 OpenCode 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable ClaudeDesktopEnabledToggle while its installer fails
+  call install install_claude_code_integration.ps1
+  call signal configuration_failed Claude Desktop
+  call refresh_paths claude_app
+  call worker detect claude_app
+  say Claude Desktop 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable TerminalCodexEnabledToggle while its installer fails
+  call refresh_paths terminal
+  call signal configuration_failed 終端機
+  call worker detect terminal
+  call worker install install_codex_integration.ps1
+  call worker trust query_availability
+  say 終端機 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable PiCodexEnabledToggle while its installer fails
+  call install install_pi_integration.ps1
+  call signal configuration_failed Pi
+  call refresh_paths terminal
+  call worker detect terminal
+  say Pi 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable TerminalOpenCodeEnabledToggle while its installer fails
+  call install install_opencode_integration.ps1
+  call signal configuration_failed 終端機 OpenCode
+  call refresh_paths terminal
+  call worker detect terminal
+  say 終端機 OpenCode 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable GeminiCliTerminalEnabledToggle while its installer fails
+  call install install_gemini_cli_integration.ps1
+  call signal configuration_failed Gemini CLI 終端機
+  call refresh_paths terminal
+  call worker detect terminal
+  say Gemini CLI 終端機 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable AgyTerminalEnabledToggle while its installer fails
+  call install install_antigravity_cli_integration.ps1
+  call signal configuration_failed Antigravity CLI 終端機
+  call refresh_paths terminal
+  call worker detect terminal
+  say Antigravity CLI 終端機 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable ClaudeCodeTerminalEnabledToggle while its installer fails
+  call install install_claude_code_integration.ps1
+  call signal configuration_failed Claude 終端機
+  call refresh_paths terminal
+  call worker detect terminal
+  say Claude 終端機 通知設定失敗，已自動關閉開關。請確認相關檔案與權限後再試。
+## enable ChatGPT Codex before the hooks are trusted
+  call refresh_paths codex_app
+  call signal codex_trust_required ChatGPT untrusted 尚未信任
+  call worker detect codex_app
+  call worker install install_codex_integration.ps1
+  call worker trust query_availability
+  call worker trust query_status
+  controller.pending_codex_trust = true
+  settings.codex_setup.pending_target = codex_app
+  settings.codex_setup.pending_target_name = ChatGPT
+  ui.CodexHookTrustPageReviewButton = visible=true disabled=false
+  ui.CodexHookTrustRecheckButton = visible=true disabled=false
+  ui.status = 尚未啟用：請先在 Codex 信任桌寵 Hook，再按「我已信任，檢查通知」 color=a66b16ff
+  ui.trust_dialog_text = 你正在開啟「ChatGPT Codex」通知。三種 Codex 共用同一組桌寵 Hook 信任。\n\n目前狀態：尚未信任\n\n不需另外安裝 CLI；桌寵會使用 Codex Desktop、VS Code 擴充功能或獨立 CLI 所提供的 Codex 核心。\n\n1. 按「開啟 Codex 信任畫面」。\n2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，每一項都按 Enter 開啟詳細內容。\n4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n6. 回到桌寵，按「我已信任，檢查通知」。\n\n選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。
+  ui.trust_dialog_visible = true
+## open Codex hook review from the Agent tab
+  call trust open_review
+## recheck while still untrusted
+  call signal codex_trust_required ChatGPT untrusted 尚未信任
+  call worker trust query_status
+## recheck after trusting the hooks
+  call signal codex_trust_ready ChatGPT codex_app
+  call worker trust query_status
+  say ChatGPT 的 Codex 通知已完成信任並啟用。
+  controller.codex_app_enabled = true
+  controller.pending_codex_trust = false
+  controller.running = true
+  runtime.enabled_targets.agy_terminal = false
+  runtime.enabled_targets.claude_app = false
+  runtime.enabled_targets.claude_terminal = false
+  runtime.enabled_targets.claude_vscode = false
+  runtime.enabled_targets.codex_app = true
+  runtime.enabled_targets.codex_terminal = false
+  runtime.enabled_targets.codex_vscode = false
+  runtime.enabled_targets.copilot = false
+  runtime.enabled_targets.gemini_terminal = false
+  runtime.enabled_targets.opencode_app = false
+  runtime.enabled_targets.opencode_terminal = false
+  runtime.enabled_targets.opencode_vscode = false
+  runtime.enabled_targets.pi_codex_terminal = false
+  runtime.executable_paths.claude_app = 
+  runtime.executable_paths.codex_app = 
+  runtime.executable_paths.opencode_app = 
+  runtime.executable_paths.terminal = C:/ODP-golden/startup-terminal.exe
+  runtime.port = 49871.0
+  settings.codex_app.enabled = true
+  settings.codex_setup.pending_target = 
+  settings.codex_setup.pending_target_name = 
+  ui.CodexAppEnabledToggle = 　Codex 開 disabled=false
+  ui.CodexHookTrustPageReviewButton = visible=false disabled=false
+  ui.CodexHookTrustRecheckButton = visible=false disabled=false
+  ui.port = 49871 editable=false
+  ui.status = 狀態: 監聽中  127.0.0.1:49871 color=238b9dff
+  ui.trust_dialog_visible = false
+  runtime removed
+## disable ChatGPT Codex
+  controller.codex_app_enabled = false
+  controller.running = false
+  runtime = missing
+  settings.codex_app.enabled = false
+  ui.CodexAppEnabledToggle = 　Codex 關 disabled=false
+  ui.port = 49871 editable=true
+  ui.status = 狀態: 已關閉 color=68747aff
+  runtime.port removed
+  runtime.enabled_targets.agy_terminal removed
+  runtime.enabled_targets.claude_app removed
+  runtime.enabled_targets.claude_terminal removed
+  runtime.enabled_targets.claude_vscode removed
+  runtime.enabled_targets.codex_app removed
+  runtime.enabled_targets.codex_terminal removed
+  runtime.enabled_targets.codex_vscode removed
+  runtime.enabled_targets.copilot removed
+  runtime.enabled_targets.gemini_terminal removed
+  runtime.enabled_targets.opencode_app removed
+  runtime.enabled_targets.opencode_terminal removed
+  runtime.enabled_targets.opencode_vscode removed
+  runtime.enabled_targets.pi_codex_terminal removed
+  runtime.executable_paths.claude_app removed
+  runtime.executable_paths.codex_app removed
+  runtime.executable_paths.opencode_app removed
+  runtime.executable_paths.terminal removed
+## enable terminal Codex before the hooks are trusted
+  call refresh_paths terminal
+  call signal codex_trust_required 終端機 untrusted 尚未信任
+  call worker detect terminal
+  call worker trust query_availability
+  call worker trust query_status
+  controller.pending_codex_trust = true
+  settings.codex_setup.pending_target = terminal
+  settings.codex_setup.pending_target_name = 終端機
+  ui.CodexHookTrustPageReviewButton = visible=true disabled=false
+  ui.CodexHookTrustRecheckButton = visible=true disabled=false
+  ui.status = 尚未啟用：請先在 Codex 信任桌寵 Hook，再按「我已信任，檢查通知」 color=a66b16ff
+  ui.trust_dialog_text = 你正在開啟「終端機 Codex」通知。三種 Codex 共用同一組桌寵 Hook 信任。\n\n目前狀態：尚未信任\n\n不需另外安裝 CLI；桌寵會使用 Codex Desktop、VS Code 擴充功能或獨立 CLI 所提供的 Codex 核心。\n\n1. 按「開啟 Codex 信任畫面」。\n2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，每一項都按 Enter 開啟詳細內容。\n4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n6. 回到桌寵，按「我已信任，檢查通知」。\n\n選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。
+  ui.trust_dialog_visible = true
+## confirm the trust dialog
+  call trust open_review
+## postpone trust from the dialog
+  controller.pending_codex_trust = false
+  settings.codex_setup.pending_target = 
+  settings.codex_setup.pending_target_name = 
+  ui.CodexHookTrustPageReviewButton = visible=false disabled=false
+  ui.CodexHookTrustRecheckButton = visible=false disabled=false
+  ui.status = 狀態: 已關閉 color=68747aff
+## recheck with no pending Codex target
+  say 尚未選擇要啟用哪一種 Codex 通知。請在下方找到你使用的程式（VS Code、ChatGPT 或終端機），把它的 Codex 開關打開。
+## enable VS Code Codex without a Codex runtime
+  call refresh_paths vscode
+  call signal codex_unavailable VS Code 找不到 Codex
+  call worker detect vscode
+  call worker trust query_availability
+  say %s 通知無法開啟：找不到支援 Hook 審查的 Codex。請先安裝或更新 Codex Desktop、VS Code Codex 擴充功能或 Codex CLI。
+## submit VscodeExecutablePath
+  controller.executable_path = C:/ODP-golden/VscodeExecutablePath.exe
+  settings.codex.executable_path = C:/ODP-golden/VscodeExecutablePath.exe
+  settings.codex.vscode_executable_path = C:/ODP-golden/VscodeExecutablePath.exe
+  ui.VscodeExecutablePath = text=C:/ODP-golden/VscodeExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：VscodeExecutablePath.exe
+## submit CodexAppExecutablePath
+  controller.codex_app_executable_path = C:/ODP-golden/CodexAppExecutablePath.exe
+  settings.codex_app.executable_path = C:/ODP-golden/CodexAppExecutablePath.exe
+  ui.CodexAppExecutablePath = text=C:/ODP-golden/CodexAppExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：CodexAppExecutablePath.exe
+## submit OpenCodeAppExecutablePath
+  controller.opencode_app_executable_path = C:/ODP-golden/OpenCodeAppExecutablePath.exe
+  settings.opencode_app.executable_path = C:/ODP-golden/OpenCodeAppExecutablePath.exe
+  ui.OpenCodeAppExecutablePath = text=C:/ODP-golden/OpenCodeAppExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：OpenCodeAppExecutablePath.exe
+## submit ClaudeAppExecutablePath
+  controller.claude_app_executable_path = C:/ODP-golden/ClaudeAppExecutablePath.exe
+  settings.claude_code_app.executable_path = C:/ODP-golden/ClaudeAppExecutablePath.exe
+  ui.ClaudeAppExecutablePath = text=C:/ODP-golden/ClaudeAppExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：ClaudeAppExecutablePath.exe
+## submit TerminalExecutablePath
+  controller.terminal_executable_path = C:/ODP-golden/TerminalExecutablePath.exe
+  settings.codex_terminal.executable_path = C:/ODP-golden/TerminalExecutablePath.exe
+  ui.TerminalExecutablePath = text=C:/ODP-golden/TerminalExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：TerminalExecutablePath.exe
+## change port while every Agent is off
+  controller.port = 49872
+  settings.codex.port = 49872
+  ui.port = 49872 editable=true
+## enable terminal Claude Code on the new port
+  call install install_claude_code_integration.ps1
+  call refresh_paths terminal
+  call worker detect terminal
+  controller.claude_terminal_enabled = true
+  controller.running = true
+  runtime.enabled_targets.agy_terminal = false
+  runtime.enabled_targets.claude_app = false
+  runtime.enabled_targets.claude_terminal = true
+  runtime.enabled_targets.claude_vscode = false
+  runtime.enabled_targets.codex_app = false
+  runtime.enabled_targets.codex_terminal = false
+  runtime.enabled_targets.codex_vscode = false
+  runtime.enabled_targets.copilot = false
+  runtime.enabled_targets.gemini_terminal = false
+  runtime.enabled_targets.opencode_app = false
+  runtime.enabled_targets.opencode_terminal = false
+  runtime.enabled_targets.opencode_vscode = false
+  runtime.enabled_targets.pi_codex_terminal = false
+  runtime.executable_paths.claude_app = C:/ODP-golden/ClaudeAppExecutablePath.exe
+  runtime.executable_paths.codex_app = C:/ODP-golden/CodexAppExecutablePath.exe
+  runtime.executable_paths.opencode_app = C:/ODP-golden/OpenCodeAppExecutablePath.exe
+  runtime.executable_paths.terminal = C:/ODP-golden/TerminalExecutablePath.exe
+  runtime.port = 49872.0
+  settings.claude_code_terminal.enabled = true
+  ui.ClaudeCodeTerminalEnabledToggle = 　Claude Code 開 disabled=false
+  ui.port = 49872 editable=false
+  ui.status = 狀態: 監聽中  127.0.0.1:49872 color=238b9dff
+  runtime removed
+## try to change port while an Agent is on
+## enable Pi
+  call install install_pi_integration.ps1
+  call refresh_paths terminal
+  call worker detect terminal
+  controller.pi_codex_enabled = true
+  runtime.enabled_targets.pi_codex_terminal = true
+  settings.pi_codex_terminal.enabled = true
+  ui.PiCodexEnabledToggle = 　Pi 開 disabled=false
+## switch the details window to the dark theme
+  ui.status = 狀態: 監聽中  127.0.0.1:49872 color=4fc1ffff
+  ui.trust_dialog_text = Codex 必須先信任桌寵的 Stop、PermissionRequest、PreToolUse Hook，通知才會生效。\n\n1. 按「開啟 Codex 信任畫面」。\n2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，每一項都按 Enter 開啟詳細內容。\n4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n6. 回到桌寵，按「我已信任，檢查通知」。\n\n選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。\n\n不需另外安裝 CLI；桌寵會使用已安裝 Codex 產品提供的核心。\n\n審查選單會顯示在「Codex Hook Review」PowerShell 視窗，不會出現在 GPT Codex 或 VS Code 面板裡。
+  ui.trust_dialog_visible = false
+## disable Pi in the rebuilt window
+  controller.pi_codex_enabled = false
+  runtime.enabled_targets.pi_codex_terminal = false
+  settings.pi_codex_terminal.enabled = false
+  ui.PiCodexEnabledToggle = 　Pi 關 disabled=false
+## switch back to the light theme
+  ui.status = 狀態: 監聽中  127.0.0.1:49872 color=238b9dff
+## close details window
+  ui = closed
+  ui.CodexEnabledToggle removed
+  ui.ClaudeCodeVscodeEnabledToggle removed
+  ui.CopilotEnabledToggle removed
+  ui.VscodeOpenCodeEnabledToggle removed
+  ui.CodexAppEnabledToggle removed
+  ui.OpenCodeAppEnabledToggle removed
+  ui.ClaudeDesktopEnabledToggle removed
+  ui.TerminalCodexEnabledToggle removed
+  ui.PiCodexEnabledToggle removed
+  ui.TerminalOpenCodeEnabledToggle removed
+  ui.GeminiCliTerminalEnabledToggle removed
+  ui.AgyTerminalEnabledToggle removed
+  ui.ClaudeCodeTerminalEnabledToggle removed
+  ui.port removed
+  ui.status removed
+  ui.codex_progress_visible removed
+  ui.CodexHookTrustPageReviewButton removed
+  ui.CodexHookTrustRecheckButton removed
+  ui.trust_dialog_visible removed
+  ui.trust_dialog_text removed
+  ui.VscodeExecutablePath removed
+  ui.CodexAppExecutablePath removed
+  ui.OpenCodeAppExecutablePath removed
+  ui.ClaudeAppExecutablePath removed
+  ui.TerminalExecutablePath removed
+## reopen details window on the Agent tab
+  call refresh_paths terminal
+  call worker detect terminal
+  ui.AgyTerminalEnabledToggle = 　Antigravity CLI 關 disabled=false
+  ui.ClaudeAppExecutablePath = text=C:/ODP-golden/ClaudeAppExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：ClaudeAppExecutablePath.exe
+  ui.ClaudeCodeTerminalEnabledToggle = 　Claude Code 開 disabled=false
+  ui.ClaudeCodeVscodeEnabledToggle = 　Claude Code 關 disabled=false
+  ui.ClaudeDesktopEnabledToggle = 　Claude Code 關 disabled=false
+  ui.CodexAppEnabledToggle = 　Codex 關 disabled=false
+  ui.CodexAppExecutablePath = text=C:/ODP-golden/CodexAppExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：CodexAppExecutablePath.exe
+  ui.CodexEnabledToggle = 　Codex 關 disabled=false
+  ui.CodexHookTrustPageReviewButton = visible=false disabled=false
+  ui.CodexHookTrustRecheckButton = visible=false disabled=false
+  ui.CopilotEnabledToggle = 　Copilot 關 disabled=false
+  ui.GeminiCliTerminalEnabledToggle = 　Gemini CLI（舊版） 關 disabled=false
+  ui.OpenCodeAppEnabledToggle = 　OpenCode 關 disabled=false
+  ui.OpenCodeAppExecutablePath = text=C:/ODP-golden/OpenCodeAppExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：OpenCodeAppExecutablePath.exe
+  ui.PiCodexEnabledToggle = 　Pi 關 disabled=false
+  ui.TerminalCodexEnabledToggle = 　Codex 關 disabled=false
+  ui.TerminalExecutablePath = text=C:/ODP-golden/TerminalExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：TerminalExecutablePath.exe
+  ui.TerminalOpenCodeEnabledToggle = 　OpenCode 關 disabled=false
+  ui.VscodeExecutablePath = text=C:/ODP-golden/VscodeExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：VscodeExecutablePath.exe
+  ui.VscodeOpenCodeEnabledToggle = 　OpenCode 關 disabled=false
+  ui.codex_progress_visible = false
+  ui.port = 49872 editable=false
+  ui.status = 狀態: 監聽中  127.0.0.1:49872 color=238b9dff
+  ui.trust_dialog_text = Codex 必須先信任桌寵的 Stop、PermissionRequest、PreToolUse Hook，通知才會生效。\n\n1. 按「開啟 Codex 信任畫面」。\n2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，每一項都按 Enter 開啟詳細內容。\n4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n6. 回到桌寵，按「我已信任，檢查通知」。\n\n選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。\n\n不需另外安裝 CLI；桌寵會使用已安裝 Codex 產品提供的核心。\n\n審查選單會顯示在「Codex Hook Review」PowerShell 視窗，不會出現在 GPT Codex 或 VS Code 面板裡。
+  ui.trust_dialog_visible = false
+  ui removed
+## enable every Agent
+  call refresh_paths vscode
+  call signal codex_trust_ready VS Code vscode
+  call refresh_paths vscode
+  call install install_copilot_integration.ps1
+  call refresh_paths vscode
+  call install install_opencode_integration.ps1
+  call refresh_paths vscode
+  call refresh_paths codex_app
+  call signal codex_trust_ready ChatGPT codex_app
+  call refresh_paths opencode_app
+  call refresh_paths claude_app
+  call refresh_paths terminal
+  call signal codex_trust_ready 終端機 terminal
+  call refresh_paths terminal
+  call refresh_paths terminal
+  call install install_gemini_cli_integration.ps1
+  call refresh_paths terminal
+  call install install_antigravity_cli_integration.ps1
+  call refresh_paths terminal
+  call worker detect claude_app
+  call worker detect codex_app
+  call worker detect opencode_app
+  call worker detect terminal
+  call worker detect terminal
+  call worker detect terminal
+  call worker detect terminal
+  call worker detect terminal
+  call worker detect vscode
+  call worker detect vscode
+  call worker detect vscode
+  call worker detect vscode
+  call worker trust query_availability
+  call worker trust query_availability
+  call worker trust query_availability
+  call worker trust query_status
+  call worker trust query_status
+  call worker trust query_status
+  say 終端機 的 Codex 通知已完成信任並啟用。
+  controller.agy_terminal_enabled = true
+  controller.claude_app_enabled = true
+  controller.claude_vscode_enabled = true
+  controller.codex_app_enabled = true
+  controller.codex_enabled = true
+  controller.copilot_enabled = true
+  controller.enabled = true
+  controller.gemini_terminal_enabled = true
+  controller.opencode_app_enabled = true
+  controller.pi_codex_enabled = true
+  controller.terminal_codex_enabled = true
+  controller.terminal_opencode_enabled = true
+  controller.vscode_opencode_enabled = true
+  runtime.enabled_targets.agy_terminal = true
+  runtime.enabled_targets.claude_app = true
+  runtime.enabled_targets.claude_vscode = true
+  runtime.enabled_targets.codex_app = true
+  runtime.enabled_targets.codex_terminal = true
+  runtime.enabled_targets.codex_vscode = true
+  runtime.enabled_targets.copilot = true
+  runtime.enabled_targets.gemini_terminal = true
+  runtime.enabled_targets.opencode_app = true
+  runtime.enabled_targets.opencode_terminal = true
+  runtime.enabled_targets.opencode_vscode = true
+  runtime.enabled_targets.pi_codex_terminal = true
+  settings.agy_terminal.enabled = true
+  settings.claude_code_app.enabled = true
+  settings.claude_code_vscode.enabled = true
+  settings.codex.enabled = true
+  settings.codex.vscode_enabled = true
+  settings.codex_app.enabled = true
+  settings.codex_terminal.enabled = true
+  settings.copilot.enabled = true
+  settings.gemini_terminal.enabled = true
+  settings.opencode_app.enabled = true
+  settings.opencode_terminal.enabled = true
+  settings.opencode_vscode.enabled = true
+  settings.pi_codex_terminal.enabled = true
+  ui.AgyTerminalEnabledToggle = 　Antigravity CLI 開 disabled=false
+  ui.ClaudeCodeVscodeEnabledToggle = 　Claude Code 開 disabled=false
+  ui.ClaudeDesktopEnabledToggle = 　Claude Code 開 disabled=false
+  ui.CodexAppEnabledToggle = 　Codex 開 disabled=false
+  ui.CodexEnabledToggle = 　Codex 開 disabled=false
+  ui.CopilotEnabledToggle = 　Copilot 開 disabled=false
+  ui.GeminiCliTerminalEnabledToggle = 　Gemini CLI（舊版） 開 disabled=false
+  ui.OpenCodeAppEnabledToggle = 　OpenCode 開 disabled=false
+  ui.PiCodexEnabledToggle = 　Pi 開 disabled=false
+  ui.TerminalCodexEnabledToggle = 　Codex 開 disabled=false
+  ui.TerminalOpenCodeEnabledToggle = 　OpenCode 開 disabled=false
+  ui.VscodeOpenCodeEnabledToggle = 　OpenCode 開 disabled=false
+## shutdown
+  say 終端機 的 Codex 通知已完成信任並啟用。
+  controller.running = false
+  runtime = missing
+  ui = closed
+  runtime.port removed
+  runtime.enabled_targets.agy_terminal removed
+  runtime.enabled_targets.claude_app removed
+  runtime.enabled_targets.claude_terminal removed
+  runtime.enabled_targets.claude_vscode removed
+  runtime.enabled_targets.codex_app removed
+  runtime.enabled_targets.codex_terminal removed
+  runtime.enabled_targets.codex_vscode removed
+  runtime.enabled_targets.copilot removed
+  runtime.enabled_targets.gemini_terminal removed
+  runtime.enabled_targets.opencode_app removed
+  runtime.enabled_targets.opencode_terminal removed
+  runtime.enabled_targets.opencode_vscode removed
+  runtime.enabled_targets.pi_codex_terminal removed
+  runtime.executable_paths.claude_app removed
+  runtime.executable_paths.codex_app removed
+  runtime.executable_paths.opencode_app removed
+  runtime.executable_paths.terminal removed
+  ui.CodexEnabledToggle removed
+  ui.ClaudeCodeVscodeEnabledToggle removed
+  ui.CopilotEnabledToggle removed
+  ui.VscodeOpenCodeEnabledToggle removed
+  ui.CodexAppEnabledToggle removed
+  ui.OpenCodeAppEnabledToggle removed
+  ui.ClaudeDesktopEnabledToggle removed
+  ui.TerminalCodexEnabledToggle removed
+  ui.PiCodexEnabledToggle removed
+  ui.TerminalOpenCodeEnabledToggle removed
+  ui.GeminiCliTerminalEnabledToggle removed
+  ui.AgyTerminalEnabledToggle removed
+  ui.ClaudeCodeTerminalEnabledToggle removed
+  ui.port removed
+  ui.status removed
+  ui.codex_progress_visible removed
+  ui.CodexHookTrustPageReviewButton removed
+  ui.CodexHookTrustRecheckButton removed
+  ui.trust_dialog_visible removed
+  ui.trust_dialog_text removed
+  ui.VscodeExecutablePath removed
+  ui.CodexAppExecutablePath removed
+  ui.OpenCodeAppExecutablePath removed
+  ui.ClaudeAppExecutablePath removed
+  ui.TerminalExecutablePath removed
+## restart with every Agent saved as enabled
+  call refresh_paths claude_app,codex_app,opencode_app,terminal,vscode
+  call worker detect claude_app
+  call worker detect codex_app
+  call worker detect opencode_app
+  call worker detect terminal
+  call worker detect vscode
+  say Luna 來了！右鍵操作・雙擊摸摸
+  controller.running = true
+  runtime.enabled_targets.agy_terminal = true
+  runtime.enabled_targets.claude_app = true
+  runtime.enabled_targets.claude_terminal = true
+  runtime.enabled_targets.claude_vscode = true
+  runtime.enabled_targets.codex_app = true
+  runtime.enabled_targets.codex_terminal = true
+  runtime.enabled_targets.codex_vscode = true
+  runtime.enabled_targets.copilot = true
+  runtime.enabled_targets.gemini_terminal = true
+  runtime.enabled_targets.opencode_app = true
+  runtime.enabled_targets.opencode_terminal = true
+  runtime.enabled_targets.opencode_vscode = true
+  runtime.enabled_targets.pi_codex_terminal = true
+  runtime.executable_paths.claude_app = C:/ODP-golden/ClaudeAppExecutablePath.exe
+  runtime.executable_paths.codex_app = C:/ODP-golden/CodexAppExecutablePath.exe
+  runtime.executable_paths.opencode_app = C:/ODP-golden/OpenCodeAppExecutablePath.exe
+  runtime.executable_paths.terminal = C:/ODP-golden/TerminalExecutablePath.exe
+  runtime.port = 49872.0
+  runtime removed
+## open the Agent tab after restart
+  call refresh_paths claude_app,codex_app,opencode_app,terminal,vscode
+  call worker detect claude_app
+  call worker detect codex_app
+  call worker detect opencode_app
+  call worker detect terminal
+  call worker detect vscode
+  ui.AgyTerminalEnabledToggle = 　Antigravity CLI 開 disabled=false
+  ui.ClaudeAppExecutablePath = text=C:/ODP-golden/ClaudeAppExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：ClaudeAppExecutablePath.exe
+  ui.ClaudeCodeTerminalEnabledToggle = 　Claude Code 開 disabled=false
+  ui.ClaudeCodeVscodeEnabledToggle = 　Claude Code 開 disabled=false
+  ui.ClaudeDesktopEnabledToggle = 　Claude Code 開 disabled=false
+  ui.CodexAppEnabledToggle = 　Codex 開 disabled=false
+  ui.CodexAppExecutablePath = text=C:/ODP-golden/CodexAppExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：CodexAppExecutablePath.exe
+  ui.CodexEnabledToggle = 　Codex 開 disabled=false
+  ui.CodexHookTrustPageReviewButton = visible=false disabled=false
+  ui.CodexHookTrustRecheckButton = visible=false disabled=false
+  ui.CopilotEnabledToggle = 　Copilot 開 disabled=false
+  ui.GeminiCliTerminalEnabledToggle = 　Gemini CLI（舊版） 開 disabled=false
+  ui.OpenCodeAppEnabledToggle = 　OpenCode 開 disabled=false
+  ui.OpenCodeAppExecutablePath = text=C:/ODP-golden/OpenCodeAppExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：OpenCodeAppExecutablePath.exe
+  ui.PiCodexEnabledToggle = 　Pi 開 disabled=false
+  ui.TerminalCodexEnabledToggle = 　Codex 開 disabled=false
+  ui.TerminalExecutablePath = text=C:/ODP-golden/TerminalExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：TerminalExecutablePath.exe
+  ui.TerminalOpenCodeEnabledToggle = 　OpenCode 開 disabled=false
+  ui.VscodeExecutablePath = text=C:/ODP-golden/VscodeExecutablePath.exe hint=找不到這個執行檔；通知氣泡會保留，直到路徑修正。 summary=點擊通知氣泡會切回：VscodeExecutablePath.exe
+  ui.VscodeOpenCodeEnabledToggle = 　OpenCode 開 disabled=false
+  ui.codex_progress_visible = false
+  ui.port = 49872 editable=false
+  ui.status = 狀態: 監聽中  127.0.0.1:49872 color=238b9dff
+  ui.trust_dialog_text = Codex 必須先信任桌寵的 Stop、PermissionRequest、PreToolUse Hook，通知才會生效。\n\n1. 按「開啟 Codex 信任畫面」。\n2. 在 PowerShell 選 1. Review hooks，再按 Enter；這一步只會開啟 Hook 清單。\n3. 在 Hook 清單依序選取 Stop、PermissionRequest、PreToolUse，每一項都按 Enter 開啟詳細內容。\n4. 在每一項找到 Open Desktop Pet 的 Hook，將核取狀態切換為 [x]。[ ] 表示尚未信任；三項都顯示 [x] 才算完成信任。\n5. 按 Esc 返回 Hook 清單；若仍在審查畫面，再按一次 Esc 離開。\n6. 回到桌寵，按「我已信任，檢查通知」。\n\n選 2 會信任所有待審 Hook；選 3 不會信任，通知也不會啟用。\n\n不需另外安裝 CLI；桌寵會使用已安裝 Codex 產品提供的核心。\n\n審查選單會顯示在「Codex Hook Review」PowerShell 視窗，不會出現在 GPT Codex 或 VS Code 面板裡。
+  ui.trust_dialog_visible = false
+  ui removed
+## final shutdown
+  say Luna 來了！右鍵操作・雙擊摸摸
+  controller.running = false
+  runtime = missing
+  ui = closed
+  runtime.port removed
+  runtime.enabled_targets.agy_terminal removed
+  runtime.enabled_targets.claude_app removed
+  runtime.enabled_targets.claude_terminal removed
+  runtime.enabled_targets.claude_vscode removed
+  runtime.enabled_targets.codex_app removed
+  runtime.enabled_targets.codex_terminal removed
+  runtime.enabled_targets.codex_vscode removed
+  runtime.enabled_targets.copilot removed
+  runtime.enabled_targets.gemini_terminal removed
+  runtime.enabled_targets.opencode_app removed
+  runtime.enabled_targets.opencode_terminal removed
+  runtime.enabled_targets.opencode_vscode removed
+  runtime.enabled_targets.pi_codex_terminal removed
+  runtime.executable_paths.claude_app removed
+  runtime.executable_paths.codex_app removed
+  runtime.executable_paths.opencode_app removed
+  runtime.executable_paths.terminal removed
+  ui.CodexEnabledToggle removed
+  ui.ClaudeCodeVscodeEnabledToggle removed
+  ui.CopilotEnabledToggle removed
+  ui.VscodeOpenCodeEnabledToggle removed
+  ui.CodexAppEnabledToggle removed
+  ui.OpenCodeAppEnabledToggle removed
+  ui.ClaudeDesktopEnabledToggle removed
+  ui.TerminalCodexEnabledToggle removed
+  ui.PiCodexEnabledToggle removed
+  ui.TerminalOpenCodeEnabledToggle removed
+  ui.GeminiCliTerminalEnabledToggle removed
+  ui.AgyTerminalEnabledToggle removed
+  ui.ClaudeCodeTerminalEnabledToggle removed
+  ui.port removed
+  ui.status removed
+  ui.codex_progress_visible removed
+  ui.CodexHookTrustPageReviewButton removed
+  ui.CodexHookTrustRecheckButton removed
+  ui.trust_dialog_visible removed
+  ui.trust_dialog_text removed
+  ui.VscodeExecutablePath removed
+  ui.CodexAppExecutablePath removed
+  ui.OpenCodeAppExecutablePath removed
+  ui.ClaudeAppExecutablePath removed
+  ui.TerminalExecutablePath removed

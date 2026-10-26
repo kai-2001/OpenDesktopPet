@@ -2,7 +2,6 @@ class_name StatsWindowCoordinator
 extends RefCounted
 
 const DetailsWindowControllerScript = preload("res://scripts/details_window_controller.gd")
-const AgentIntegrationControllerScript = preload("res://scripts/agent_integration_controller.gd")
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const DEFAULT_WINDOW_SIZE := Vector2i(640, 620)
 const MIN_WINDOW_SIZE := Vector2i(360, 480)
@@ -14,25 +13,8 @@ signal tab_changed(index: int)
 
 var theme_mode := "light"
 var last_state_message := "尚無紀錄"
-var codex_enabled := false
-var codex_app_enabled := false
-var terminal_codex_enabled := false
-var terminal_opencode_enabled := false
-var vscode_opencode_enabled := false
-var opencode_app_enabled := false
-var copilot_enabled := false
-var claude_vscode_enabled := false
-var claude_app_enabled := false
-var claude_terminal_enabled := false
-var gemini_terminal_enabled := false
-var agy_terminal_enabled := false
-var pi_codex_enabled := false
-var agent_port := AgentIntegrationControllerScript.DEFAULT_PORT
-var codex_executable_path := ""
-var codex_app_executable_path := ""
-var terminal_executable_path := ""
-var opencode_app_executable_path := ""
-var claude_app_executable_path := ""
+# AgentIntegrationController.get_settings_snapshot() for the Agent tab.
+var agent_settings: Dictionary = {}
 var autostart_supported := false
 var keep_screen_on := false
 var focus_mode := false
@@ -108,25 +90,7 @@ func build(owner: Node) -> Dictionary:
 	details_controller = DetailsWindowControllerScript.new()
 	details_controller.theme_mode = theme_mode
 	details_controller.last_state_message = last_state_message
-	details_controller.codex_enabled = codex_enabled
-	details_controller.codex_app_enabled = codex_app_enabled
-	details_controller.terminal_codex_enabled = terminal_codex_enabled
-	details_controller.terminal_opencode_enabled = terminal_opencode_enabled
-	details_controller.vscode_opencode_enabled = vscode_opencode_enabled
-	details_controller.opencode_app_enabled = opencode_app_enabled
-	details_controller.copilot_enabled = copilot_enabled
-	details_controller.claude_vscode_enabled = claude_vscode_enabled
-	details_controller.claude_app_enabled = claude_app_enabled
-	details_controller.claude_terminal_enabled = claude_terminal_enabled
-	details_controller.gemini_terminal_enabled = gemini_terminal_enabled
-	details_controller.agy_terminal_enabled = agy_terminal_enabled
-	details_controller.pi_codex_enabled = pi_codex_enabled
-	details_controller.agent_port = agent_port
-	details_controller.vscode_executable_path = codex_executable_path
-	details_controller.codex_app_executable_path = codex_app_executable_path
-	details_controller.terminal_executable_path = terminal_executable_path
-	details_controller.opencode_app_executable_path = opencode_app_executable_path
-	details_controller.claude_app_executable_path = claude_app_executable_path
+	details_controller.agent_settings = agent_settings
 	details_controller.autostart_supported = autostart_supported
 	details_controller.keep_screen_on = keep_screen_on
 	details_controller.focus_mode = focus_mode

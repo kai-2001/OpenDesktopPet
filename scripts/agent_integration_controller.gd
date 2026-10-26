@@ -4,6 +4,7 @@ extends RefCounted
 const LocalAgentNotificationReceiverScript = preload("res://scripts/local_agent_notification_receiver.gd")
 const AgentNotificationRouterScript = preload("res://scripts/agent_notification_router.gd")
 const CodexHookTrustServiceScript = preload("res://scripts/codex_hook_trust_service.gd")
+const AgentChannelCatalogScript = preload("res://scripts/agent_channel_catalog.gd")
 const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const DEFAULT_PORT := 38571
 const MIN_PORT := 1024
@@ -113,13 +114,14 @@ func _init() -> void:
 func load_settings() -> void:
 	var config := ConfigFile.new()
 	if config.load(UI_SETTINGS_PATH) == OK:
+		for channel: Dictionary in AgentChannelCatalogScript.CHANNELS:
+			set(channel["property"], bool(config.get_value(
+				channel["settings_section"], "enabled", false
+			)))
+		# VS Code Codex used to be the only Codex target and saved codex.enabled.
 		codex_enabled = bool(config.get_value(
 			"codex", "vscode_enabled", config.get_value("codex", "enabled", false)
 		))
-		codex_app_enabled = bool(config.get_value("codex_app", "enabled", false))
-		terminal_codex_enabled = bool(
-			config.get_value("codex_terminal", "enabled", false)
-		)
 		_pending_codex_target = String(config.get_value(
 			CODEX_SETUP_SETTINGS_SECTION, "pending_target", ""
 		))
@@ -128,34 +130,6 @@ func load_settings() -> void:
 		))
 		if not _is_codex_notification_target(_pending_codex_target):
 			_clear_pending_codex_enable()
-		terminal_opencode_enabled = bool(
-			config.get_value("opencode_terminal", "enabled", false)
-		)
-		vscode_opencode_enabled = bool(
-			config.get_value("opencode_vscode", "enabled", false)
-		)
-		opencode_app_enabled = bool(
-			config.get_value("opencode_app", "enabled", false)
-		)
-		copilot_enabled = bool(config.get_value("copilot", "enabled", false))
-		claude_vscode_enabled = bool(
-			config.get_value("claude_code_vscode", "enabled", false)
-		)
-		claude_app_enabled = bool(
-			config.get_value("claude_code_app", "enabled", false)
-		)
-		claude_terminal_enabled = bool(
-			config.get_value("claude_code_terminal", "enabled", false)
-		)
-		gemini_terminal_enabled = bool(
-			config.get_value("gemini_terminal", "enabled", false)
-		)
-		agy_terminal_enabled = bool(
-			config.get_value("agy_terminal", "enabled", false)
-		)
-		pi_codex_enabled = bool(
-			config.get_value("pi_codex_terminal", "enabled", false)
-		)
 		port = normalize_port(int(config.get_value("codex", "port", DEFAULT_PORT)))
 		executable_path = _normalize_executable_path(String(config.get_value(
 			"codex", "vscode_executable_path", config.get_value("codex", "executable_path", "")
@@ -203,33 +177,32 @@ func shutdown() -> void:
 	_remove_runtime_if_owned()
 
 
-func set_enabled(value: bool) -> void:
-	set_codex_enabled(value)
+func is_channel_enabled(channel_id: String) -> bool:
+	var channel := AgentChannelCatalogScript.channel(channel_id)
+	return not channel.is_empty() and bool(get(channel["property"]))
 
 
-func set_codex_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless":
-		_begin_codex_enable(TARGET_VSCODE, "VS Code")
+func set_channel_enabled(channel_id: String, value: bool) -> void:
+	var channel := AgentChannelCatalogScript.channel(channel_id)
+	if channel.is_empty():
 		return
-	codex_enabled = value
-	enabled = value
-	_persist_agent_state()
-
-
-func set_codex_app_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless":
-		_begin_codex_enable(TARGET_CODEX_APP, "ChatGPT")
-		return
-	codex_app_enabled = value
-	_persist_agent_state()
-
-
-func set_terminal_codex_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless":
-		_begin_codex_enable(TARGET_TERMINAL, "終端機")
-		return
-	terminal_codex_enabled = value
-	_persist_agent_state()
+	var setup := String(channel["setup"])
+	var target := String(channel["target"])
+	if setup == AgentChannelCatalogScript.SETUP_CODEX and value and not _is_headless():
+		# Codex channels turn on only after the background trust check passes.
+		_begin_codex_enable(target, channel["setup_name"])
+	else:
+		if setup == AgentChannelCatalogScript.SETUP_CODEX:
+			_set_codex_target_enabled(target, value)
+		elif value and not _is_headless() \
+				and not _ensure_setup_configuration(setup, channel["setup_name"]):
+			set(channel["property"], false)
+		else:
+			set(channel["property"], value)
+		_persist_agent_state()
+	if value:
+		var targets: Array[String] = [target]
+		refresh_executable_paths_if_invalid(targets)
 
 
 func get_codex_hook_trust_status() -> Dictionary:
@@ -283,14 +256,18 @@ func is_codex_setup_busy() -> bool:
 	return _codex_setup_thread != null
 
 
-func set_copilot_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_copilot_configuration():
-		copilot_enabled = false
-		_persist_agent_state()
-		return
-	copilot_enabled = value
-	_persist_agent_state()
+func get_settings_snapshot() -> Dictionary:
+	var channels := {}
+	for channel: Dictionary in AgentChannelCatalogScript.CHANNELS:
+		channels[channel["id"]] = bool(get(channel["property"]))
+	var executable_paths := {}
+	for target: Dictionary in AgentChannelCatalogScript.TARGETS:
+		executable_paths[target["target"]] = String(get(target["property"]))
+	return {
+		"channels": channels,
+		"executable_paths": executable_paths,
+		"port": port,
+	}
 
 
 func set_port(value: int) -> void:
@@ -298,125 +275,8 @@ func set_port(value: int) -> void:
 	_persist_agent_state()
 
 
-func set_executable_path(value: String) -> void:
-	executable_path = _normalize_executable_path(value)
-	_save_settings()
-	state_changed.emit()
-
-
-func set_terminal_opencode_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_opencode_configuration():
-		terminal_opencode_enabled = false
-		_persist_agent_state()
-		return
-	terminal_opencode_enabled = value
-	_persist_agent_state()
-
-
-func set_vscode_opencode_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_opencode_configuration():
-		vscode_opencode_enabled = false
-		_persist_agent_state()
-		return
-	vscode_opencode_enabled = value
-	_persist_agent_state()
-
-
-func set_opencode_app_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_opencode_configuration():
-		opencode_app_enabled = false
-		_persist_agent_state()
-		return
-	opencode_app_enabled = value
-	_persist_agent_state()
-
-
-func set_claude_vscode_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_claude_code_configuration("Claude Code"):
-		claude_vscode_enabled = false
-		_persist_agent_state()
-		return
-	claude_vscode_enabled = value
-	_persist_agent_state()
-
-
-func set_claude_app_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_claude_code_configuration("Claude Desktop"):
-		claude_app_enabled = false
-		_persist_agent_state()
-		return
-	claude_app_enabled = value
-	_persist_agent_state()
-
-
-func set_claude_terminal_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_claude_code_configuration("Claude 終端機"):
-		claude_terminal_enabled = false
-		_persist_agent_state()
-		return
-	claude_terminal_enabled = value
-	_persist_agent_state()
-
-
-func set_gemini_terminal_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_gemini_cli_configuration():
-		gemini_terminal_enabled = false
-		_persist_agent_state()
-		return
-	gemini_terminal_enabled = value
-	_persist_agent_state()
-
-
-func set_agy_terminal_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_antigravity_cli_configuration():
-		agy_terminal_enabled = false
-		_persist_agent_state()
-		return
-	agy_terminal_enabled = value
-	_persist_agent_state()
-
-
-func set_pi_codex_enabled(value: bool) -> void:
-	if value and DisplayServer.get_name() != "headless" \
-			and not _ensure_pi_configuration():
-		pi_codex_enabled = false
-		_persist_agent_state()
-		return
-	pi_codex_enabled = value
-	_persist_agent_state()
-
-
-func set_codex_app_executable_path(value: String) -> void:
-	codex_app_executable_path = _normalize_executable_path(value)
-	_save_settings()
-	_publish_runtime_if_running()
-	state_changed.emit()
-
-
-func set_terminal_executable_path(value: String) -> void:
-	terminal_executable_path = _normalize_executable_path(value)
-	_save_settings()
-	_publish_runtime_if_running()
-	state_changed.emit()
-
-
-func set_opencode_app_executable_path(value: String) -> void:
-	opencode_app_executable_path = _normalize_executable_path(value)
-	_save_settings()
-	_publish_runtime_if_running()
-	state_changed.emit()
-
-
-func set_claude_app_executable_path(value: String) -> void:
-	claude_app_executable_path = _normalize_executable_path(value)
+func set_target_executable_path(target: String, value: String) -> void:
+	_set_executable_path_for_target(target, _normalize_executable_path(value))
 	_save_settings()
 	_publish_runtime_if_running()
 	state_changed.emit()
@@ -424,24 +284,9 @@ func set_claude_app_executable_path(value: String) -> void:
 
 func refresh_enabled_executable_paths_if_invalid() -> void:
 	var targets: Array[String] = []
-	if codex_enabled or copilot_enabled:
-		targets.append(TARGET_VSCODE)
-	if codex_app_enabled:
-		targets.append(TARGET_CODEX_APP)
-	if terminal_codex_enabled or terminal_opencode_enabled \
-			or gemini_terminal_enabled or agy_terminal_enabled \
-			or pi_codex_enabled:
-		targets.append(TARGET_TERMINAL)
-	if vscode_opencode_enabled:
-		targets.append(TARGET_VSCODE)
-	if opencode_app_enabled:
-		targets.append(TARGET_OPENCODE_APP)
-	if claude_vscode_enabled:
-		targets.append(TARGET_VSCODE)
-	if claude_app_enabled:
-		targets.append(TARGET_CLAUDE_APP)
-	if claude_terminal_enabled:
-		targets.append(TARGET_TERMINAL)
+	for channel: Dictionary in AgentChannelCatalogScript.CHANNELS:
+		if bool(get(channel["property"])) and not targets.has(channel["target"]):
+			targets.append(channel["target"])
 	refresh_executable_paths_if_invalid(targets)
 
 
@@ -552,11 +397,10 @@ func _stop_executable_path_detection() -> void:
 
 
 func is_any_enabled() -> bool:
-	return codex_enabled or codex_app_enabled or terminal_codex_enabled \
-		or terminal_opencode_enabled or vscode_opencode_enabled \
-		or opencode_app_enabled or copilot_enabled \
-		or claude_vscode_enabled or claude_app_enabled or claude_terminal_enabled \
-		or gemini_terminal_enabled or agy_terminal_enabled or pi_codex_enabled
+	for channel: Dictionary in AgentChannelCatalogScript.CHANNELS:
+		if bool(get(channel["property"])):
+			return true
+	return false
 
 
 func is_running() -> bool:
@@ -957,66 +801,32 @@ func _codex_status_working_directory() -> String:
 	return _user_profile_path()
 
 
-func _ensure_codex_configuration(target_name: String) -> bool:
-	if is_codex_configured():
-		return true
-	if _run_codex_configuration_tool() and is_codex_configured():
-		return true
-	configuration_failed.emit(target_name)
+func _is_setup_configured(setup: String) -> bool:
+	match setup:
+		AgentChannelCatalogScript.SETUP_CODEX:
+			return is_codex_configured()
+		AgentChannelCatalogScript.SETUP_COPILOT:
+			return is_copilot_configured()
+		AgentChannelCatalogScript.SETUP_OPENCODE:
+			return is_opencode_configured()
+		AgentChannelCatalogScript.SETUP_CLAUDE_CODE:
+			return is_claude_code_configured()
+		AgentChannelCatalogScript.SETUP_GEMINI_CLI:
+			return is_gemini_cli_configured()
+		AgentChannelCatalogScript.SETUP_ANTIGRAVITY_CLI:
+			return is_antigravity_cli_configured()
+		AgentChannelCatalogScript.SETUP_PI:
+			return is_pi_configured()
 	return false
 
 
-func _ensure_copilot_configuration() -> bool:
-	if is_copilot_configured():
+func _ensure_setup_configuration(setup: String, failure_name: String) -> bool:
+	if _is_setup_configured(setup):
 		return true
-	if _run_copilot_configuration_tool() and is_copilot_configured():
+	var installer := String(AgentChannelCatalogScript.SETUPS[setup]["installer"])
+	if _run_configuration_tool(installer) and _is_setup_configured(setup):
 		return true
-	configuration_failed.emit("VS Code Copilot")
-	return false
-
-
-func _ensure_opencode_configuration() -> bool:
-	if is_opencode_configured():
-		return true
-	if _run_opencode_configuration_tool() and is_opencode_configured():
-		return true
-	configuration_failed.emit("終端機 OpenCode")
-	return false
-
-
-func _ensure_claude_code_configuration(target_name: String) -> bool:
-	if is_claude_code_configured():
-		return true
-	if _run_claude_code_configuration_tool() and is_claude_code_configured():
-		return true
-	configuration_failed.emit(target_name)
-	return false
-
-
-func _ensure_gemini_cli_configuration() -> bool:
-	if is_gemini_cli_configured():
-		return true
-	if _run_gemini_cli_configuration_tool() and is_gemini_cli_configured():
-		return true
-	configuration_failed.emit("Gemini CLI 終端機")
-	return false
-
-
-func _ensure_antigravity_cli_configuration() -> bool:
-	if is_antigravity_cli_configured():
-		return true
-	if _run_antigravity_cli_configuration_tool() and is_antigravity_cli_configured():
-		return true
-	configuration_failed.emit("Antigravity CLI 終端機")
-	return false
-
-
-func _ensure_pi_configuration() -> bool:
-	if is_pi_configured():
-		return true
-	if _run_pi_configuration_tool() and is_pi_configured():
-		return true
-	configuration_failed.emit("Pi")
+	configuration_failed.emit(failure_name)
 	return false
 
 
@@ -1027,45 +837,28 @@ func _persist_agent_state() -> void:
 
 
 func _ensure_enabled_configurations() -> void:
-	if DisplayServer.get_name() == "headless":
+	if _is_headless():
 		return
 	var changed := false
-	if codex_enabled or codex_app_enabled or terminal_codex_enabled:
-		var codex_was_configured := is_codex_configured()
-		if not _ensure_codex_configuration("Codex"):
-			codex_enabled = false
-			codex_app_enabled = false
-			terminal_codex_enabled = false
-			enabled = false
+	for setup: String in AgentChannelCatalogScript.SETUPS:
+		var channels := AgentChannelCatalogScript.channels_for_setup(setup)
+		var any_enabled := false
+		for channel: Dictionary in channels:
+			any_enabled = any_enabled or bool(get(channel["property"]))
+		if not any_enabled:
+			continue
+		var was_configured := _is_setup_configured(setup)
+		var failure_name := String(AgentChannelCatalogScript.SETUPS[setup]["failure_name"])
+		if not _ensure_setup_configuration(setup, failure_name):
+			for channel: Dictionary in channels:
+				set(channel["property"], false)
+			if setup == AgentChannelCatalogScript.SETUP_CODEX:
+				enabled = false
 			changed = true
-		elif not codex_was_configured:
+		elif setup == AgentChannelCatalogScript.SETUP_CODEX and not was_configured:
 			# Reinstalling rewrites hooks.json; Codex drops trust whenever a
 			# hook definition changes, so confirm it before notifications fail.
 			_start_codex_upgrade_trust_check()
-	if copilot_enabled and not _ensure_copilot_configuration():
-		copilot_enabled = false
-		changed = true
-	if terminal_opencode_enabled or vscode_opencode_enabled or opencode_app_enabled:
-		if not _ensure_opencode_configuration():
-			terminal_opencode_enabled = false
-			vscode_opencode_enabled = false
-			opencode_app_enabled = false
-			changed = true
-	if claude_vscode_enabled or claude_app_enabled or claude_terminal_enabled:
-		if not _ensure_claude_code_configuration("Claude Code"):
-			claude_vscode_enabled = false
-			claude_app_enabled = false
-			claude_terminal_enabled = false
-			changed = true
-	if gemini_terminal_enabled and not _ensure_gemini_cli_configuration():
-		gemini_terminal_enabled = false
-		changed = true
-	if agy_terminal_enabled and not _ensure_antigravity_cli_configuration():
-		agy_terminal_enabled = false
-		changed = true
-	if pi_codex_enabled and not _ensure_pi_configuration():
-		pi_codex_enabled = false
-		changed = true
 	if changed:
 		_save_settings()
 
@@ -1306,21 +1099,7 @@ func _handle_notification(notification: Dictionary) -> void:
 			)
 		).to_lower()
 	)
-	var enabled_by_key := {
-		"codex_vscode": codex_enabled,
-		"codex_app": codex_app_enabled,
-		"codex_terminal": terminal_codex_enabled,
-		"copilot": copilot_enabled,
-		"opencode_terminal": terminal_opencode_enabled,
-		"opencode_vscode": vscode_opencode_enabled,
-		"opencode_app": opencode_app_enabled,
-		"claude_terminal": claude_terminal_enabled,
-		"claude_vscode": claude_vscode_enabled,
-		"claude_app": claude_app_enabled,
-		"gemini_terminal": gemini_terminal_enabled,
-		"agy_terminal": agy_terminal_enabled,
-		"pi_codex_terminal": pi_codex_enabled,
-	}
+	var enabled_by_key := _runtime_enabled_targets()
 	if not AgentNotificationRouterScript.is_notification_enabled(
 			source, agent, target_app, enabled_by_key
 	):
@@ -1361,14 +1140,13 @@ func _handle_notification(notification: Dictionary) -> void:
 func _save_settings() -> void:
 	var config := ConfigFile.new()
 	config.load(UI_SETTINGS_PATH)
-	config.set_value("codex", "enabled", codex_enabled)
+	for channel: Dictionary in AgentChannelCatalogScript.CHANNELS:
+		config.set_value(channel["settings_section"], "enabled", get(channel["property"]))
 	config.set_value("codex", "vscode_enabled", codex_enabled)
 	config.set_value("codex", "port", port)
 	config.set_value("codex", "executable_path", executable_path)
 	config.set_value("codex", "vscode_executable_path", executable_path)
-	config.set_value("codex_app", "enabled", codex_app_enabled)
 	config.set_value("codex_app", "executable_path", codex_app_executable_path)
-	config.set_value("codex_terminal", "enabled", terminal_codex_enabled)
 	config.set_value("codex_terminal", "executable_path", terminal_executable_path)
 	config.set_value(
 		CODEX_SETUP_SETTINGS_SECTION, "pending_target", _pending_codex_target
@@ -1378,18 +1156,8 @@ func _save_settings() -> void:
 		"pending_target_name",
 		_pending_codex_target_name
 	)
-	config.set_value("opencode_terminal", "enabled", terminal_opencode_enabled)
-	config.set_value("opencode_vscode", "enabled", vscode_opencode_enabled)
-	config.set_value("opencode_app", "enabled", opencode_app_enabled)
 	config.set_value("opencode_app", "executable_path", opencode_app_executable_path)
-	config.set_value("copilot", "enabled", copilot_enabled)
-	config.set_value("claude_code_vscode", "enabled", claude_vscode_enabled)
-	config.set_value("claude_code_app", "enabled", claude_app_enabled)
 	config.set_value("claude_code_app", "executable_path", claude_app_executable_path)
-	config.set_value("claude_code_terminal", "enabled", claude_terminal_enabled)
-	config.set_value("gemini_terminal", "enabled", gemini_terminal_enabled)
-	config.set_value("agy_terminal", "enabled", agy_terminal_enabled)
-	config.set_value("pi_codex_terminal", "enabled", pi_codex_enabled)
 	config.save(UI_SETTINGS_PATH)
 
 
@@ -1486,7 +1254,7 @@ func _integration_home_path() -> String:
 
 func _refresh_runtime_registration() -> void:
 	# Headless validation must never mutate the real user's notification state.
-	if DisplayServer.get_name() == "headless":
+	if _is_headless():
 		if is_any_enabled():
 			_start_receiver()
 		else:
@@ -1505,7 +1273,7 @@ func _start_receiver() -> bool:
 		return false
 	if is_running() and _receiver.get_port() == port:
 		return true
-	if DisplayServer.get_name() != "headless" and _has_live_runtime_owner():
+	if not _is_headless() and _has_live_runtime_owner():
 		push_warning("另一個 Open Desktop Pet 實例正在管理 Agent 通知。")
 		return false
 	_stop_receiver()
@@ -1546,21 +1314,7 @@ func _write_runtime_state() -> bool:
 		"pid": OS.get_process_id(),
 		"port": port,
 		"updated_unix_time": Time.get_unix_time_from_system(),
-		"enabled_targets": {
-			"codex_vscode": codex_enabled,
-			"codex_app": codex_app_enabled,
-			"codex_terminal": terminal_codex_enabled,
-			"copilot": copilot_enabled,
-			"opencode_terminal": terminal_opencode_enabled,
-			"opencode_vscode": vscode_opencode_enabled,
-			"opencode_app": opencode_app_enabled,
-			"claude_terminal": claude_terminal_enabled,
-			"claude_vscode": claude_vscode_enabled,
-			"claude_app": claude_app_enabled,
-			"gemini_terminal": gemini_terminal_enabled,
-			"agy_terminal": agy_terminal_enabled,
-			"pi_codex_terminal": pi_codex_enabled,
-		},
+		"enabled_targets": _runtime_enabled_targets(),
 		"executable_paths": {
 			"codex_app": codex_app_executable_path,
 			"terminal": terminal_executable_path,
@@ -1583,8 +1337,15 @@ func _write_runtime_state() -> bool:
 	return true
 
 
+func _runtime_enabled_targets() -> Dictionary:
+	var targets := {}
+	for channel: Dictionary in AgentChannelCatalogScript.CHANNELS:
+		targets[channel["runtime_key"]] = bool(get(channel["property"]))
+	return targets
+
+
 func _publish_runtime_if_running() -> void:
-	if DisplayServer.get_name() != "headless" and is_running():
+	if not _is_headless() and is_running():
 		_write_runtime_state()
 
 
@@ -1748,7 +1509,11 @@ func _detect_appx_executable(package_name: String, executable_name: String) -> S
 
 
 func _run_codex_configuration_tool() -> bool:
-	var installer_path := _tool_path("install_codex_integration.ps1")
+	return _run_configuration_tool("install_codex_integration.ps1")
+
+
+func _run_configuration_tool(installer_file_name: String) -> bool:
+	var installer_path := _tool_path(installer_file_name)
 	if not FileAccess.file_exists(installer_path):
 		return false
 	var output: Array = []
@@ -1764,106 +1529,10 @@ func _run_codex_configuration_tool() -> bool:
 	return exit_code == 0
 
 
-func _run_copilot_configuration_tool() -> bool:
-	var installer_path := _tool_path("install_copilot_integration.ps1")
-	if not FileAccess.file_exists(installer_path):
-		return false
-	var output: Array = []
-	var exit_code := OS.execute("powershell.exe", [
-		"-NoProfile",
-		"-ExecutionPolicy",
-		"Bypass",
-		"-WindowStyle",
-		"Hidden",
-		"-File",
-		installer_path,
-	], output, true, false)
-	return exit_code == 0
-
-
-func _run_opencode_configuration_tool() -> bool:
-	var installer_path := _tool_path("install_opencode_integration.ps1")
-	if not FileAccess.file_exists(installer_path):
-		return false
-	var output: Array = []
-	var exit_code := OS.execute("powershell.exe", [
-		"-NoProfile",
-		"-ExecutionPolicy",
-		"Bypass",
-		"-WindowStyle",
-		"Hidden",
-		"-File",
-		installer_path,
-	], output, true, false)
-	return exit_code == 0
-
-
-func _run_claude_code_configuration_tool() -> bool:
-	var installer_path := _tool_path("install_claude_code_integration.ps1")
-	if not FileAccess.file_exists(installer_path):
-		return false
-	var output: Array = []
-	var exit_code := OS.execute("powershell.exe", [
-		"-NoProfile",
-		"-ExecutionPolicy",
-		"Bypass",
-		"-WindowStyle",
-		"Hidden",
-		"-File",
-		installer_path,
-	], output, true, false)
-	return exit_code == 0
-
-
-func _run_gemini_cli_configuration_tool() -> bool:
-	var installer_path := _tool_path("install_gemini_cli_integration.ps1")
-	if not FileAccess.file_exists(installer_path):
-		return false
-	var output: Array = []
-	var exit_code := OS.execute("powershell.exe", [
-		"-NoProfile",
-		"-ExecutionPolicy",
-		"Bypass",
-		"-WindowStyle",
-		"Hidden",
-		"-File",
-		installer_path,
-	], output, true, false)
-	return exit_code == 0
-
-
-func _run_antigravity_cli_configuration_tool() -> bool:
-	var installer_path := _tool_path("install_antigravity_cli_integration.ps1")
-	if not FileAccess.file_exists(installer_path):
-		return false
-	var output: Array = []
-	var exit_code := OS.execute("powershell.exe", [
-		"-NoProfile",
-		"-ExecutionPolicy",
-		"Bypass",
-		"-WindowStyle",
-		"Hidden",
-		"-File",
-		installer_path,
-	], output, true, false)
-	return exit_code == 0
-
-
-func _run_pi_configuration_tool() -> bool:
-	var installer_path := _tool_path("install_pi_integration.ps1")
-	if not FileAccess.file_exists(installer_path):
-		return false
-	var output: Array = []
-	var exit_code := OS.execute("powershell.exe", [
-		"-NoProfile",
-		"-ExecutionPolicy",
-		"Bypass",
-		"-WindowStyle",
-		"Hidden",
-		"-File",
-		installer_path,
-	], output, true, false)
-	return exit_code == 0
+# Tests replace this to drive the desktop code paths without touching the
+# real user's Agent configuration.
+func _is_headless() -> bool:
+	return DisplayServer.get_name() == "headless"
 
 
 func _tool_path(file_name: String) -> String:

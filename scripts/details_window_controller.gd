@@ -2,6 +2,7 @@ class_name DetailsWindowController
 extends RefCounted
 
 const AgentIntegrationControllerScript = preload("res://scripts/agent_integration_controller.gd")
+const AgentChannelCatalogScript = preload("res://scripts/agent_channel_catalog.gd")
 const SettingsToggleSwitchScript = preload("res://scripts/settings_toggle_switch.gd")
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
 const TaskReminderPanelScript = preload("res://scripts/task_reminder_panel.gd")
@@ -14,27 +15,11 @@ signal auto_feeder_buy_requested
 signal auto_feeder_toggled(enabled: bool)
 signal target_fps_selected(index: int)
 signal details_theme_selected(index: int)
-signal agent_codex_enabled_toggled(enabled: bool)
-signal agent_codex_app_enabled_toggled(enabled: bool)
-signal agent_terminal_codex_enabled_toggled(enabled: bool)
-signal agent_terminal_opencode_enabled_toggled(enabled: bool)
-signal agent_vscode_opencode_enabled_toggled(enabled: bool)
-signal agent_opencode_app_enabled_toggled(enabled: bool)
-signal agent_copilot_enabled_toggled(enabled: bool)
-signal agent_claude_vscode_enabled_toggled(enabled: bool)
-signal agent_claude_app_enabled_toggled(enabled: bool)
-signal agent_claude_terminal_enabled_toggled(enabled: bool)
-signal agent_gemini_terminal_enabled_toggled(enabled: bool)
-signal agent_agy_terminal_enabled_toggled(enabled: bool)
-signal agent_pi_codex_enabled_toggled(enabled: bool)
+signal agent_channel_toggled(channel_id: String, enabled: bool)
 signal agent_port_changed(value: float)
 signal codex_trust_review_requested
 signal codex_trust_recheck_requested
-signal vscode_executable_path_changed(path: String)
-signal codex_app_executable_path_changed(path: String)
-signal terminal_executable_path_changed(path: String)
-signal opencode_app_executable_path_changed(path: String)
-signal claude_app_executable_path_changed(path: String)
+signal agent_executable_path_changed(target: String, path: String)
 signal autostart_toggled(enabled: bool)
 signal keep_screen_on_toggled(enabled: bool)
 signal focus_mode_toggled(enabled: bool)
@@ -59,25 +44,8 @@ signal mask_effect_reset_requested
 
 var theme_mode := "light"
 var last_state_message := "尚無紀錄"
-var codex_enabled := false
-var codex_app_enabled := false
-var terminal_codex_enabled := false
-var terminal_opencode_enabled := false
-var vscode_opencode_enabled := false
-var opencode_app_enabled := false
-var copilot_enabled := false
-var claude_vscode_enabled := false
-var claude_app_enabled := false
-var claude_terminal_enabled := false
-var gemini_terminal_enabled := false
-var agy_terminal_enabled := false
-var pi_codex_enabled := false
-var agent_port := AgentIntegrationControllerScript.DEFAULT_PORT
-var vscode_executable_path := ""
-var codex_app_executable_path := ""
-var terminal_executable_path := ""
-var opencode_app_executable_path := ""
-var claude_app_executable_path := ""
+# AgentIntegrationController.get_settings_snapshot() for the Agent tab.
+var agent_settings: Dictionary = {}
 var autostart_supported := false
 var keep_screen_on := false
 var focus_mode := false
@@ -85,7 +53,7 @@ var visual_scale := PetVisualScaleScript.DEFAULT_VALUE
 var interaction_label: Callable
 var interaction_icon: Callable
 var stats_bars: Dictionary = {}
-var _agent_executable_path_summaries: Dictionary = {}
+var _agent_executable_controls: Dictionary = {}
 var _task_reminder_panel
 
 
@@ -682,7 +650,9 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	port_spin_box.min_value = AgentIntegrationControllerScript.MIN_PORT
 	port_spin_box.max_value = AgentIntegrationControllerScript.MAX_PORT
 	port_spin_box.step = 1
-	port_spin_box.value = agent_port
+	port_spin_box.value = int(
+		agent_settings.get("port", AgentIntegrationControllerScript.DEFAULT_PORT)
+	)
 	port_spin_box.custom_minimum_size = Vector2(120, 40)
 	port_spin_box.tooltip_text = "所有 Agent 共用的桌寵本機通訊埠"
 	_style_spin_box(port_spin_box)
@@ -752,212 +722,39 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 	codex_trust_dialog.ok_button_text = "開啟 Codex 信任畫面"
 	codex_trust_dialog.cancel_button_text = "稍後"
 	agent_scroll.add_child(codex_trust_dialog)
-	content.add_child(HSeparator.new())
-
-	var vscode_controls := _build_executable_path_controls(
-		content,
-		agent_scroll,
-		vscode_executable_path,
-		"VscodeExecutablePath",
-		"VscodeExecutableBrowseButton",
-		"VscodeExecutableHint",
-		"VS Code",
-		"選擇 Code.exe",
-		"選擇 VS Code 執行檔",
-		"VS Code",
-		true,
-		func(path: String) -> void: vscode_executable_path_changed.emit(path)
-	)
-	var vscode_path_line_edit := vscode_controls["line_edit"] as LineEdit
-
-	var codex_toggle := SettingsToggleSwitchScript.new()
-	codex_toggle.name = "CodexEnabledToggle"
-	codex_toggle.tooltip_text = "開啟或關閉 VS Code 中的 Codex 通知"
-	codex_toggle.configure(theme_mode, codex_enabled)
-	codex_toggle.toggled.connect(
-		func(value: bool) -> void: agent_codex_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Codex", codex_toggle))
-
-	var claude_vscode_toggle := SettingsToggleSwitchScript.new()
-	claude_vscode_toggle.name = "ClaudeCodeVscodeEnabledToggle"
-	claude_vscode_toggle.tooltip_text = "開啟或關閉 VS Code 中的 Claude Code 通知"
-	claude_vscode_toggle.configure(theme_mode, claude_vscode_enabled)
-	claude_vscode_toggle.toggled.connect(
-		func(value: bool) -> void: agent_claude_vscode_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Claude Code", claude_vscode_toggle))
-
-	var copilot_toggle := SettingsToggleSwitchScript.new()
-	copilot_toggle.name = "CopilotEnabledToggle"
-	copilot_toggle.tooltip_text = "開啟或關閉 Copilot Agent 通知"
-	copilot_toggle.configure(theme_mode, copilot_enabled)
-	copilot_toggle.toggled.connect(
-		func(value: bool) -> void: agent_copilot_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Copilot", copilot_toggle))
-
-	var vscode_opencode_toggle := SettingsToggleSwitchScript.new()
-	vscode_opencode_toggle.name = "VscodeOpenCodeEnabledToggle"
-	vscode_opencode_toggle.tooltip_text = "開啟或關閉 VS Code 中的 OpenCode 通知"
-	vscode_opencode_toggle.configure(theme_mode, vscode_opencode_enabled)
-	vscode_opencode_toggle.toggled.connect(
-		func(value: bool) -> void: agent_vscode_opencode_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("OpenCode", vscode_opencode_toggle))
-
-	content.add_child(HSeparator.new())
-	var codex_app_controls := _build_executable_path_controls(
-		content,
-		agent_scroll,
-		codex_app_executable_path,
-		"CodexAppExecutablePath",
-		"CodexAppExecutableBrowseButton",
-		"CodexAppExecutableHint",
-		"ChatGPT",
-		"選擇 ChatGPT.exe",
-		"選擇 ChatGPT 執行檔",
-		"ChatGPT",
-		true,
-		func(path: String) -> void: codex_app_executable_path_changed.emit(path)
-	)
-	var codex_app_toggle := SettingsToggleSwitchScript.new()
-	codex_app_toggle.name = "CodexAppEnabledToggle"
-	codex_app_toggle.tooltip_text = "開啟或關閉 ChatGPT 中的 Codex 通知"
-	codex_app_toggle.configure(theme_mode, codex_app_enabled)
-	codex_app_toggle.toggled.connect(
-		func(value: bool) -> void: agent_codex_app_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Codex", codex_app_toggle))
-
-	content.add_child(HSeparator.new())
-	var opencode_app_controls := _build_executable_path_controls(
-		content,
-		agent_scroll,
-		opencode_app_executable_path,
-		"OpenCodeAppExecutablePath",
-		"OpenCodeAppExecutableBrowseButton",
-		"OpenCodeAppExecutableHint",
-		"OpenCode",
-		"選擇 OpenCode Desktop.exe",
-		"選擇 OpenCode Desktop 執行檔",
-		"OpenCode",
-		false,
-		func(path: String) -> void: opencode_app_executable_path_changed.emit(path)
-	)
-	var opencode_app_toggle := SettingsToggleSwitchScript.new()
-	opencode_app_toggle.name = "OpenCodeAppEnabledToggle"
-	opencode_app_toggle.tooltip_text = "開啟或關閉 OpenCode Desktop 通知"
-	opencode_app_toggle.configure(theme_mode, opencode_app_enabled)
-	opencode_app_toggle.toggled.connect(
-		func(value: bool) -> void: agent_opencode_app_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("OpenCode", opencode_app_toggle))
-
-	content.add_child(HSeparator.new())
-	var claude_app_controls := _build_executable_path_controls(
-		content,
-		agent_scroll,
-		claude_app_executable_path,
-		"ClaudeAppExecutablePath",
-		"ClaudeAppExecutableBrowseButton",
-		"ClaudeAppExecutableHint",
-		"Claude",
-		"選擇 Claude.exe",
-		"選擇 Claude Code 執行檔",
-		"Claude",
-		false,
-		func(path: String) -> void: claude_app_executable_path_changed.emit(path)
-	)
-	var claude_app_toggle := SettingsToggleSwitchScript.new()
-	claude_app_toggle.name = "ClaudeDesktopEnabledToggle"
-	claude_app_toggle.tooltip_text = "開啟或關閉 Claude Desktop Code 通知"
-	claude_app_toggle.configure(theme_mode, claude_app_enabled)
-	claude_app_toggle.toggled.connect(
-		func(value: bool) -> void: agent_claude_app_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Claude Code", claude_app_toggle))
-
-	content.add_child(HSeparator.new())
-	var terminal_controls := _build_executable_path_controls(
-		content,
-		agent_scroll,
-		terminal_executable_path,
-		"TerminalExecutablePath",
-		"TerminalExecutableBrowseButton",
-		"TerminalExecutableHint",
-		"終端機",
-		"選擇 WindowsTerminal.exe",
-		"選擇終端機執行檔",
-		"終端機",
-		false,
-		func(path: String) -> void: terminal_executable_path_changed.emit(path)
-	)
-	var terminal_toggle := SettingsToggleSwitchScript.new()
-	terminal_toggle.name = "TerminalCodexEnabledToggle"
-	terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Codex CLI 通知"
-	terminal_toggle.configure(theme_mode, terminal_codex_enabled)
-	terminal_toggle.toggled.connect(
-		func(value: bool) -> void: agent_terminal_codex_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Codex", terminal_toggle))
-
-	var pi_codex_toggle := SettingsToggleSwitchScript.new()
-	pi_codex_toggle.name = "PiCodexEnabledToggle"
-	pi_codex_toggle.tooltip_text = "開啟或關閉 Pi 中所有模型的通知"
-	pi_codex_toggle.configure(theme_mode, pi_codex_enabled)
-	pi_codex_toggle.toggled.connect(
-		func(value: bool) -> void: agent_pi_codex_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Pi", pi_codex_toggle))
-
-	var opencode_toggle := SettingsToggleSwitchScript.new()
-	opencode_toggle.name = "TerminalOpenCodeEnabledToggle"
-	opencode_toggle.tooltip_text = "開啟或關閉終端機中的 OpenCode 通知"
-	opencode_toggle.configure(theme_mode, terminal_opencode_enabled)
-	opencode_toggle.toggled.connect(
-		func(value: bool) -> void: agent_terminal_opencode_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("OpenCode", opencode_toggle))
-
-	var gemini_terminal_toggle := SettingsToggleSwitchScript.new()
-	gemini_terminal_toggle.name = "GeminiCliTerminalEnabledToggle"
-	gemini_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Gemini CLI 舊版通知（企業/API Key）"
-	gemini_terminal_toggle.configure(theme_mode, gemini_terminal_enabled)
-	gemini_terminal_toggle.toggled.connect(
-		func(value: bool) -> void: agent_gemini_terminal_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Gemini CLI（舊版）", gemini_terminal_toggle))
-
-	var agy_terminal_toggle := SettingsToggleSwitchScript.new()
-	agy_terminal_toggle.name = "AgyTerminalEnabledToggle"
-	agy_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Antigravity CLI 通知"
-	agy_terminal_toggle.configure(theme_mode, agy_terminal_enabled)
-	agy_terminal_toggle.toggled.connect(
-		func(value: bool) -> void: agent_agy_terminal_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Antigravity CLI", agy_terminal_toggle))
-
-	var claude_terminal_toggle := SettingsToggleSwitchScript.new()
-	claude_terminal_toggle.name = "ClaudeCodeTerminalEnabledToggle"
-	claude_terminal_toggle.tooltip_text = "開啟或關閉終端機中的 Claude Code 通知"
-	claude_terminal_toggle.configure(theme_mode, claude_terminal_enabled)
-	claude_terminal_toggle.toggled.connect(
-		func(value: bool) -> void: agent_claude_terminal_enabled_toggled.emit(value)
-	)
-	content.add_child(_build_agent_row("Claude Code", claude_terminal_toggle))
-	_agent_executable_path_summaries = {
-		AgentIntegrationControllerScript.TARGET_VSCODE:
-			vscode_controls["summary"] as Label,
-		AgentIntegrationControllerScript.TARGET_CODEX_APP:
-			codex_app_controls["summary"] as Label,
-		AgentIntegrationControllerScript.TARGET_OPENCODE_APP:
-			opencode_app_controls["summary"] as Label,
-		AgentIntegrationControllerScript.TARGET_CLAUDE_APP:
-			claude_app_controls["summary"] as Label,
-		AgentIntegrationControllerScript.TARGET_TERMINAL:
-			terminal_controls["summary"] as Label,
-	}
+	var channel_states: Dictionary = agent_settings.get("channels", {})
+	var executable_paths: Dictionary = agent_settings.get("executable_paths", {})
+	var channel_toggles := {}
+	_agent_executable_controls = {}
+	for target_entry: Dictionary in AgentChannelCatalogScript.TARGETS:
+		var target := String(target_entry["target"])
+		var node_prefix := String(target_entry["node_prefix"])
+		content.add_child(HSeparator.new())
+		_agent_executable_controls[target] = _build_executable_path_controls(
+			content,
+			agent_scroll,
+			String(executable_paths.get(target, "")),
+			node_prefix + "ExecutablePath",
+			node_prefix + "ExecutableBrowseButton",
+			node_prefix + "ExecutableHint",
+			target_entry["title"],
+			target_entry["placeholder"],
+			target_entry["dialog_title"],
+			target_entry["title"],
+			target_entry["required"],
+			func(path: String) -> void: agent_executable_path_changed.emit(target, path)
+		)
+		for channel: Dictionary in AgentChannelCatalogScript.channels_for_target(target):
+			var channel_id := String(channel["id"])
+			var toggle := SettingsToggleSwitchScript.new()
+			toggle.name = channel["node_name"]
+			toggle.tooltip_text = channel["tooltip"]
+			toggle.configure(theme_mode, bool(channel_states.get(channel_id, false)))
+			toggle.toggled.connect(
+				func(value: bool) -> void: agent_channel_toggled.emit(channel_id, value)
+			)
+			content.add_child(_build_agent_row(channel["label"], toggle))
+			channel_toggles[channel_id] = toggle
 
 	return {
 		"agent_port_spin_box": port_spin_box,
@@ -966,34 +763,7 @@ func build_agent_tab(tabs: TabContainer) -> Dictionary:
 		"codex_trust_review_button": codex_trust_review_button,
 		"codex_trust_recheck_button": codex_trust_recheck_button,
 		"codex_trust_dialog": codex_trust_dialog,
-		"codex_enabled_toggle": codex_toggle,
-		"copilot_enabled_toggle": copilot_toggle,
-		"vscode_opencode_enabled_toggle": vscode_opencode_toggle,
-		"codex_app_enabled_toggle": codex_app_toggle,
-		"opencode_app_enabled_toggle": opencode_app_toggle,
-		"terminal_codex_enabled_toggle": terminal_toggle,
-		"pi_codex_enabled_toggle": pi_codex_toggle,
-		"terminal_opencode_enabled_toggle": opencode_toggle,
-		"gemini_terminal_enabled_toggle": gemini_terminal_toggle,
-		"agy_terminal_enabled_toggle": agy_terminal_toggle,
-		"claude_vscode_enabled_toggle": claude_vscode_toggle,
-		"claude_app_enabled_toggle": claude_app_toggle,
-		"claude_terminal_enabled_toggle": claude_terminal_toggle,
-		"vscode_executable_line_edit": vscode_path_line_edit,
-		"vscode_executable_hint": vscode_controls["hint"] as Label,
-		"vscode_executable_summary": vscode_controls["summary"] as Label,
-		"codex_app_executable_line_edit": codex_app_controls["line_edit"] as LineEdit,
-		"codex_app_executable_hint": codex_app_controls["hint"] as Label,
-		"codex_app_executable_summary": codex_app_controls["summary"] as Label,
-		"opencode_app_executable_line_edit": opencode_app_controls["line_edit"] as LineEdit,
-		"opencode_app_executable_hint": opencode_app_controls["hint"] as Label,
-		"opencode_app_executable_summary": opencode_app_controls["summary"] as Label,
-		"claude_app_executable_line_edit": claude_app_controls["line_edit"] as LineEdit,
-		"claude_app_executable_hint": claude_app_controls["hint"] as Label,
-		"claude_app_executable_summary": claude_app_controls["summary"] as Label,
-		"terminal_executable_line_edit": terminal_controls["line_edit"] as LineEdit,
-		"terminal_executable_hint": terminal_controls["hint"] as Label,
-		"terminal_executable_summary": terminal_controls["summary"] as Label,
+		"channel_toggles": channel_toggles,
 	}
 
 
@@ -1103,28 +873,36 @@ func _build_executable_path_controls(
 	return {"line_edit": line_edit, "hint": hint, "summary": path_summary}
 
 
-func refresh_executable_path_control(
-	path: String,
-	line_edit: LineEdit,
-	hint: Label,
-	path_summary: Label,
-	target_name: String,
-	required: bool
-) -> void:
+func refresh_agent_executable_path(target: String, path: String) -> void:
+	var controls: Dictionary = _agent_executable_controls.get(target, {})
+	if controls.is_empty():
+		return
+	var target_entry := _agent_target_entry(target)
+	var line_edit := controls["line_edit"] as LineEdit
+	var hint := controls["hint"] as Label
+	var path_summary := controls["summary"] as Label
 	if is_instance_valid(line_edit) and not line_edit.has_focus():
 		line_edit.text = path
 		line_edit.tooltip_text = "點擊 Agent 通知時切回這個目標：%s" % path
 	if is_instance_valid(hint):
-		_update_executable_hint(path, hint, target_name, required)
+		_update_executable_hint(path, hint, target_entry["title"], target_entry["required"])
 	if is_instance_valid(path_summary):
 		_update_executable_summary(path, path_summary)
+
+
+func _agent_target_entry(target: String) -> Dictionary:
+	for target_entry: Dictionary in AgentChannelCatalogScript.TARGETS:
+		if target_entry["target"] == target:
+			return target_entry
+	return {}
 
 
 func set_agent_executable_path_detection_state(
 	targets: Array, detecting: bool
 ) -> void:
 	for target: String in targets:
-		var path_summary := _agent_executable_path_summaries.get(target) as Label
+		var controls: Dictionary = _agent_executable_controls.get(target, {})
+		var path_summary := controls.get("summary") as Label
 		if not is_instance_valid(path_summary):
 			continue
 		if detecting:
