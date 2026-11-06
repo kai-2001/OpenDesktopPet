@@ -172,12 +172,64 @@ func _run() -> void:
 		"mixed-case pack removes by its lowercase id"
 	)
 
+	_check_header_dimensions()
+
 	if _failures > 0:
 		push_error("CODEX_PET_IMPORTER_TEST_FAILED: %d assertion(s)" % _failures)
 		quit(1)
 		return
 	print("CODEX_PET_IMPORTER_TEST_OK")
 	quit(0)
+
+
+## Listing packs reads every Codex spritesheet's size. The size must come from
+## the file header, so files are cut right after it: decoding them would fail.
+func _check_header_dimensions() -> void:
+	var header_root := TEST_ROOT.path_join("headers")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(header_root))
+	for size: Vector2i in [Vector2i(1536, 1872), Vector2i(1001, 777)]:
+		var transparent := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+		transparent.fill(Color(0.2, 0.4, 0.6, 0.5))
+		var opaque := Image.create(size.x, size.y, false, Image.FORMAT_RGB8)
+		opaque.fill(Color(0.2, 0.4, 0.6))
+		var cases := {
+			"png": func(path: String) -> Error: return transparent.save_png(path),
+			"webp-lossless": func(path: String) -> Error: return transparent.save_webp(path, false),
+			"webp-lossy-alpha": func(path: String) -> Error: return transparent.save_webp(path, true, 0.8),
+			"webp-lossy": func(path: String) -> Error: return opaque.save_webp(path, true, 0.8),
+		}
+		for label: String in cases:
+			var extension := "png" if label == "png" else "webp"
+			var path := header_root.path_join("%s-%dx%d.%s" % [label, size.x, size.y, extension])
+			var absolute := ProjectSettings.globalize_path(path)
+			_assert_true((cases[label] as Callable).call(absolute) == OK, "%s test image is written" % label)
+			var bytes := FileAccess.get_file_as_bytes(path)
+			var cut := FileAccess.open(path, FileAccess.WRITE)
+			cut.store_buffer(bytes.slice(0, 64))
+			cut.close()
+			_assert_equal(
+				CodexPetImporterScript._read_dimensions(path),
+				size,
+				"%s size is read from the header alone (%dx%d)" % [label, size.x, size.y]
+			)
+	var jpeg_path := header_root.path_join("fallback.jpg")
+	var jpeg := Image.create(320, 240, false, Image.FORMAT_RGB8)
+	jpeg.fill(Color(0.8, 0.2, 0.2))
+	jpeg.save_jpg(ProjectSettings.globalize_path(jpeg_path))
+	_assert_equal(
+		CodexPetImporterScript._read_dimensions(jpeg_path),
+		Vector2i(320, 240),
+		"formats without a header reader still report their decoded size"
+	)
+	var broken_path := header_root.path_join("broken.png")
+	var broken := FileAccess.open(broken_path, FileAccess.WRITE)
+	broken.store_buffer(PackedByteArray([0x89, 0x50, 0x4E, 0x47]))
+	broken.close()
+	_assert_equal(
+		CodexPetImporterScript._read_dimensions(broken_path),
+		Vector2i.ZERO,
+		"a damaged spritesheet reports no size"
+	)
 
 
 func _write_sheet(path: String, rows: int) -> bool:

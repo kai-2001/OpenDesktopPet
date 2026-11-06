@@ -176,11 +176,52 @@ static func _rows_for_version(sprite_version: int) -> int:
 
 
 static func _read_dimensions(path: String) -> Vector2i:
+	var header_size := _read_header_dimensions(path)
+	if header_size != Vector2i.ZERO:
+		return header_size
 	var image := Image.new()
 	var error := image.load(ProjectSettings.globalize_path(path))
 	if error != OK:
 		return Vector2i.ZERO
 	return Vector2i(image.get_width(), image.get_height())
+
+
+## Listing packs checks every spritesheet's size. PNG and WebP store it in
+## their first bytes, so read those instead of decoding the whole sheet; other
+## formats fall back to decoding.
+static func _read_header_dimensions(path: String) -> Vector2i:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return Vector2i.ZERO
+	var header := file.get_buffer(30)
+	file.close()
+	if header.size() >= 24 			and header.slice(0, 8) == PackedByteArray([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) 			and header.slice(12, 16).get_string_from_ascii() == "IHDR":
+		return Vector2i(_big_endian_u32(header, 16), _big_endian_u32(header, 20))
+	if header.size() < 30 			or header.slice(0, 4).get_string_from_ascii() != "RIFF" 			or header.slice(8, 12).get_string_from_ascii() != "WEBP":
+		return Vector2i.ZERO
+	match header.slice(12, 16).get_string_from_ascii():
+		"VP8 ":
+			# Lossy: 14-bit sizes follow the 9D 01 2A frame start code.
+			if header[23] == 0x9D and header[24] == 0x01 and header[25] == 0x2A:
+				return Vector2i(
+					header.decode_u16(26) & 0x3FFF, header.decode_u16(28) & 0x3FFF
+				)
+		"VP8L":
+			# Lossless: after the 0x2F signature, 14 bits each of width - 1 and height - 1.
+			if header[20] == 0x2F:
+				var bits := header.decode_u32(21)
+				return Vector2i((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1)
+		"VP8X":
+			# Extended: 24-bit canvas width - 1 and height - 1.
+			return Vector2i(
+				(header[24] | header[25] << 8 | header[26] << 16) + 1,
+				(header[27] | header[28] << 8 | header[29] << 16) + 1
+			)
+	return Vector2i.ZERO
+
+
+static func _big_endian_u32(bytes: PackedByteArray, offset: int) -> int:
+	return bytes[offset] << 24 | bytes[offset + 1] << 16 | bytes[offset + 2] << 8 | bytes[offset + 3]
 
 
 ## Codex pet files may use mixed-case ids such as "Giratina". Pack folders and
