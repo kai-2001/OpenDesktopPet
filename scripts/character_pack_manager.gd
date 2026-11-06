@@ -4,6 +4,7 @@ extends RefCounted
 const PACKS_ROOT := "user://character_packs"
 const CharacterPackValidatorScript = preload("res://scripts/character_pack_validator.gd")
 const CodexPetImporterScript = preload("res://scripts/codex_pet_importer.gd")
+const CharacterGeometryCacheScript = preload("res://scripts/character_geometry_cache.gd")
 const REQUIRED_ACTIONS := ["idle", "pet", "eat", "drink", "sleep", "move", "drag", "work"]
 const ALLOWED_PREVIEW_EXTENSIONS := ["png", "jpg", "jpeg", "webp", "svg"]
 const MAX_ARCHIVE_FILES := 2048
@@ -135,6 +136,7 @@ static func remove_pack(character_id: String) -> Dictionary:
 		return _failure("找不到要刪除的角色包。")
 	if not _remove_tree(target_absolute):
 		return _failure("角色包刪除失敗，可能仍有檔案正在使用。")
+	CharacterGeometryCacheScript.forget(safe_id)
 	return {"ok": true, "id": safe_id}
 
 

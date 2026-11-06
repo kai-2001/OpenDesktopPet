@@ -253,6 +253,12 @@ try {
     if ($settingsTabControllerExitCode -ne 0 -or -not ($settingsTabControllerOutput -match 'SETTINGS_TAB_CONTROLLER_TEST_OK')) {
         throw 'Settings tab controller validation failed.'
     }
+    $fixedWindowCacheOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/fixed_window_cache_test.gd' 2>&1
+    $fixedWindowCacheExitCode = $LASTEXITCODE
+    $fixedWindowCacheOutput | Write-Output
+    if ($fixedWindowCacheExitCode -ne 0 -or -not ($fixedWindowCacheOutput -match 'FIXED_WINDOW_CACHE_TEST_OK')) {
+        throw 'Fixed window cache validation failed.'
+    }
     $codexSleepTransitionOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_sleep_transition_test.gd' 2>&1
     $codexSleepTransitionExitCode = $LASTEXITCODE
     $codexSleepTransitionOutput | Write-Output

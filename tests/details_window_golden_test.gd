@@ -22,6 +22,7 @@ const SKIPPED_SUBTREES: Array[String] = ["待辦"]
 # behind; move them aside so the recording starts from a fresh install.
 const SET_ASIDE_PATHS: Array[String] = [
 	"user://character_packs", "user://profiles", "user://character_effects.json",
+	"user://character_geometry_cache.json",
 ]
 const SET_ASIDE_SUFFIX := ".details-golden-backup"
 

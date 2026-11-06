@@ -11,10 +11,14 @@ const PetHitboxCalculatorScript = preload("res://scripts/pet_hitbox_calculator.g
 const CharacterPackProfileScript = preload("res://scripts/character_pack_profile.gd")
 const PetEffectControllerScript = preload("res://scripts/pet_effect_controller.gd")
 const PetVisualScaleScript = preload("res://scripts/pet_visual_scale.gd")
+const CharacterGeometryCacheScript = preload("res://scripts/character_geometry_cache.gd")
 const FRAME_VIEWPORT_PADDING := 2.0
 # Idle breathing, action pulses and drag sway draw slightly past a frame's
 # resting bounds; keep that much extra room in the fixed window.
 const FIXED_WINDOW_MOTION_MARGIN := 0.06
+# Bump when _measure_fixed_window_envelope changes, so cached envelopes from
+# the old measurement are measured again.
+const FIXED_WINDOW_GEOMETRY_VERSION := 1
 
 var _profile = CharacterPackProfileScript.new()
 var _hitbox_calculator = PetHitboxCalculatorScript.new()
@@ -257,6 +261,38 @@ func use_fixed_window(enabled: bool) -> void:
 func _reserve_fixed_window() -> void:
 	# Measure from the base canvas origin; frame bounds are canvas coordinates.
 	_restore_base_geometry(false)
+	var pack_signature := CharacterGeometryCacheScript.signature(_profile.pack_root(), [
+		FIXED_WINDOW_GEOMETRY_VERSION, PetVisualScaleScript.MAX_VALUE, _home_position,
+	])
+	var envelope: Variant = CharacterGeometryCacheScript.lookup(
+		get_character_id(), pack_signature
+	)
+	if envelope == null:
+		envelope = _measure_fixed_window_envelope()
+		if envelope is Rect2:
+			CharacterGeometryCacheScript.store(get_character_id(), pack_signature, envelope)
+	if envelope is Rect2:
+		var bounds: Rect2 = envelope
+		_fit_window_to_bounds(bounds.grow_individual(
+			bounds.size.x * FIXED_WINDOW_MOTION_MARGIN,
+			bounds.size.y * FIXED_WINDOW_MOTION_MARGIN,
+			bounds.size.x * FIXED_WINDOW_MOTION_MARGIN,
+			bounds.size.y * FIXED_WINDOW_MOTION_MARGIN
+		))
+		# The reserved window becomes the base, so later action envelopes fit
+		# inside it and neither the window size nor the canvas offset changes.
+		_capture_base_geometry()
+	var action := _current_action
+	if action.is_empty():
+		action = "drag" if _dragging else "idle"
+	_geometry_action = ""
+	_show_action_frame(action, _current_frame_index())
+
+
+## Decodes every frame of every action, facing both ways at the largest scale,
+## and returns the canvas rect that holds all of them, or null when no frame
+## has visible pixels.
+func _measure_fixed_window_envelope() -> Variant:
 	var saved_scale := scale
 	var saved_rotation := rotation
 	var saved_facing := _facing_direction
@@ -278,21 +314,7 @@ func _reserve_fixed_window() -> void:
 	scale = saved_scale
 	rotation = saved_rotation
 	_facing_direction = saved_facing
-	if has_bounds:
-		_fit_window_to_bounds(envelope.grow_individual(
-			envelope.size.x * FIXED_WINDOW_MOTION_MARGIN,
-			envelope.size.y * FIXED_WINDOW_MOTION_MARGIN,
-			envelope.size.x * FIXED_WINDOW_MOTION_MARGIN,
-			envelope.size.y * FIXED_WINDOW_MOTION_MARGIN
-		))
-		# The reserved window becomes the base, so later action envelopes fit
-		# inside it and neither the window size nor the canvas offset changes.
-		_capture_base_geometry()
-	var action := _current_action
-	if action.is_empty():
-		action = "drag" if _dragging else "idle"
-	_geometry_action = ""
-	_show_action_frame(action, _current_frame_index())
+	return envelope if has_bounds else null
 
 
 func _capture_base_geometry() -> void:
