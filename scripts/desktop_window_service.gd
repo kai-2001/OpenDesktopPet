@@ -1,6 +1,8 @@
 class_name DesktopWindowService
 extends RefCounted
 
+const CONCEALED_POSITION := Vector2i(-32000, -32000)
+
 var _click_through: RefCounted
 var _click_through_error_reported := false
 
@@ -93,6 +95,27 @@ func enable_native_click_through() -> bool:
 		return false
 	_click_through = ClassDB.instantiate("WindowsClickThrough")
 	return _click_through != null
+
+
+## Godot cannot hide its main window, so a closed pet's empty window moves
+## off every screen and, with the native extension, turns fully transparent
+## and lets clicks through.
+func conceal_window() -> void:
+	set_window_position(CONCEALED_POSITION)
+	if enable_native_click_through():
+		var handle := DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE)
+		_click_through.set_opacity(handle, 0)
+		_click_through.set_click_through(handle, true)
+
+
+## Undoes conceal_window; the pet then places the window itself.
+func reveal_window() -> void:
+	if enable_native_click_through():
+		set_window_opacity(255)
+
+
+func is_window_concealed() -> bool:
+	return window_position() == CONCEALED_POSITION
 
 
 func uses_native_click_through() -> bool:

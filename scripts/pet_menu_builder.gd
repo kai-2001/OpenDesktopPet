@@ -9,7 +9,8 @@ const WORK_ITEM_ID := 4
 const SLEEP_ITEM_ID := 5
 const DETAILS_ITEM_ID := 6
 const EXIT_ITEM_ID := 7
-const RECOVER_ITEM_ID := 22
+const CLOSE_ITEM_ID := 9
+const SHOW_ITEM_ID := 22
 const REMINDER_VIEW_ALL_ITEM_ID := 8
 const REMINDER_ITEM_ID_BASE := 1000
 
@@ -37,7 +38,6 @@ static func populate(
 	apply_care_labels(menu, interaction_icon, interaction_label, care_cost_text)
 	menu.add_separator()
 	menu.add_item("📊  開啟詳細面板", DETAILS_ITEM_ID)
-	menu.add_item("🏠  找回桌寵", RECOVER_ITEM_ID)
 
 
 ## The single place that writes care item text, so menu prices always match
@@ -80,6 +80,25 @@ static func populate_today_reminders(
 		menu.add_item("查看全部今日待辦", REMINDER_VIEW_ALL_ITEM_ID)
 
 
-static func append_exit(menu: PopupMenu) -> void:
+## The pet's own menu closes the pet; the app keeps running in the tray.
+static func append_close(menu: PopupMenu) -> void:
 	menu.add_separator()
-	menu.add_item("❌  儲存並離開", EXIT_ITEM_ID)
+	menu.add_item("❌  關閉桌寵", CLOSE_ITEM_ID)
+
+
+static func add_show_item(menu: PopupMenu) -> void:
+	menu.add_item("🏠  顯示桌寵", SHOW_ITEM_ID)
+
+
+## Only the tray menu quits; the pet's own menu closes the pet instead.
+static func append_exit(menu: PopupMenu, separated := true) -> void:
+	if separated:
+		menu.add_separator()
+	menu.add_item("🚪  退出", EXIT_ITEM_ID)
+
+
+## The tray menu while the pet is closed.
+static func populate_closed_tray(menu: PopupMenu) -> void:
+	menu.clear()
+	add_show_item(menu)
+	append_exit(menu)

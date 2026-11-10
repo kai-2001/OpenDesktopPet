@@ -38,6 +38,7 @@ $windowsExtension = Read-Source 'native/windows/windows_window_activator.gdexten
 $releasePreparation = Read-Source 'tools/prepare_windows_release.ps1'
 $updateCoordinator = Read-Source 'scripts/update_check_coordinator.gd'
 $exportPresets = Read-Source 'export_presets.cfg'
+$appShell = Read-Source 'scripts/app_shell.gd'
 
 # Keep only rules that tests cannot express: dependency boundaries and
 # requirements of external tools, native code and release files. Behavior
@@ -66,6 +67,10 @@ Assert-Architecture ($state -notmatch 'FileAccess|DirAccess|OS\.execute|Time\.(g
 	'PetState must delegate persistence and system time.'
 Assert-Architecture ($main -notmatch 'OS\.execute|AUTOSTART_REGISTRY_KEY|_registry_executable') `
 	'main.gd must not contain Windows Registry implementation details.'
+Assert-Architecture ($main -notmatch 'StatusIndicator|TCPServer|InstanceLink') `
+	'main.gd must leave the tray icon and the single-instance link to AppShell, which outlives the pet.'
+Assert-Architecture ($appShell -notmatch 'state\.|PetState') `
+	'AppShell must not reach into gameplay state; the pet saves itself.'
 Assert-Architecture ($visual -notmatch 'func _validate_action') `
 	'PetVisual must not own character-pack action validation.'
 Assert-Architecture ($details -notmatch 'autostart_query_requested') `

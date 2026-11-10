@@ -159,42 +159,47 @@ func _init() -> void:
 		bubble_token_before_missing_idle,
 		"missing idle dialogue does not open a speech bubble"
 	)
+	var context_ids: Array[int] = []
+	for index in main.context_menu.item_count:
+		context_ids.append(main.context_menu.get_item_id(index))
+	_assert_true(
+		not context_ids.has(PetMenuBuilderScript.SHOW_ITEM_ID)
+			and not context_ids.has(PetMenuBuilderScript.EXIT_ITEM_ID),
+		"the pet's own menu neither shows the pet nor quits the app"
+	)
+	_assert_equal(
+		context_ids[context_ids.size() - 1],
+		PetMenuBuilderScript.CLOSE_ITEM_ID,
+		"the pet's own menu ends with closing the pet"
+	)
 	if DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR):
 		_assert_true(
-			is_instance_valid(main._status_indicator)
-				and is_instance_valid(main._tray_menu)
-				and main._status_indicator.menu != NodePath(),
-			"status indicator uses a dedicated native action menu"
+			is_instance_valid(main.get_tray_menu()),
+			"the pet builds a dedicated native tray menu"
 		)
+		var tray_ids: Array[int] = []
+		for index in main._tray_menu.item_count:
+			tray_ids.append(main._tray_menu.get_item_id(index))
+		var shared_count := context_ids.find(PetMenuBuilderScript.DETAILS_ITEM_ID) + 1
 		_assert_equal(
-			main._tray_menu.item_count,
-			main.context_menu.item_count,
-			"status indicator menu contains the same actions as the pet context menu"
+			tray_ids.slice(0, shared_count),
+			context_ids.slice(0, shared_count),
+			"the tray menu offers the same pet actions as the pet's own menu"
 		)
-		for index in main.context_menu.item_count:
-			_assert_equal(
-				main._tray_menu.get_item_id(index),
-				main.context_menu.get_item_id(index),
-				"status indicator action %d uses the same command ID" % index
-			)
+		for index in shared_count:
 			_assert_equal(
 				main._tray_menu.get_item_text(index),
 				main.context_menu.get_item_text(index),
-				"status indicator action %d uses the same label" % index
+				"tray action %d uses the same label" % index
 			)
-		var recover_item_index := -1
-		for index in main._tray_menu.item_count:
-			if main._tray_menu.get_item_id(index) == 22:
-				recover_item_index = index
-				break
 		_assert_true(
-			recover_item_index >= 0,
-			"status indicator menu contains the recover-pet action"
+			tray_ids.has(PetMenuBuilderScript.SHOW_ITEM_ID),
+			"the tray menu can show the pet"
 		)
 		_assert_equal(
-			main._tray_menu.get_item_id(main._tray_menu.item_count - 1),
-			7,
-			"status indicator menu keeps save-and-exit as the final action"
+			tray_ids.slice(tray_ids.size() - 2),
+			[PetMenuBuilderScript.CLOSE_ITEM_ID, PetMenuBuilderScript.EXIT_ITEM_ID],
+			"the tray menu ends with closing the pet, then quitting the app"
 		)
 	_assert_equal(
 		main.pet.get_interaction_label("feed", "__fallback__"),

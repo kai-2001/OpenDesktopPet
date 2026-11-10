@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Open Desktop Pet"
 config/version="0.12.0"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/app.tscn"
 config/features=PackedStringArray("4.6")
 run/max_fps=30
 run/low_processor_mode=true

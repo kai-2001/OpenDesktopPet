@@ -37,7 +37,10 @@ const TASK_REMINDER_NOTIFICATION_DURATION_SECONDS := 8.0
 const REMINDERS_TAB_INDEX := 1
 const AGENT_TAB_INDEX := 3
 const DRAG_DISTANCE_THRESHOLD_PX := 1.0
-const STATUS_ICON = preload("res://assets/branding/birthmark_app_icon.png")
+
+## Raised instead of quitting while AppShell hosts the pet, so the tray stays.
+signal close_requested
+signal exit_requested
 
 @onready var state: Node = $PetState
 @onready var pet: Node2D = $PetVisual
@@ -67,10 +70,14 @@ var _known_unlocked_actions: Dictionary = {}
 var _unlock_tracking_ready := false
 var _last_state_message := "尚無紀錄"
 var _pet_interaction_polygon := PackedVector2Array()
-var _status_indicator: StatusIndicator
 var _tray_menu: PopupMenu
 var _today_reminder_ids: Dictionary = {}
 var _agent_controller: AgentIntegrationController
+## Set by AppShell before the pet enters the tree. Unhosted (tests, running
+## main.tscn alone), closing and exiting both quit.
+var hosted := false
+## Said once the pet appears, in place of the usual greeting.
+var startup_notice := ""
 var _agent_settings_panel
 # Tests swap in a recording subclass before the node enters the tree.
 var agent_controller_script: Script = AgentIntegrationControllerScript
@@ -145,7 +152,7 @@ func _ready() -> void:
 	_connect_signals()
 	_refresh_ui(state.get_snapshot())
 	_setup_context_menu()
-	_setup_status_indicator()
+	_setup_tray_menu()
 	_setup_agent_integration()
 	_setup_update_check()
 	_setup_autostart_service()
@@ -194,7 +201,8 @@ func _interrupt_autonomous_action() -> bool:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+	# AppShell owns the window close request while it hosts the pet.
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and not hosted:
 		call_deferred("_request_shutdown")
 
 
@@ -552,6 +560,9 @@ func _on_task_reminder_badge_resized() -> void:
 
 
 func _show_startup_message() -> void:
+	if not startup_notice.is_empty():
+		say(startup_notice, STARTUP_REMINDER_DURATION_SECONDS)
+		return
 	if _task_reminder_presentation != null:
 		var today_notice: String = _task_reminder_presentation.startup_message()
 		if not today_notice.is_empty():
@@ -587,33 +598,26 @@ func _show_context_menu(at: Vector2i) -> void:
 	context_menu.popup()
 
 
-func _setup_status_indicator() -> void:
+## The tray menu holds the pet's actions; AppShell owns the tray icon and
+## points it at this menu while the pet is open.
+func _setup_tray_menu() -> void:
 	if not _window_service.has_status_indicator():
 		return
 	_tray_menu = PopupMenu.new()
+	_tray_menu.name = "TrayMenu"
 	_rebuild_action_menu(_tray_menu)
 	_tray_menu.id_pressed.connect(_on_context_action)
 	add_child(_tray_menu)
-	_status_indicator = StatusIndicator.new()
-	_status_indicator.icon = STATUS_ICON
-	_status_indicator.tooltip = "Open Desktop Pet"
-	add_child(_status_indicator)
-	_status_indicator.menu = _status_indicator.get_path_to(_tray_menu)
-	_status_indicator.pressed.connect(_on_status_indicator_pressed)
 
 
-func _on_status_indicator_pressed(button: int, _position: Vector2i) -> void:
-	if button == MOUSE_BUTTON_LEFT:
-		call_deferred("_show_stats_window")
+func get_tray_menu() -> PopupMenu:
+	return _tray_menu if is_instance_valid(_tray_menu) else null
 
 
-func _remove_status_indicator() -> void:
-	if is_instance_valid(_status_indicator):
-		_status_indicator.queue_free()
-	_status_indicator = null
+func _remove_tray_menu() -> void:
 	if is_instance_valid(_tray_menu):
 		_tray_menu.queue_free()
-		_tray_menu = null
+	_tray_menu = null
 
 
 func _on_context_action(id: int) -> void:
@@ -624,12 +628,14 @@ func _on_context_action(id: int) -> void:
 			call_deferred("_show_stats_window")
 		PetMenuBuilderScript.REMINDER_VIEW_ALL_ITEM_ID:
 			call_deferred("_show_stats_window", REMINDERS_TAB_INDEX)
-		7:
+		PetMenuBuilderScript.EXIT_ITEM_ID:
 			# Let the native PopupMenu finish dispatching `id_pressed` before
 			# destroying either native window.
 			call_deferred("_request_shutdown")
-		22:
-			_recover_pet()
+		PetMenuBuilderScript.CLOSE_ITEM_ID:
+			call_deferred("_request_close")
+		PetMenuBuilderScript.SHOW_ITEM_ID:
+			recover_pet()
 		_:
 			if id < PetMenuBuilderScript.REMINDER_ITEM_ID_BASE:
 				return
@@ -653,8 +659,13 @@ func _rebuild_action_menu(menu: PopupMenu) -> void:
 	var reminders: Array[Dictionary] = []
 	if _task_reminder_coordinator != null:
 		reminders = _task_reminder_coordinator.get_open_today_reminders()
+	var is_tray := menu == _tray_menu
+	if is_tray:
+		PetMenuBuilderScript.add_show_item(menu)
 	PetMenuBuilderScript.populate_today_reminders(menu, reminders)
-	PetMenuBuilderScript.append_exit(menu)
+	PetMenuBuilderScript.append_close(menu)
+	if is_tray:
+		PetMenuBuilderScript.append_exit(menu, false)
 	_set_action_menu_level(menu)
 	for index: int in mini(reminders.size(), 4):
 		_today_reminder_ids[PetMenuBuilderScript.REMINDER_ITEM_ID_BASE + index] = (
@@ -958,8 +969,25 @@ func _rebuild_stats_window_after_theme_change(
 func _request_shutdown() -> void:
 	if _shutting_down:
 		return
+	if hosted:
+		exit_requested.emit()
+		return
 	_prepare_shutdown()
 	get_tree().quit()
+
+
+func _request_close() -> void:
+	if _shutting_down:
+		return
+	if hosted:
+		close_requested.emit()
+		return
+	_request_shutdown()
+
+
+## Saves and stops everything the pet runs, before it is freed or the app quits.
+func prepare_shutdown() -> void:
+	_prepare_shutdown()
 
 
 func _prepare_shutdown() -> void:
@@ -979,7 +1007,7 @@ func _prepare_shutdown() -> void:
 		_autostart_service.shutdown()
 	if _agent_controller != null:
 		_agent_controller.shutdown()
-	_remove_status_indicator()
+	_remove_tray_menu()
 	_destroy_stats_window()
 
 
@@ -1100,7 +1128,8 @@ func _place_bottom_right() -> void:
 	))
 
 
-func _recover_pet() -> void:
+## Brings a lost pet back to the bottom-right corner of its screen.
+func recover_pet() -> void:
 	_input_controller.cancel()
 	_gameplay_coordinator.cancel_autonomous_action()
 	_window_service.restore_if_minimized()

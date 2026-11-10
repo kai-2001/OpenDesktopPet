@@ -259,6 +259,12 @@ try {
     if ($fixedWindowCacheExitCode -ne 0 -or -not ($fixedWindowCacheOutput -match 'FIXED_WINDOW_CACHE_TEST_OK')) {
         throw 'Fixed window cache validation failed.'
     }
+    $instanceLinkOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/instance_link_test.gd' 2>&1
+    $instanceLinkExitCode = $LASTEXITCODE
+    $instanceLinkOutput | Write-Output
+    if ($instanceLinkExitCode -ne 0 -or -not ($instanceLinkOutput -match 'INSTANCE_LINK_TEST_OK')) {
+        throw 'Instance link validation failed.'
+    }
     $codexSleepTransitionOutput = & $GodotExe --headless --path $projectRoot --script 'res://tests/codex_sleep_transition_test.gd' 2>&1
     $codexSleepTransitionExitCode = $LASTEXITCODE
     $codexSleepTransitionOutput | Write-Output
@@ -294,6 +300,15 @@ try {
         throw 'Task reminder badge visual validation failed.'
     }
     $ErrorActionPreference = $previousErrorActionPreference
+
+    $ErrorActionPreference = 'Continue'
+    $appShellOutput = & $GodotExe --path $projectRoot --script 'res://tests/app_shell_test.gd' 2>&1
+    $appShellExitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+    $appShellOutput | Write-Output
+    if ($appShellExitCode -ne 0 -or -not ($appShellOutput -match 'APP_SHELL_TEST_OK')) {
+        throw 'App shell validation failed.'
+    }
 
     $ErrorActionPreference = 'Continue'
     $windowOutput = & $GodotExe --path $projectRoot --script 'res://tests/window_integration_test.gd' 2>&1
