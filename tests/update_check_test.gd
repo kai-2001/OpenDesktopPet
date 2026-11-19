@@ -8,11 +8,16 @@ var _settings_path := ""
 
 
 func _init() -> void:
+	call_deferred("_run")
+
+
+func _run() -> void:
 	_settings_path = "user://update-check-test-%d.cfg" % Time.get_ticks_usec()
 	_test_versions()
 	_test_privacy_contract()
 	_test_response_evaluation()
 	_test_coordinator()
+	await _test_schedule_ticks()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(_settings_path))
 	if _failures > 0:
 		printerr("UPDATE_CHECK_TEST_FAILED: %d assertion(s)" % _failures)
@@ -110,6 +115,23 @@ func _test_coordinator() -> void:
 	_assert_true(coordinator._is_scheduled_check_due(), "first automatic check is due")
 	coordinator.last_check_at = int(Time.get_unix_time_from_system()) - 60
 	_assert_true(not coordinator._is_scheduled_check_due(), "automatic checks run at most daily")
+	var now := int(Time.get_unix_time_from_system())
+	coordinator.last_check_at = now - CoordinatorScript.AUTO_CHECK_INTERVAL_SECONDS
+	_assert_true(coordinator._is_scheduled_check_due(), "a pet left open checks again after a day")
+
+	# A check that cannot reach GitHub (no network yet after boot) leaves the
+	# next tick due, so it is retried instead of waiting for a restart.
+	coordinator.last_check_at = 0
+	coordinator.apply_result({"status": ServiceScript.RESULT_FAILED, "version": ""}, true)
+	_assert_true(coordinator.last_check_at == 0, "a failed check is not counted as checked")
+	_assert_true(coordinator._is_scheduled_check_due(), "a failed check is retried on the next tick")
+	coordinator.apply_result({"status": ServiceScript.RESULT_RATE_LIMITED, "version": ""}, true)
+	_assert_true(not coordinator._is_scheduled_check_due(), "a rate limit pauses automatic checks")
+	coordinator._retry_after = now - 1
+	_assert_true(coordinator._is_scheduled_check_due(), "automatic checks resume after the pause")
+	coordinator.apply_result({"status": ServiceScript.RESULT_UP_TO_DATE, "version": ""}, true)
+	_assert_true(not coordinator._is_scheduled_check_due(), "a successful check waits a day")
+	coordinator.last_check_at = now - 60
 
 	var found: Array[String] = []
 	coordinator.update_found.connect(func(version: String) -> void: found.append(version))
@@ -137,6 +159,32 @@ func _test_coordinator() -> void:
 	)
 	coordinator.free()
 	reloaded.free()
+
+
+## The schedule keeps ticking after the first check, and an opted-out pet
+## never sends a request from a tick.
+func _test_schedule_ticks() -> void:
+	var coordinator = CoordinatorScript.new()
+	coordinator.settings_path = _settings_path + ".ticks"
+	root.add_child(coordinator)
+	await process_frame
+	var timer: Timer = coordinator._schedule_timer
+	if timer == null:
+		_assert_true(false, "the coordinator builds its schedule timer")
+		coordinator.free()
+		return
+	_assert_true(
+		timer.wait_time == CoordinatorScript.STARTUP_CHECK_DELAY_SECONDS and not timer.one_shot,
+		"the first tick comes shortly after launch and the timer repeats"
+	)
+	coordinator._run_scheduled_check()
+	_assert_true(
+		timer.wait_time == CoordinatorScript.SCHEDULE_TICK_SECONDS,
+		"later ticks come every %d minutes" % int(CoordinatorScript.SCHEDULE_TICK_SECONDS / 60.0)
+	)
+	_assert_true(coordinator.state == CoordinatorScript.STATE_IDLE, "an opted-out tick sends no request")
+	coordinator.free()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(_settings_path + ".ticks"))
 
 
 func _json(data: Dictionary) -> PackedByteArray:

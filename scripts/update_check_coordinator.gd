@@ -11,6 +11,12 @@ const UI_SETTINGS_PATH := "user://ui_settings.cfg"
 const SETTINGS_SECTION := "update"
 const AUTO_CHECK_INTERVAL_SECONDS := 24 * 60 * 60
 const STARTUP_CHECK_DELAY_SECONDS := 30.0
+## After the first check, how often the schedule asks whether a check is due.
+## A check that could not reach GitHub (no network yet after boot, offline)
+## is therefore retried on the next tick instead of waiting for a restart.
+const SCHEDULE_TICK_SECONDS := 15.0 * 60.0
+## GitHub asked us to slow down; automatic checks wait this long.
+const RATE_LIMIT_RETRY_SECONDS := 60 * 60
 
 const STATE_IDLE := "idle"
 const STATE_CHECKING := "checking"
@@ -28,8 +34,10 @@ var state := STATE_IDLE
 # Tests point this at a throwaway file so they never touch real settings.
 var settings_path := UI_SETTINGS_PATH
 var _request: HTTPRequest
-var _startup_timer: Timer
+var _schedule_timer: Timer
 var _automatic_request := false
+## Unix time before which automatic checks wait, after a rate limit.
+var _retry_after := 0
 
 
 func _ready() -> void:
@@ -42,14 +50,14 @@ func _ready() -> void:
 	_request.timeout = UpdateCheckServiceScript.REQUEST_TIMEOUT_SECONDS
 	add_child(_request)
 	_request.request_completed.connect(_on_request_completed)
-	_startup_timer = Timer.new()
-	_startup_timer.one_shot = true
-	_startup_timer.wait_time = STARTUP_CHECK_DELAY_SECONDS
-	add_child(_startup_timer)
-	_startup_timer.timeout.connect(_run_scheduled_check)
+	_schedule_timer = Timer.new()
+	_schedule_timer.name = "UpdateCheckSchedule"
+	_schedule_timer.wait_time = STARTUP_CHECK_DELAY_SECONDS
+	add_child(_schedule_timer)
+	_schedule_timer.timeout.connect(_run_scheduled_check)
 	# Tests run headless and must never reach the network on their own.
 	if DisplayServer.get_name() != "headless":
-		_startup_timer.start()
+		_schedule_timer.start()
 
 
 func load_settings() -> void:
@@ -139,6 +147,8 @@ func apply_result(evaluation: Dictionary, automatic: bool) -> void:
 	if last_result == UpdateCheckServiceScript.RESULT_AVAILABLE \
 			or last_result == UpdateCheckServiceScript.RESULT_UP_TO_DATE:
 		last_check_at = int(Time.get_unix_time_from_system())
+	if last_result == UpdateCheckServiceScript.RESULT_RATE_LIMITED:
+		_retry_after = int(Time.get_unix_time_from_system()) + RATE_LIMIT_RETRY_SECONDS
 	if last_result == UpdateCheckServiceScript.RESULT_AVAILABLE:
 		latest_version = String(evaluation.get("version", ""))
 	elif last_result == UpdateCheckServiceScript.RESULT_UP_TO_DATE:
@@ -158,10 +168,17 @@ func _is_scheduled_check_due() -> bool:
 	if not auto_check_enabled:
 		return false
 	var now := int(Time.get_unix_time_from_system())
+	if now < _retry_after:
+		return false
 	return last_check_at <= 0 or now - last_check_at >= AUTO_CHECK_INTERVAL_SECONDS
 
 
+## The first tick comes shortly after launch; later ticks keep the pet
+## checking daily while it stays open and retry checks that failed.
 func _run_scheduled_check() -> void:
+	if _schedule_timer.wait_time != SCHEDULE_TICK_SECONDS:
+		_schedule_timer.wait_time = SCHEDULE_TICK_SECONDS
+		_schedule_timer.start()
 	check_now(true)
 
 
