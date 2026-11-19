@@ -46,6 +46,10 @@ if ($Uninstall) {
     if (Test-Path -LiteralPath $installMarker) {
         Remove-Item -LiteralPath $installMarker -Force
     }
+    if ((Test-Path -LiteralPath $pluginsHome -PathType Container) -and
+        @(Get-ChildItem -LiteralPath $pluginsHome -Force).Count -eq 0) {
+        Remove-Item -LiteralPath $pluginsHome -Force
+    }
     Write-Output "Removed OpenCode notification plugin: $pluginPath"
     exit 0
 }

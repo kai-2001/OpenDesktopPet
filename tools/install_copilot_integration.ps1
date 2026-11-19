@@ -67,10 +67,20 @@ if ($Uninstall) {
 			$hookConfig = Get-Content -LiteralPath $hookConfigPath -Raw -Encoding UTF8 |
 				ConvertFrom-Json
 			Remove-OpenDesktopPetStopHook $hookConfig
-			Save-HookConfig $hookConfig
+			# The file is this integration's own; drop it once no hook is left.
+			if ($null -eq $hookConfig.hooks -or
+				@($hookConfig.hooks.PSObject.Properties).Count -eq 0) {
+				Remove-Item -LiteralPath $hookConfigPath -Force
+			} else {
+				Save-HookConfig $hookConfig
+			}
 		} catch {
 			Write-Warning "Could not update existing Copilot hook config; leaving it unchanged."
 		}
+	}
+	if ((Test-Path -LiteralPath $hooksHome -PathType Container) -and
+		@(Get-ChildItem -LiteralPath $hooksHome -Force).Count -eq 0) {
+		Remove-Item -LiteralPath $hooksHome -Force
 	}
     if (Test-Path -LiteralPath $installedScriptPath) {
         Remove-Item -LiteralPath $installedScriptPath -Force

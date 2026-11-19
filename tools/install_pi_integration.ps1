@@ -50,6 +50,10 @@ if ($Uninstall) {
     if (Test-Path -LiteralPath $installMarker -PathType Leaf) {
         Remove-Item -LiteralPath $installMarker -Force
     }
+    if ((Test-Path -LiteralPath $extensionsHome -PathType Container) -and
+        @(Get-ChildItem -LiteralPath $extensionsHome -Force).Count -eq 0) {
+        Remove-Item -LiteralPath $extensionsHome -Force
+    }
     Write-Output "Removed Pi notification extension: $extensionPath"
     exit 0
 }

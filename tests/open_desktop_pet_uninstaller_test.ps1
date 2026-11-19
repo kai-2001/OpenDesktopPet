@@ -87,25 +87,25 @@ try {
     Assert-Uninstaller (Test-Path -LiteralPath (Join-Path $testTemp 'OpenDesktopPet-codex-notify.log')) `
         'Integration-only uninstall removed diagnostic logs.'
 
-    $codexHooks = Get-Content -LiteralPath (Join-Path $testProfile '.codex\hooks.json') -Raw -Encoding UTF8
-    $copilotConfig = Get-Content -LiteralPath (Join-Path $testProfile '.copilot\hooks\open-desktop-pet.json') -Raw -Encoding UTF8
-    $claudeConfig = Get-Content -LiteralPath (Join-Path $testProfile '.claude\settings.json') -Raw -Encoding UTF8
-    $geminiConfig = Get-Content -LiteralPath (Join-Path $testProfile '.gemini\settings.json') -Raw -Encoding UTF8
-    $agyConfig = Get-Content -LiteralPath (Join-Path $testProfile '.gemini\config\hooks.json') -Raw -Encoding UTF8
-    Assert-Uninstaller ($codexHooks -notmatch 'codex_stop_notify\.ps1') `
-        'Integration-only uninstall did not remove the Codex Stop hook.'
-    Assert-Uninstaller ($copilotConfig -notmatch 'vscode_copilot_notify\.ps1') `
-        'Integration-only uninstall did not remove the Copilot hook.'
+    # A config file the pet created is removed once its hook is gone; one
+    # that stays must no longer mention the pet.
+    foreach ($check in @(
+        @('.codex\hooks.json', 'codex_stop_notify\.ps1', 'Codex Stop hook'),
+        @('.copilot\hooks\open-desktop-pet.json', 'vscode_copilot_notify\.ps1', 'Copilot hook'),
+        @('.claude\settings.json', 'claude_code_notify\.ps1', 'Claude Code hook'),
+        @('.gemini\settings.json', 'gemini_cli_notify\.ps1', 'Gemini CLI hook'),
+        @('.gemini\config\hooks.json', 'EncodedCommand|open-desktop-pet', 'Antigravity CLI hook')
+    )) {
+        $configPath = Join-Path $testProfile $check[0]
+        if (Test-Path -LiteralPath $configPath) {
+            Assert-Uninstaller ((Get-Content -LiteralPath $configPath -Raw -Encoding UTF8) -notmatch $check[1]) `
+                "Integration-only uninstall did not remove the $($check[2])."
+        }
+    }
     Assert-Uninstaller (-not (Test-Path -LiteralPath (Join-Path $testProfile '.config\opencode\plugins\open-desktop-pet.js'))) `
         'Integration-only uninstall did not remove the OpenCode plugin.'
     Assert-Uninstaller (-not (Test-Path -LiteralPath (Join-Path $testProfile '.pi\agent\extensions\open-desktop-pet.ts'))) `
         'Integration-only uninstall did not remove the Pi extension.'
-    Assert-Uninstaller ($claudeConfig -notmatch 'claude_code_notify\.ps1') `
-        'Integration-only uninstall did not remove the Claude Code hook.'
-    Assert-Uninstaller ($geminiConfig -notmatch 'gemini_cli_notify\.ps1') `
-        'Integration-only uninstall did not remove the Gemini CLI hook.'
-    Assert-Uninstaller ($agyConfig -notmatch 'EncodedCommand') `
-        'Integration-only uninstall did not remove the Antigravity CLI hook.'
 
     & $uninstallerPath -Mode Complete -SkipAutostart | Out-Null
     if (-not $?) {

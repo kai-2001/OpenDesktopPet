@@ -52,6 +52,8 @@ try {
     Assert-Installer (-not (Test-Path -LiteralPath $markerPath)) `
         'Pi install marker was not removed.'
 
+    Assert-Installer (-not (Test-Path -LiteralPath (Split-Path -Parent $extensionPath))) `
+        'Pi uninstall left its emptied folder behind.'
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $extensionPath) | Out-Null
     Set-Content -LiteralPath $extensionPath -Value '// existing user Pi extension' -Encoding UTF8
     & $installerPath | Out-Null

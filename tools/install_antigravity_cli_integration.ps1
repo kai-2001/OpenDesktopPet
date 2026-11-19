@@ -116,7 +116,9 @@ function Remove-OpenDesktopPetHooks($settings) {
                 -Value $remaining -Force
         }
     }
-    if ($hookDefinition.PSObject.Properties.Count -eq 0) {
+    # PSObject.Properties has no Count in Windows PowerShell 5.1, so an
+    # emptied entry used to stay behind; count it as an array instead.
+    if (@($hookDefinition.PSObject.Properties).Count -eq 0) {
         $settings.PSObject.Properties.Remove($hookName)
     }
 }
@@ -131,9 +133,25 @@ function New-AntigravityHookEntry([string]$command) {
 
 if ($Uninstall) {
     if (Test-Path -LiteralPath $hooksPath) {
-        $settings = Get-Settings
-        Remove-OpenDesktopPetHooks $settings
-        Save-Settings $settings
+        # Read the file directly: an unreadable file is left exactly as it is.
+        $settings = $null
+        try {
+            $settings = Get-Content -LiteralPath $hooksPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        } catch {
+            Write-Warning "Could not read the Antigravity CLI hooks; leaving them unchanged: $hooksPath"
+        }
+        if ($null -ne $settings -and $null -ne $settings.PSObject.Properties[$hookName]) {
+            Remove-OpenDesktopPetHooks $settings
+            if (@($settings.PSObject.Properties).Count -eq 0) {
+                Remove-Item -LiteralPath $hooksPath -Force
+            } else {
+                Save-Settings $settings
+            }
+        }
+    }
+    if ((Test-Path -LiteralPath $antigravityConfigHome -PathType Container) -and
+        @(Get-ChildItem -LiteralPath $antigravityConfigHome -Force).Count -eq 0) {
+        Remove-Item -LiteralPath $antigravityConfigHome -Force
     }
     if (Test-Path -LiteralPath $installedBridgePath) {
         Remove-Item -LiteralPath $installedBridgePath -Force

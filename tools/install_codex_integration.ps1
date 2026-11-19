@@ -296,12 +296,29 @@ New-Item -ItemType Directory -Force -Path $integrationHome | Out-Null
 
 if ($Uninstall) {
 	if (Test-Path -LiteralPath $hookConfigPath) {
+		# Read the file directly: an unreadable file is left exactly as it is.
+		$settings = $null
 		try {
-			$hookConfig = Get-HookConfig
-			Remove-OpenDesktopPetHooks $hookConfig
-			Save-HookConfig $hookConfig
+			$settings = Get-Content -LiteralPath $hookConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
 		} catch {
-			Write-Warning 'Could not update existing Codex hook config; leaving it unchanged.'
+			Write-Warning "Could not read the Codex hook config; leaving it unchanged: $hookConfigPath"
+		}
+		if ($null -ne $settings -and $null -ne $settings.PSObject.Properties['hooks'] -and
+			$null -ne $settings.hooks) {
+			$before = $settings | ConvertTo-Json -Depth 20 -Compress
+			Remove-OpenDesktopPetHooks $settings
+			# Only a file this integration changed is written back. The emptied
+			# "hooks" object, and a file left with nothing at all, are removed.
+			if (($settings | ConvertTo-Json -Depth 20 -Compress) -ne $before) {
+				if (@($settings.hooks.PSObject.Properties).Count -eq 0) {
+					$settings.PSObject.Properties.Remove('hooks')
+				}
+				if (@($settings.PSObject.Properties).Count -eq 0) {
+					Remove-Item -LiteralPath $hookConfigPath -Force
+				} else {
+					Save-HookConfig $settings
+				}
+			}
 		}
 	}
 	Remove-LegacyNotifyIntegration

@@ -60,6 +60,9 @@ try {
     Assert-Installer (-not (Test-Path -LiteralPath $pluginPath)) 'OpenCode plugin was not removed.'
     Assert-Installer (-not (Test-Path -LiteralPath $markerPath)) 'OpenCode marker was not removed.'
 
+    Assert-Installer (-not (Test-Path -LiteralPath (Split-Path -Parent $pluginPath))) `
+        'OpenCode uninstall left its emptied folder behind.'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pluginPath) | Out-Null
     Set-Content -LiteralPath $pluginPath -Value '// existing user plugin' -Encoding UTF8
     & $installerPath | Out-Null
     $backupFiles = @(Get-ChildItem -LiteralPath (Split-Path -Parent $pluginPath) `

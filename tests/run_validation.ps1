@@ -69,6 +69,10 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
 	throw 'OpenDesktopPet uninstaller checks failed.'
 }
+& (Join-Path $PSScriptRoot 'open_desktop_pet_uninstaller_cleanup_test.ps1')
+if ($LASTEXITCODE -ne 0) {
+	throw 'OpenDesktopPet uninstaller cleanup checks failed.'
+}
 $isolatedAppData = Join-Path $env:TEMP (
     'OpenDesktopPet-Automated-Validation-' + [guid]::NewGuid().ToString('N')
 )

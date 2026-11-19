@@ -106,9 +106,30 @@ function New-GeminiHookEntry([string]$command, [string]$matcher = '') {
 
 if ($Uninstall) {
     if (Test-Path -LiteralPath $settingsPath) {
-        $settings = Get-Settings
-        Remove-OpenDesktopPetHooks $settings
-        Save-Settings $settings
+        # Read the file directly: an unreadable file is left exactly as it is.
+        $settings = $null
+        try {
+            $settings = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        } catch {
+            Write-Warning "Could not read Gemini CLI settings; leaving it unchanged: $settingsPath"
+        }
+        if ($null -ne $settings -and $null -ne $settings.PSObject.Properties['hooks'] -and
+            $null -ne $settings.hooks) {
+            $before = $settings | ConvertTo-Json -Depth 20 -Compress
+            Remove-OpenDesktopPetHooks $settings
+            # Only a file this integration changed is written back. The emptied
+            # "hooks" object, and a file left with nothing at all, are removed.
+            if (($settings | ConvertTo-Json -Depth 20 -Compress) -ne $before) {
+                if (@($settings.hooks.PSObject.Properties).Count -eq 0) {
+                    $settings.PSObject.Properties.Remove('hooks')
+                }
+                if (@($settings.PSObject.Properties).Count -eq 0) {
+                    Remove-Item -LiteralPath $settingsPath -Force
+                } else {
+                    Save-Settings $settings
+                }
+            }
+        }
     }
     if (Test-Path -LiteralPath $installedBridgePath) {
         Remove-Item -LiteralPath $installedBridgePath -Force

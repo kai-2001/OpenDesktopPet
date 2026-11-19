@@ -193,12 +193,30 @@ function Remove-OpenDesktopPetAutostart {
     }
 }
 
+## Godot's shader cache nests past the 260-character path limit of Windows
+## PowerShell 5.1 for longer user names, so delete through the
+## extended-length form of the path.
+function Remove-DirectoryTree([string]$path) {
+    $fullPath = [IO.Path]::GetFullPath($path)
+    $extendedPath = if ($fullPath.StartsWith('\\')) {
+        '\\?\UNC\' + $fullPath.Substring(2)
+    } else {
+        '\\?\' + $fullPath
+    }
+    [IO.Directory]::Delete($extendedPath, $true)
+}
+
 function Remove-OpenDesktopPetUserData([string]$userProfilePath) {
     $userDataPath = Get-OpenDesktopPetUserDataPath $userProfilePath
     if (Test-Path -LiteralPath $userDataPath -PathType Container) {
-        Remove-Item -LiteralPath $userDataPath -Recurse -Force
+        Remove-DirectoryTree $userDataPath
         Write-Output "Removed Open Desktop Pet settings, saves, and character packs: $userDataPath"
     }
+    # Godot creates these shared parents; remove them only when nothing else
+    # (such as another Godot app) uses them.
+    $appUserDataPath = Split-Path -Parent $userDataPath
+    Remove-DirectoryWhenEmpty $appUserDataPath
+    Remove-DirectoryWhenEmpty (Split-Path -Parent $appUserDataPath)
 }
 
 function Remove-OpenDesktopPetDiagnosticLogs {
@@ -219,14 +237,28 @@ if ([string]::IsNullOrWhiteSpace($selectedMode)) {
     exit 0
 }
 
+## A failed step is reported at the end instead of stopping the uninstall,
+## so one locked or unreadable file never leaves the remaining steps undone.
+function Invoke-UninstallStep([string]$description, [scriptblock]$step) {
+    try {
+        & $step
+    } catch {
+        $script:failures.Add("Could not remove ${description}: $($_.Exception.Message)")
+    }
+}
+
 $userProfilePath = Get-UserProfilePath
 Invoke-IntegrationUninstallers
-Remove-OpenDesktopPetRuntimeFiles $userProfilePath ($selectedMode -eq 'Complete')
-Remove-OpenDesktopPetAutostart
+Invoke-UninstallStep 'Open Desktop Pet runtime files' {
+    Remove-OpenDesktopPetRuntimeFiles $userProfilePath ($selectedMode -eq 'Complete')
+}
+Invoke-UninstallStep 'the autostart entry' { Remove-OpenDesktopPetAutostart }
 
 if ($selectedMode -eq 'Complete') {
-    Remove-OpenDesktopPetUserData $userProfilePath
-    Remove-OpenDesktopPetDiagnosticLogs
+    Invoke-UninstallStep 'settings, saves and character packs' {
+        Remove-OpenDesktopPetUserData $userProfilePath
+    }
+    Invoke-UninstallStep 'diagnostic logs' { Remove-OpenDesktopPetDiagnosticLogs }
 }
 
 if ($script:failures.Count -gt 0) {
